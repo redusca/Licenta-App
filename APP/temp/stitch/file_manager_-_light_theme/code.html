@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html class="" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>File Manager - Light Theme</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-white h-screen flex overflow-hidden">
+<!-- Left Sidebar -->
+<aside class="w-64 flex-shrink-0 bg-white dark:bg-[#111a22] border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between h-full z-10 transition-colors duration-300">
+<!-- User Profile & Title -->
+<div class="p-6">
+<div class="flex items-center gap-3 mb-8">
+<div class="bg-center bg-no-repeat bg-cover rounded-full h-10 w-10 shadow-sm" data-alt="User profile picture with a gradient background" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCgxE5_7XxIq15xtB-zVtpmWCVmMbamL9y6qAMUV3yI4sq_dKjWO3DuKTmE5ofk4qtFt4HRF1iW-q9K8N0IxTKUgGJ2rt_2PJUosBPzXdnJbc5_v0lhVWbdJ5XEU3hkKJ7xSnkbROT9fMWUJDgoplKFkmdiujpVmXlve1HlBVlp52DxEekenWJ2rR_c_1ZsJmymf9gH8lbEyGhmxofPhmXy-bI7JaA5RA1Jo6lmVYnYuVSPAPA3BUJ6GEUu6d0wzWfl_IicnyN8P5U");'></div>
+<div class="flex flex-col">
+<h1 class="text-base font-bold leading-tight text-slate-900 dark:text-white">My Drive</h1>
+<p class="text-slate-500 dark:text-[#92adc9] text-xs font-medium">Pro Plan</p>
+</div>
+</div>
+<!-- Main Navigation -->
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary/10 text-primary dark:bg-primary/20" href="#">
+<span class="material-symbols-outlined text-[20px]">folder_open</span>
+<span class="text-sm font-medium">Files</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">build</span>
+<span class="text-sm font-medium">Tools</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">smart_toy</span>
+<span class="text-sm font-medium">Agent</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">extension</span>
+<span class="text-sm font-medium">Extensions</span>
+</a>
+</nav>
+</div>
+<!-- Bottom Navigation -->
+<div class="p-6 border-t border-slate-100 dark:border-slate-800">
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">account_circle</span>
+<span class="text-sm font-medium">Account</span>
+</a>
+</nav>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col h-full overflow-hidden relative">
+<!-- Top Toolbar & Breadcrumbs -->
+<header class="bg-white dark:bg-[#111a22] border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
+<div class="px-6 py-4 flex items-center justify-between">
+<!-- Breadcrumbs -->
+<div class="flex items-center gap-2 text-sm">
+<a class="text-slate-500 hover:text-primary dark:text-[#92adc9] transition-colors" href="#">Home</a>
+<span class="material-symbols-outlined text-slate-400 text-[16px]">chevron_right</span>
+<a class="text-slate-500 hover:text-primary dark:text-[#92adc9] transition-colors" href="#">Documents</a>
+<span class="material-symbols-outlined text-slate-400 text-[16px]">chevron_right</span>
+<span class="font-semibold text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">Projects</span>
+</div>
+<!-- Actions -->
+<div class="flex items-center gap-3">
+<div class="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+<button class="p-1.5 rounded-md text-slate-500 hover:text-slate-900 hover:bg-white dark:text-slate-400 dark:hover:bg-[#1f2b38] dark:hover:text-white transition-all shadow-sm">
+<span class="material-symbols-outlined text-[20px]">view_list</span>
+</button>
+<button class="p-1.5 rounded-md bg-white text-primary shadow-sm dark:bg-[#1f2b38] dark:text-white">
+<span class="material-symbols-outlined text-[20px]">grid_view</span>
+</button>
+</div>
+<div class="h-6 w-px bg-slate-200 dark:bg-slate-700 mx-1"></div>
+<button class="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[22px]">sort</span>
+</button>
+<button class="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
+<span class="material-symbols-outlined text-[22px]">filter_list</span>
+</button>
+<button class="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white text-sm font-semibold py-2 px-4 rounded-lg shadow-sm shadow-primary/20 transition-all">
+<span class="material-symbols-outlined text-[20px]">add</span>
+<span>New Folder</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Content Split View -->
+<div class="flex flex-1 overflow-hidden">
+<!-- Inner Sidebar (File Tree) -->
+<div class="w-64 bg-background-light dark:bg-[#111a22] border-r border-slate-200 dark:border-slate-800 flex flex-col overflow-y-auto p-4 gap-2">
+<h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Locations</h3>
+<!-- Radio List Items as Nav Links -->
+<label class="group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white hover:shadow-sm dark:hover:bg-[#1f2b38] transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<input checked="" class="hidden peer" name="location" type="radio"/>
+<div class="w-1 h-8 bg-primary rounded-full opacity-0 peer-checked:opacity-100 absolute left-0 ml-1 transition-opacity"></div>
+<span class="material-symbols-outlined text-slate-400 peer-checked:text-primary dark:text-slate-500">computer</span>
+<div class="flex flex-col">
+<span class="text-sm font-medium text-slate-700 peer-checked:text-slate-900 dark:text-slate-300 dark:peer-checked:text-white">My Computer</span>
+<span class="text-xs text-slate-400">Local Drive</span>
+</div>
+</label>
+<label class="group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white hover:shadow-sm dark:hover:bg-[#1f2b38] transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<input class="hidden peer" name="location" type="radio"/>
+<div class="w-1 h-8 bg-primary rounded-full opacity-0 peer-checked:opacity-100 absolute left-0 ml-1 transition-opacity"></div>
+<span class="material-symbols-outlined text-slate-400 peer-checked:text-primary dark:text-slate-500">description</span>
+<div class="flex flex-col">
+<span class="text-sm font-medium text-slate-700 peer-checked:text-slate-900 dark:text-slate-300 dark:peer-checked:text-white">Documents</span>
+<span class="text-xs text-slate-400">25 items</span>
+</div>
+</label>
+<label class="group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white hover:shadow-sm dark:hover:bg-[#1f2b38] transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<input class="hidden peer" name="location" type="radio"/>
+<div class="w-1 h-8 bg-primary rounded-full opacity-0 peer-checked:opacity-100 absolute left-0 ml-1 transition-opacity"></div>
+<span class="material-symbols-outlined text-slate-400 peer-checked:text-primary dark:text-slate-500">download</span>
+<div class="flex flex-col">
+<span class="text-sm font-medium text-slate-700 peer-checked:text-slate-900 dark:text-slate-300 dark:peer-checked:text-white">Downloads</span>
+<span class="text-xs text-slate-400">12 items</span>
+</div>
+</label>
+<label class="group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white hover:shadow-sm dark:hover:bg-[#1f2b38] transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<input class="hidden peer" name="location" type="radio"/>
+<div class="w-1 h-8 bg-primary rounded-full opacity-0 peer-checked:opacity-100 absolute left-0 ml-1 transition-opacity"></div>
+<span class="material-symbols-outlined text-slate-400 peer-checked:text-primary dark:text-slate-500">image</span>
+<div class="flex flex-col">
+<span class="text-sm font-medium text-slate-700 peer-checked:text-slate-900 dark:text-slate-300 dark:peer-checked:text-white">Pictures</span>
+<span class="text-xs text-slate-400">45 items</span>
+</div>
+</label>
+<label class="group flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-white hover:shadow-sm dark:hover:bg-[#1f2b38] transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+<input class="hidden peer" name="location" type="radio"/>
+<div class="w-1 h-8 bg-primary rounded-full opacity-0 peer-checked:opacity-100 absolute left-0 ml-1 transition-opacity"></div>
+<span class="material-symbols-outlined text-slate-400 peer-checked:text-primary dark:text-slate-500">music_note</span>
+<div class="flex flex-col">
+<span class="text-sm font-medium text-slate-700 peer-checked:text-slate-900 dark:text-slate-300 dark:peer-checked:text-white">Music</span>
+<span class="text-xs text-slate-400">200 items</span>
+</div>
+</label>
+<div class="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+<h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-2">Recent</h3>
+<div class="px-2 py-1 text-sm text-slate-600 dark:text-slate-400 hover:text-primary cursor-pointer">Project Alpha Specs</div>
+<div class="px-2 py-1 text-sm text-slate-600 dark:text-slate-400 hover:text-primary cursor-pointer">Q4 Financials</div>
+<div class="px-2 py-1 text-sm text-slate-600 dark:text-slate-400 hover:text-primary cursor-pointer">Marketing Assets</div>
+</div>
+</div>
+<!-- Grid View (Main) -->
+<div class="flex-1 overflow-y-auto bg-white dark:bg-[#101922] p-6">
+<div class="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-6">
+<!-- Folder Item -->
+<div class="group flex flex-col gap-2 p-3 rounded-xl hover:bg-background-light dark:hover:bg-[#1f2b38] transition-colors cursor-pointer">
+<div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700">
+<div class="absolute inset-0 bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-blue-400 dark:text-blue-300 text-6xl">folder</span>
+</div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-primary truncate max-w-[120px]">Project Alpha</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">14 items</p>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Folder Item -->
+<div class="group flex flex-col gap-2 p-3 rounded-xl hover:bg-background-light dark:hover:bg-[#1f2b38] transition-colors cursor-pointer">
+<div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700">
+<div class="absolute inset-0 bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-emerald-400 dark:text-emerald-300 text-6xl">folder</span>
+</div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-primary truncate max-w-[120px]">Financials</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">8 items</p>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- File Item (Image) -->
+<div class="group flex flex-col gap-2 p-3 rounded-xl hover:bg-background-light dark:hover:bg-[#1f2b38] transition-colors cursor-pointer">
+<div class="w-full aspect-[4/3] bg-center bg-no-repeat bg-cover rounded-lg border border-slate-100 dark:border-slate-700" data-alt="Abstract blue wavy pattern representing a logo file preview" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCzTr0nWflDPqu19tvy4MGg37Fpeg7jlGEQC3PddkqRsMJMGwz69wqU6TH42dvoKZ2kXwNoQrDSJyOa8PXogjqqIMKn2SDASllyNMRTDhrRkLwJNcuh_TBtwkH_X_kR1f6UDJQCuSuGlxcGA1WEkcYHT6LAXFL-2P6y8AAKMbz4ln4foT9pI_KE-eY-7ZlkBLyPo2rGM3K7RSyMm_OG6v5XvtJ9fPdxzDcbefQhoA_iVcZo9b71H3N1d8sD0W2lkzL9tav3ddXRb48");'></div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-primary truncate max-w-[120px]">Logo.png</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">2.4 MB</p>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- File Item (Document) -->
+<div class="group flex flex-col gap-2 p-3 rounded-xl hover:bg-background-light dark:hover:bg-[#1f2b38] transition-colors cursor-pointer">
+<div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+<div class="absolute inset-0 flex flex-col items-center justify-center gap-1">
+<span class="material-symbols-outlined text-slate-400 dark:text-slate-500 text-5xl">description</span>
+<span class="text-[10px] font-mono text-slate-400 uppercase">DOCX</span>
+</div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-primary truncate max-w-[120px]">Meeting Notes</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">124 KB</p>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- File Item (Spreadsheet) -->
+<div class="group flex flex-col gap-2 p-3 rounded-xl hover:bg-background-light dark:hover:bg-[#1f2b38] transition-colors cursor-pointer">
+<div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+<div class="absolute inset-0 flex flex-col items-center justify-center gap-1">
+<span class="material-symbols-outlined text-green-500 dark:text-green-400 text-5xl">table_view</span>
+<span class="text-[10px] font-mono text-slate-400 uppercase">XLSX</span>
+</div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-primary truncate max-w-[120px]">Budget_2024</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">45 KB</p>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- File Item (Image) -->
+<div class="group flex flex-col gap-2 p-3 rounded-xl hover:bg-background-light dark:hover:bg-[#1f2b38] transition-colors cursor-pointer">
+<div class="w-full aspect-[4/3] bg-center bg-no-repeat bg-cover rounded-lg border border-slate-100 dark:border-slate-700" data-alt="Portrait photo of a person for a profile picture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB4lF2h2c1aoZP5aB8tVCdXbjCRRr3eD0g9vdkhcqCgRT9yEGyKrK_p9kXEiPpRYNpqAuKa3crgc_eRnwShb0Nickyu_RcCjFjpV78O6DjsC7oew2PObARNtYAEiIE4FD9sgz4KlvROc2TLDyaTpO1iHk7P7_hvVHoxK3zOlC8Hby0yf3S0QuPGJZRlfQJ0JG-sDOqbji2O3fccXFXGGKrkkG1-SzpRl-2cnCOw-xxm6QI8wfnBDUpSGHdyEjqVKwTgH4zx87eQgOw");'></div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-primary truncate max-w-[120px]">Profile.jpg</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">1.2 MB</p>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- Folder Item -->
+<div class="group flex flex-col gap-2 p-3 rounded-xl hover:bg-background-light dark:hover:bg-[#1f2b38] transition-colors cursor-pointer">
+<div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700">
+<div class="absolute inset-0 bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-purple-400 dark:text-purple-300 text-6xl">folder_zip</span>
+</div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-primary truncate max-w-[120px]">Design Specs</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">Compressed</p>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+<!-- File Item (Presentation) -->
+<div class="group flex flex-col gap-2 p-3 rounded-xl hover:bg-background-light dark:hover:bg-[#1f2b38] transition-colors cursor-pointer">
+<div class="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800">
+<div class="absolute inset-0 flex flex-col items-center justify-center gap-1">
+<span class="material-symbols-outlined text-orange-400 dark:text-orange-400 text-5xl">pie_chart</span>
+<span class="text-[10px] font-mono text-slate-400 uppercase">PPTX</span>
+</div>
+</div>
+<div class="flex justify-between items-start">
+<div>
+<p class="text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-primary truncate max-w-[120px]">Q4 Report</p>
+<p class="text-xs text-slate-400 dark:text-slate-500">5.6 MB</p>
+</div>
+<button class="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-opacity">
+<span class="material-symbols-outlined text-[20px]">more_vert</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

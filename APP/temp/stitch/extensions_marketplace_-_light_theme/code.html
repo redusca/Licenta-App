@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Extensions Marketplace</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#137fec",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#111a22] dark:text-white h-screen w-full flex overflow-hidden">
+<!-- Sidebar -->
+<aside class="w-[280px] bg-white dark:bg-[#111a22] flex flex-col justify-between h-full border-r border-gray-200 dark:border-gray-800 shrink-0">
+<div class="flex flex-col gap-4 p-4">
+<!-- User Profile / App Header -->
+<div class="flex gap-3 items-center mb-4">
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-10 bg-gray-200 dark:bg-gray-700" data-alt="User avatar or application logo showing a generic abstract shape" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuAZ0tT9T6QbdYZk5HY_iPRggKcmB8_TUM4sMBf5C1_4DWhuhbxWLR043HgGEHLybAzcL_6r0ztqUbk00Y89R68idBxxtngha1wddqesoGL4aYMTrlURxE7wbx6CEzfGFYzn662YV5IcbGMbb_6SwBt4YEbYdldR_LZ3Y9UK75UMD_91ooav6pS-LjNg1wXBaCDJVKuJLgIR9ycDio4sKueNA8r_f3tquc0lfHF6Er1BvKfPKmqrK4vHTiauvvoS8xb__tHgysZmzGI");'></div>
+<div class="flex flex-col">
+<h1 class="text-[#111a22] dark:text-white text-base font-bold leading-normal">File Explorer</h1>
+<p class="text-[#64748b] dark:text-[#92adc9] text-xs font-normal leading-normal">v2.4.0</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2a36] group transition-colors" href="#">
+<span class="material-symbols-outlined text-[#64748b] dark:text-gray-400 group-hover:text-primary transition-colors">folder_open</span>
+<p class="text-[#111a22] dark:text-white text-sm font-medium leading-normal">My Files</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2a36] group transition-colors" href="#">
+<span class="material-symbols-outlined text-[#64748b] dark:text-gray-400 group-hover:text-primary transition-colors">schedule</span>
+<p class="text-[#111a22] dark:text-white text-sm font-medium leading-normal">Recent</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2a36] group transition-colors" href="#">
+<span class="material-symbols-outlined text-[#64748b] dark:text-gray-400 group-hover:text-primary transition-colors">group</span>
+<p class="text-[#111a22] dark:text-white text-sm font-medium leading-normal">Shared</p>
+</a>
+<!-- Active Item -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 dark:bg-[#233648]" href="#">
+<span class="material-symbols-outlined text-primary dark:text-white">storefront</span>
+<p class="text-primary dark:text-white text-sm font-bold leading-normal">Marketplace</p>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#1e2a36] group transition-colors" href="#">
+<span class="material-symbols-outlined text-[#64748b] dark:text-gray-400 group-hover:text-primary transition-colors">settings</span>
+<p class="text-[#111a22] dark:text-white text-sm font-medium leading-normal">Settings</p>
+</a>
+</nav>
+</div>
+<!-- Storage Info (Optional enhancement for sidebar context) -->
+<div class="p-4 border-t border-gray-200 dark:border-gray-800">
+<div class="flex items-center justify-between text-sm mb-2">
+<span class="text-[#64748b] dark:text-[#92adc9]">Storage</span>
+<span class="text-[#111a22] dark:text-white font-medium">75%</span>
+</div>
+<div class="h-1.5 w-full bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+<div class="h-full bg-primary w-3/4 rounded-full"></div>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col h-full overflow-y-auto">
+<div class="max-w-[1200px] w-full mx-auto px-6 py-8 flex flex-col gap-8">
+<!-- Header Section -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+<div>
+<h1 class="text-[#111a22] dark:text-white text-3xl font-bold tracking-tight mb-2">Extensions Marketplace</h1>
+<p class="text-[#64748b] dark:text-[#92adc9] text-base">Supercharge your file manager with powerful tools.</p>
+</div>
+<button class="flex items-center justify-center gap-2 h-10 px-5 bg-primary hover:bg-blue-600 text-white text-sm font-bold rounded-lg transition-all shadow-sm hover:shadow-md">
+<span class="material-symbols-outlined text-[20px]">upload</span>
+<span>Publish Extension</span>
+</button>
+</div>
+<!-- Categories / Filter (Enhancement for Marketplace feel) -->
+<div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
+<button class="px-4 py-1.5 bg-[#111a22] dark:bg-white text-white dark:text-[#111a22] rounded-full text-sm font-medium whitespace-nowrap">All</button>
+<button class="px-4 py-1.5 bg-white dark:bg-[#1e2a36] border border-gray-200 dark:border-gray-700 text-[#64748b] dark:text-gray-300 rounded-full text-sm font-medium hover:bg-gray-50 dark:hover:bg-[#2a3b4d] whitespace-nowrap transition-colors">Productivity</button>
+<button class="px-4 py-1.5 bg-white dark:bg-[#1e2a36] border border-gray-200 dark:border-gray-700 text-[#64748b] dark:text-gray-300 rounded-full text-sm font-medium hover:bg-gray-50 dark:hover:bg-[#2a3b4d] whitespace-nowrap transition-colors">Developer Tools</button>
+<button class="px-4 py-1.5 bg-white dark:bg-[#1e2a36] border border-gray-200 dark:border-gray-700 text-[#64748b] dark:text-gray-300 rounded-full text-sm font-medium hover:bg-gray-50 dark:hover:bg-[#2a3b4d] whitespace-nowrap transition-colors">Design</button>
+<button class="px-4 py-1.5 bg-white dark:bg-[#1e2a36] border border-gray-200 dark:border-gray-700 text-[#64748b] dark:text-gray-300 rounded-full text-sm font-medium hover:bg-gray-50 dark:hover:bg-[#2a3b4d] whitespace-nowrap transition-colors">Utilities</button>
+</div>
+<!-- Extensions Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+<!-- Card 1 -->
+<div class="group bg-white dark:bg-[#1e293b] p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
+<div class="flex items-start justify-between">
+<div class="size-14 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center">
+<!-- Icon Image -->
+<div class="w-8 h-8 bg-center bg-no-repeat bg-contain" data-alt="Red PDF icon logo" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBGm9ieasq7fDv5qrpm_ZAV98MXZxKN0nqrYuHYnyGJqyhvO0KBfPbjGuDUgZM8gAYlRufVMgpfTblXiZ69_P4E-WRrS4pgkvw2C48nYRAS7cSTSD97PUzmRGa_yW6wJRY3Vy8fH0dSAmdV6BMEm3805axGsKLDjrzRSEQShgeaVmVt6icAEfrxcHgFm6Qh7E_HKVcfLc33tALxFs2GTiT1Di36z6ira6isHIlf1EL6QrvxGtnhWjj_ILwdxYBBnW8V92Mgqps8tjk");'></div>
+</div>
+<div class="px-2 py-1 rounded bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-xs font-semibold">Free</div>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111a22] dark:text-white font-bold text-lg">PDF Compressor</h3>
+<p class="text-[#64748b] dark:text-[#92adc9] text-sm leading-relaxed">Reduce PDF file size significantly without losing visible quality. Perfect for email attachments.</p>
+</div>
+<div class="mt-auto pt-2 flex items-center gap-3">
+<button class="flex-1 h-9 bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 text-primary dark:text-blue-300 text-sm font-bold rounded-lg transition-colors">Install</button>
+<button class="size-9 flex items-center justify-center text-[#64748b] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="group bg-white dark:bg-[#1e293b] p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
+<div class="flex items-start justify-between">
+<div class="size-14 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center">
+<div class="w-8 h-8 bg-center bg-no-repeat bg-contain" data-alt="Code brackets icon logo in purple" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuC5v3mnvOhUIMBe7X3qUNn7MYiUmykk_CLBs9jAD0kJItzn7HmRFCpOGeutckEJdqcu-__9W3qbNeFnR4WXhhhwRDZ6nLCNehgf6-xXfotV7YJ-QNqTieVD1oyZ-H_-aRtCw-Rg5mHzVx1P_haH_Vx5qkfXbr3DT-VQbu88pTQn9OlY3QqjYyFmcb-y4Nf_7ydOWlGFLHvHDU26lYMQlFfVqzMu9Uh4lbv1W-_RjYHzXkKrBBBRt58zg5gGTIfmYGkQy0nl4rhW8ZU");'></div>
+</div>
+<div class="flex items-center gap-1 text-amber-500 text-xs font-medium">
+<span class="material-symbols-outlined text-[14px] fill-current">star</span>
+<span>4.9</span>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111a22] dark:text-white font-bold text-lg">Code Highlighter</h3>
+<p class="text-[#64748b] dark:text-[#92adc9] text-sm leading-relaxed">Advanced syntax highlighting for over 50 programming languages directly in preview.</p>
+</div>
+<div class="mt-auto pt-2 flex items-center gap-3">
+<button class="flex-1 h-9 bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 text-primary dark:text-blue-300 text-sm font-bold rounded-lg transition-colors">Install</button>
+<button class="size-9 flex items-center justify-center text-[#64748b] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="group bg-white dark:bg-[#1e293b] p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
+<div class="flex items-start justify-between">
+<div class="size-14 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+<div class="w-8 h-8 bg-center bg-no-repeat bg-contain" data-alt="Cloud icon logo in blue" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBM4f87txXG6feDbVbJJB5ukVpxXTEYTD2uqLxUZ1_Y6TZLsBWzTU7yk_C1qTFgCRGOzRcOc858PqN77OjYCuRuMs0sRGxYoKr8kyKHGqF3aDnajSIJAE7KzyDZkPE9vfG2qP3KezYTnCD9sqgukrN-jDwMZahL3_SqNnAf2k8FSpN1iHVGFK-YJ3g6q9UeuNoND87vrgP8iHYYfIPEC3fuFA_m5bvjYqPso7Sagj16TsELcWcHevab9jtxM9bSrLbm6Ed4FwcVm_4");'></div>
+</div>
+<div class="px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-semibold">Pro</div>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111a22] dark:text-white font-bold text-lg">Cloud Sync</h3>
+<p class="text-[#64748b] dark:text-[#92adc9] text-sm leading-relaxed">Automatically sync your local folders with Google Drive, Dropbox, and OneDrive.</p>
+</div>
+<div class="mt-auto pt-2 flex items-center gap-3">
+<button class="flex-1 h-9 bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 text-primary dark:text-blue-300 text-sm font-bold rounded-lg transition-colors">Install</button>
+<button class="size-9 flex items-center justify-center text-[#64748b] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="group bg-white dark:bg-[#1e293b] p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
+<div class="flex items-start justify-between">
+<div class="size-14 rounded-xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center">
+<div class="w-8 h-8 bg-center bg-no-repeat bg-contain" data-alt="Zip file icon logo in orange" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDjQX_37fAzMJWlhhFur1fHp1nhpKJWUQaZxuK2DzQLH1FvwJcdI4WaekiFg5strCbdbGizJWIQn39z1KC3xVcBTg1cMF7L1VAhtvwU7WOeFNtBYvcmSE9h7ca3oFCGY2ZUdMbbL-aAX2InBaldzV9KGsfzgkAdOjkH6cmXSqzH55r3K6mgwRVtRrw7UFBp3RjSifNptf1sIhvv36Dl3TohvmAbHbnoxns0qQYkiodNlNFTNOdXA9p2GOnYjkncCr0B4ow5y83jsiM");'></div>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111a22] dark:text-white font-bold text-lg">Unarchiver Plus</h3>
+<p class="text-[#64748b] dark:text-[#92adc9] text-sm leading-relaxed">Extract RAR, 7z, and TAR files instantly with a single click in the file browser.</p>
+</div>
+<div class="mt-auto pt-2 flex items-center gap-3">
+<button class="flex-1 h-9 bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 text-primary dark:text-blue-300 text-sm font-bold rounded-lg transition-colors">Install</button>
+<button class="size-9 flex items-center justify-center text-[#64748b] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="group bg-white dark:bg-[#1e293b] p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
+<div class="flex items-start justify-between">
+<div class="size-14 rounded-xl bg-teal-50 dark:bg-teal-900/20 flex items-center justify-center">
+<div class="w-8 h-8 bg-center bg-no-repeat bg-contain" data-alt="Shield icon logo in teal" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCxNce_Vo97OZN0WXfE2t2KfiR9gS9pWtdWOxR9ax43Ebjsg7xzkv-paJ4vUJZpOC6l4QqKmoYcbiKD8MOvVojo10Pj69xVY8jbhWviomS1nR40ooeVC70W9cCICcw4K-uaZi5km2fC5MH0hbgrB7qzCFUT06BbJKAc-fNnlmVeY-KFsGoh7xOBy8k6LE4sJNyOCQD30uen8MR3p0kS0_zmFaqaK5aCd0xHenSdXfFkDYBRCYfvug1Nsocr6xmzGkra763uTfjHHhY");'></div>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111a22] dark:text-white font-bold text-lg">File Encryptor</h3>
+<p class="text-[#64748b] dark:text-[#92adc9] text-sm leading-relaxed">Secure your sensitive documents with AES-256 encryption before sharing.</p>
+</div>
+<div class="mt-auto pt-2 flex items-center gap-3">
+<button class="flex-1 h-9 bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 text-primary dark:text-blue-300 text-sm font-bold rounded-lg transition-colors">Install</button>
+<button class="size-9 flex items-center justify-center text-[#64748b] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</div>
+<!-- Card 6 -->
+<div class="group bg-white dark:bg-[#1e293b] p-5 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
+<div class="flex items-start justify-between">
+<div class="size-14 rounded-xl bg-pink-50 dark:bg-pink-900/20 flex items-center justify-center">
+<div class="w-8 h-8 bg-center bg-no-repeat bg-contain" data-alt="Palette icon logo in pink" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBHaxzHw8eUL0Cw9PkAyf7qc07l-odVybkIuMFYI8G1H-CqmpQUxoRFDkr4LuNkM03lxgdHzGx4toaIdJlL7jBpeSxW3t9CHOzXbeIFjIJNb3u2OOiSwGDsRCo-dT05uF4EQ1bLGS7agjvDnHbriLq_k-D3b9MYu--an7CgME18RgnD-fl-MSwHHffqNvjcJ_pjpPhni-DF0ESL0wfcAFACc0czzA9ZrS-mqwRuPiLS6nqV7LSA9TXX92Bp77DG_qDmeR9JWXFicDA");'></div>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<h3 class="text-[#111a22] dark:text-white font-bold text-lg">Image Editor</h3>
+<p class="text-[#64748b] dark:text-[#92adc9] text-sm leading-relaxed">Crop, resize, and apply filters to images without leaving your folder.</p>
+</div>
+<div class="mt-auto pt-2 flex items-center gap-3">
+<button class="flex-1 h-9 bg-primary/10 hover:bg-primary/20 dark:bg-primary/20 dark:hover:bg-primary/30 text-primary dark:text-blue-300 text-sm font-bold rounded-lg transition-colors">Install</button>
+<button class="size-9 flex items-center justify-center text-[#64748b] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>
