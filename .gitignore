@@ -250,3 +250,10 @@ Thumbs.db
 # App Temp
 APP/temp/
 
+# App local runtime data (drive registry + migration backups)
+APP/src/data/
+Container/src/data/
+Server/src/data/
+
+# Drive config files (created inside user-defined virtual drive folders)
+.drive_config.json

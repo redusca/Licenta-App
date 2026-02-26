@@ -218,6 +218,30 @@ def get_drive_tree(drive_path: str, max_depth: int = 6) -> dict:
 
     return _build(drive_path, 0)  # type: ignore[return-value]
 
+def rename_drive_config(drive_path: str, new_name: str) -> bool:
+    """
+    Update the display name stored in the drive's config file.
+    The folder itself is NOT renamed — the path remains the drive identifier.
+    """
+    config_path = os.path.join(drive_path, CONFIG_FILENAME)
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Drive config not found in: {drive_path}")
+    # Unhide the file on Windows before reading/writing (hidden != read-only,
+    # but some security contexts block writes to hidden files).
+    subprocess.call(["attrib", "-h", "-r", config_path], shell=True)
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            raw = f.read().strip()
+            config = json.loads(raw) if raw else {}
+        config['name'] = new_name
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=2, ensure_ascii=False)
+    finally:
+        # Re-apply hidden attribute regardless of success/failure
+        subprocess.call(["attrib", "+h", config_path], shell=True)
+    return True
+
+
 def delete_drive(drive_path: str) -> bool:
     """
     Permanently delete the entire virtual drive folder and all its contents.
