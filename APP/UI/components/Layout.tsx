@@ -17,7 +17,7 @@ export const Layout: React.FC = () => {
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Home' },
-    { path: '/files', icon: FolderOpen, label: 'My Files' },
+    { path: '/files', icon: HardDrive, label: 'My Drive' },
     { path: '/chat', icon: MessageSquare, label: 'AI Agent' },
     { path: '/extensions', icon: Blocks, label: 'Extensions' },
     { path: '/tools', icon: Wrench, label: 'Tools' },
