@@ -1,0 +1,73 @@
+# Licenta Server — Docker Compose
+#
+# Usage (from repo root):
+#   docker compose -f Server/docker/docker-compose.yml up --build
+#
+# The server will be available at http://localhost:8000
+# PostgreSQL will be available at localhost:5432 (dev only)
+#
+# Build the React interface first:
+#   cd Server/Interface && npm install && npm run build
+
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: licenta
+      POSTGRES_USER: licenta
+      POSTGRES_PASSWORD: licenta
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"          # expose for local psql / dev tools
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U licenta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Container image build placeholder (removed — server builds it on-demand) ──
+  # The server auto-builds licenta-container:latest from its embedded source
+  # on first deploy via the Docker socket.  No separate pull or push needed.
+
+  # ── Licenta Server ──────────────────────────────────────────────────────────
+  server:
+    image: europe-west10-docker.pkg.dev/licenta-ubb/licenta-server/server:latest
+    build:
+      context: ../..          # repo root so COPY Server/... works
+      dockerfile: Server/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../src/.env           # created from .env.example — includes JWT_SECRET etc.
+    environment:
+      DATABASE_URL: postgresql://licenta:licenta@postgres:5432/licenta
+      CONTAINER_IMAGE_NAME: licenta-container:latest
+      CONTAINER_INTERNAL_PORT: "8001"
+      CONTAINER_NETWORK: licenta-agents
+      MODEL_NAME: gemini-2.5-flash
+      PORT: "8000"          # uvicorn falls back to 8080 without this
+    ports:
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - default
+      - agents
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  default: {}
+  agents:
+    name: licenta-agents
+    driver: bridge

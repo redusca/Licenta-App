@@ -257,3 +257,5 @@ Server/src/data/
 
 # Drive config files (created inside user-defined virtual drive folders)
 .drive_config.json
+.github/prompts/plan-serverAndContainer.prompt.md
+APP/data/agent_config.json

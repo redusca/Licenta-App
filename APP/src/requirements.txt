@@ -2,3 +2,4 @@ flask
 flask-cors
 pyinstaller
 python-dotenv
+requests
