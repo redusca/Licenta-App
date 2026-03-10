@@ -14,16 +14,20 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
-    # Docker / container management
-    DOCKER_SOCKET: str = "unix:///var/run/docker.sock"
-    CONTAINER_IMAGE_NAME: str = "licenta-container:latest"
-    CONTAINER_INTERNAL_PORT: int = 8001
-    # Shared Docker network for server-hosted containers (set in docker-compose)
-    CONTAINER_NETWORK: str = ""
-    # Google Gemini API key injected into every server-hosted container
+    # Redis (task queue for agent pool)
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # Agent pool
+    AGENT_WORKER_COUNT: int = 5
+    AGENT_TASK_TIMEOUT: int = 120  # seconds a chat request will wait for a worker
+
+    # Google Gemini - shared by all agent workers
     GOOGLE_API_KEY: str = ""
-    # Gemini model used by all containers
     MODEL_NAME: str = "gemini-2.5-flash"
+    MAX_AGENT_ITERATIONS: int = 10
+
+    # Container image name (only needed for the ZIP download feature)
+    CONTAINER_IMAGE_NAME: str = "licenta-container:latest"
 
     # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]

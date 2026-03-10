@@ -1,0 +1,41 @@
+# Licenta Server — Development Dockerfile
+#
+# Used by docker-compose.dev.yml (local/personal-computer builds).
+# Differences from the production Dockerfile:
+#   - No Interface/dist copy (serve the React dev server separately, or skip)
+#   - No release-binary copy
+#   - uvicorn runs with --reload for fast iteration
+#
+# Build (from repo root):
+#   docker build -f Server/docker/Dockerfile.dev -t licenta-server:dev .
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies
+COPY Server/src/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application source
+COPY Server/src/       ./src/
+COPY Server/Database/  ./Database/
+COPY Server/migrations/ ./migrations/
+COPY Server/alembic.ini ./alembic.ini
+
+# Embed Container source for the /api/containers/download endpoint
+RUN mkdir -p ./Container/docker ./Container/src
+COPY Container/docker/ ./Container/docker/
+COPY Container/src/    ./Container/src/
+
+ENV PYTHONPATH=/app/src:/app
+
+EXPOSE 8000
+
+# Run Alembic migrations then start with hot-reload
+CMD ["sh", "-c", "cd /app && python -m alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/src"]

@@ -20,6 +20,8 @@ from Database.models import Base
 from API.auth_routes import router as auth_router
 from API.container_routes import router as container_router
 from API.releases_routes import router as releases_router
+from API.agent_routes import router as agent_router
+from utils.agent_pool import AgentPool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
 logger = logging.getLogger(__name__)
@@ -30,7 +32,14 @@ async def lifespan(app: FastAPI):
     # Create all tables on startup (Alembic handles migrations in prod)
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ensured")
+
+    pool = AgentPool()
+    await pool.start(settings.AGENT_WORKER_COUNT)
+    app.state.agent_pool = pool
+
     yield
+
+    await pool.shutdown()
     logger.info("Server shutting down")
 
 
@@ -56,6 +65,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(container_router)
 app.include_router(releases_router)
+app.include_router(agent_router)
 
 
 @app.get("/api/health", tags=["health"])

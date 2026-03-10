@@ -1,10 +1,12 @@
-# ── Server image ──────────────────────────────────────────────────────────────
+# -- Server image (Production) ------------------------------------------------
 # Build from the repo root:
 #   docker build -t licenta-server:latest -f Server/docker/Dockerfile .
 #
-# The image expects the React SPA to be pre-built at Server/Interface/dist/.
-# Build it first:
-#   cd Server/Interface && npm install && npm run build
+# Pre-requisites:
+#   1. Pre-build the React SPA: cd Server/Interface && npm install && npm run build
+#   2. Set GOOGLE_API_KEY, JWT_SECRET, REDIS_URL, DATABASE_URL via env / .env
+#
+# Services required at runtime: PostgreSQL, Redis
 
 FROM python:3.12-slim
 
@@ -28,7 +30,8 @@ COPY Server/alembic.ini ./alembic.ini
 # Built React interface (must be pre-built)
 COPY Server/Interface/dist/ ./Interface/dist/
 
-# Container source + Dockerfile (needed so the server can build the agent image at runtime via Docker socket)
+# Container source — kept for /api/containers/download (exports image as tar for self-hosted users)
+# The server no longer spawns per-user containers; the agent pool runs inside this process.
 RUN mkdir -p ./Container/docker ./Container/src
 COPY Container/docker/Dockerfile         ./Container/docker/Dockerfile
 COPY Container/docker/Dockerfile.runtime ./Container/Dockerfile.runtime

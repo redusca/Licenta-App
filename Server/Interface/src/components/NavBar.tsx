@@ -8,7 +8,7 @@ const TABS = [
   { to: '/downloads', label: 'Downloads' },
   { to: '/wiki', label: 'Wiki' },
   { to: '/support', label: 'Support' },
-  { to: '/containers', label: 'Containers' },
+  { to: '/containers', label: 'Agent' },
 ]
 
 export default function NavBar() {
