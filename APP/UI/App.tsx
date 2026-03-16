@@ -6,6 +6,7 @@ import { Chat } from './pages/Chat';
 import { Files } from './pages/Files';
 import { Extensions } from './pages/Extensions';
 import { Tools } from './pages/Tools';
+import { ToolDetail } from './pages/ToolDetail';
 import { Settings } from './pages/SettingsPage';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
             <Route path="files" element={<Files />} />
             <Route path="extensions" element={<Extensions />} />
             <Route path="tools" element={<Tools />} />
+            <Route path="tools/:id" element={<ToolDetail />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

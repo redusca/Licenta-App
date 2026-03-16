@@ -14,6 +14,10 @@ POST /api/tools/execute
 GET /api/tools
     Returns the list of available tool definitions to register with the agent.
     Each definition includes a `callback_url` pointing back to this endpoint.
+
+GET /api/tools/catalog
+    Returns the full UI-facing tool catalog (tools + categories).
+    The frontend fetches this once on startup to build the Tools page.
 """
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ import logging
 from flask import Blueprint, jsonify, request
 
 from tools import hello as hello_tool
+from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
 
@@ -78,3 +83,18 @@ def list_tools():
         defn.setdefault("callback_url", "")  # caller fills this in
         definitions.append(defn)
     return jsonify(definitions)
+
+
+@tools_bp.get("/catalog")
+def get_catalog():
+    """
+    Return the full UI-facing tool catalog.
+
+    Called by the frontend on startup to populate the Tools page.
+    The catalog is built from tools/catalog.py which is loaded once
+    when the backend starts.
+    """
+    return jsonify({
+        "tools": CATALOG_TOOLS,
+        "categories": CATALOG_CATEGORIES,
+    })

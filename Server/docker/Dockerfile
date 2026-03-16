@@ -42,7 +42,7 @@ COPY Container/src/              ./Container/src/
 
 # Release binaries — copy from APP/release/, rename spaces to dashes
 RUN mkdir -p ./downloads
-COPY APP/release/ ./downloads_tmp/
+COPY APP/release/*.exe ./downloads_tmp/
 RUN for f in ./downloads_tmp/*.exe; do \
       dest="./downloads/$(basename "$f" | sed 's/ /-/g')"; \
       cp "$f" "$dest"; \
