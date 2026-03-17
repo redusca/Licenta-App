@@ -72,6 +72,7 @@ declare global {
         electronAPI?: {
             selectDirectory: () => Promise<string | null>;
             selectFile: () => Promise<string | null>;
+            selectFiles: (options?: { filters?: { name: string; extensions: string[] }[] }) => Promise<string[]>;
             onDeviceChange: (cb: (payload: { availableRoots: string[]; added: string[]; removed: string[] }) => void) => () => void;
             getAvailableRoots: () => Promise<string[]>;
         }
@@ -183,9 +184,14 @@ export const Files: React.FC = () => {
     const DRIVES_PER_PAGE = 6;
     const [drivePage, setDrivePage] = useState(0);
 
+    // Tool-drive filter
+    const [driveFilter, setDriveFilter] = useState<'all' | 'tool'>('all');
+    const [toolDrives, setToolDrives] = useState<{ path: string; name: string; tool: string }[]>([]);
+
     // Initial Load
     useEffect(() => {
         loadKnownDrives();
+        loadToolDrives();
 
         // Run startup migration on all known drives (once per session)
         const runStartupMigration = () => {
@@ -281,6 +287,16 @@ export const Files: React.FC = () => {
             }
         } catch(e) {
             console.warn('[registry] Could not restore from backend:', e);
+        }
+    };
+
+    const loadToolDrives = async () => {
+        try {
+            const res = await fetch('http://127.0.0.1:5000/api/tools/created-drives');
+            const data = await res.json();
+            setToolDrives(Array.isArray(data.drives) ? data.drives : []);
+        } catch {
+            // backend not reachable yet
         }
     };
 
@@ -1024,8 +1040,62 @@ export const Files: React.FC = () => {
             <div className="flex flex-col h-full">
                 {/* Drive list */}
                 <div className="space-y-3 py-4 px-1">
-                    <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider pl-1 mb-4">Your Drives</div>
-                    {pageDrives.map((d, i) => {
+                    {/* Header row: title + filter pills */}
+                    <div className="flex items-center justify-between pl-1 mb-4">
+                        <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                            {driveFilter === 'tool' ? 'Tool Drives' : 'Your Drives'}
+                        </div>
+                        {toolDrives.length > 0 && (
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={() => setDriveFilter('all')}
+                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}
+                                >All</button>
+                                <button
+                                    onClick={() => setDriveFilter('tool')}
+                                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveFilter === 'tool' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}
+                                >
+                                    <Filter className="w-3 h-3" />
+                                    Tool Drives
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Tool drives view */}
+                    {driveFilter === 'tool' && toolDrives.map((td, i) => {
+                        const asDrive: DriveConfig = { path: td.path, name: td.name, type: 'move' };
+                        const available = isDriveAvailable(asDrive);
+                        return (
+                            <div key={i} className="flex items-center gap-2">
+                                <button onClick={() => available && selectDrive(asDrive)} disabled={!available}
+                                    className={`flex-1 text-left p-4 bg-white dark:bg-slate-900 border rounded-xl transition-all group flex items-center gap-4
+                                        ${available
+                                            ? 'border-blue-200 dark:border-blue-900/40 hover:border-blue-500 hover:shadow-md cursor-pointer'
+                                            : 'border-slate-100 dark:border-slate-800/50 opacity-40 cursor-not-allowed'}`}>
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-transform ${available ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                        <HardDrive className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="font-semibold">{td.name}</h3>
+                                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">Tool</span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 truncate">{td.path}</p>
+                                        {!available && <p className="text-xs text-red-400 mt-0.5">Drive not connected</p>}
+                                    </div>
+                                    {available && <div className="ml-auto opacity-0 group-hover:opacity-100 text-blue-500"><ExternalLink className="w-4 h-4" /></div>}
+                                </button>
+                            </div>
+                        );
+                    })}
+
+                    {driveFilter === 'tool' && toolDrives.length === 0 && (
+                        <p className="text-sm text-slate-500 text-center py-8">No tool-created drives yet.</p>
+                    )}
+
+                    {/* Regular drives view */}
+                    {driveFilter === 'all' && pageDrives.map((d, i) => {
                         const available = isDriveAvailable(d);
                         return (
                         <div key={i} className="flex items-center gap-2">
@@ -1063,7 +1133,8 @@ export const Files: React.FC = () => {
                     })}
                 </div>
 
-                {/* Bottom bar: pagination corners + create button center */}
+                {/* Bottom bar: pagination + create (only in All Drives view) */}
+                {driveFilter === 'all' && (
                 <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
                     <button
                         onClick={() => setDrivePage(p => Math.max(0, p - 1))}
@@ -1088,6 +1159,7 @@ export const Files: React.FC = () => {
                         <ChevronRight className="w-5 h-5" />
                     </button>
                 </div>
+                )}
             </div>
             <DriveModals />
             </>
@@ -1135,7 +1207,7 @@ export const Files: React.FC = () => {
     const folderCount = files.filter(f =>  f.is_dir).length;
 
     // Filter chips
-    const filterChips: { label: string; value: FileTypeFilter; count: number }[] = [
+    const filterChips: { label: string; value: FileTypeFilter; count: number }[] = ([
         { label: 'All',       value: 'all',      count: files.length },
         { label: 'Folders',   value: 'folder',   count: files.filter(f => getTypeBucket(f) === 'folder').length },
         { label: 'Images',    value: 'image',    count: files.filter(f => getTypeBucket(f) === 'image').length },
@@ -1144,7 +1216,7 @@ export const Files: React.FC = () => {
         { label: 'Code',      value: 'code',     count: files.filter(f => getTypeBucket(f) === 'code').length },
         { label: 'Archives',  value: 'archive',  count: files.filter(f => getTypeBucket(f) === 'archive').length },
         { label: 'Shortcuts', value: 'shortcut', count: files.filter(f => getTypeBucket(f) === 'shortcut').length },
-    ].filter(c => c.value === 'all' || c.count > 0);
+    ] as { label: string; value: FileTypeFilter; count: number }[]).filter(c => c.value === 'all' || c.count > 0);
 
     // If the active drive was ejected, show a full overlay
     if (ejectedError) {
@@ -1161,7 +1233,7 @@ export const Files: React.FC = () => {
                     </p>
                 </div>
                 <button
-                    onClick={() => { setCurrentDrive(null); setEjectedError(false); }}
+                    onClick={() => { setCurrentDrive(null); setCurrentPath(null); setFiles([]); setEjectedError(false); }}
                     className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-semibold transition-all hover:shadow-lg"
                 >
                     Back to Drives
@@ -1177,7 +1249,7 @@ export const Files: React.FC = () => {
                 {/* Breadcrumbs row */}
                 <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
                     <div className="flex items-center gap-1 overflow-hidden flex-1 text-sm pl-2">
-                        <Home className="w-4 h-4 text-slate-400 flex-shrink-0 cursor-pointer hover:text-blue-500" onClick={() => setCurrentDrive(null)} />
+                        <Home className="w-4 h-4 text-slate-400 shrink-0 cursor-pointer hover:text-blue-500" onClick={() => { setCurrentDrive(null); setCurrentPath(null); setFiles([]); }} />
                         <span className="text-slate-300 mx-1">|</span>
                         {getBreadcrumbs().map((crumb, i, arr) => (
                             <div key={crumb.path} className="flex items-center gap-1 whitespace-nowrap">
@@ -1191,7 +1263,7 @@ export const Files: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1">
                         <span className="text-xs text-slate-400 px-2">{currentDrive?.type === 'shortcut' ? '🔗 Shortcut' : '📁 Move'}</span>
-                        <button onClick={() => setCurrentDrive(null)} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Close Drive"><LogOut className="w-4 h-4" /></button>
+                        <button onClick={() => { setCurrentDrive(null); setCurrentPath(null); setFiles([]); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Close Drive"><LogOut className="w-4 h-4" /></button>
                     </div>
                 </div>
 
@@ -1422,8 +1494,9 @@ export const Files: React.FC = () => {
                                     </div>
                                     <div className="text-xs text-slate-400 group-hover:text-slate-500 w-32 text-right hidden sm:block">{fmtDate(file.modified)}</div>
                                     <div className="text-xs text-slate-400 group-hover:text-slate-500 w-24 text-right">{file.is_dir ? '—' : fmtBytes(file.size)}</div>
-                                    <button className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-all ml-4">
-                                         <MoreVertical className="w-4 h-4 text-slate-500" onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY + 10, item: file }); }} />
+                                    <button className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-all ml-4"
+                                        onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY + 10, item: file }); }}>
+                                        <MoreVertical className="w-4 h-4 text-slate-500" />
                                     </button>
                                  </div>
                             );

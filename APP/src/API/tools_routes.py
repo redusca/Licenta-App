@@ -21,21 +21,29 @@ GET /api/tools/catalog
 """
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
+
 from flask import Blueprint, jsonify, request
 
 from tools import hello as hello_tool
+from tools import image_converter as image_converter_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
 
 tools_bp = Blueprint("tools", __name__)
 
+# Path to the tool-drives registry written by image_converter
+_TOOL_DRIVES_PATH = Path(__file__).parent.parent.parent / "data" / "tool_drives.json"
+
 # ── Tool registry ─────────────────────────────────────────────────────────────
 # Maps tool name → executor module.  Add new tools here.
 
 _TOOLS: dict[str, object] = {
     "hello": hello_tool,
+    "image_converter": image_converter_tool,
 }
 
 
@@ -98,3 +106,53 @@ def get_catalog():
         "tools": CATALOG_TOOLS,
         "categories": CATALOG_CATEGORIES,
     })
+
+
+@tools_bp.post("/image-converter/run")
+def image_converter_run():
+    """
+    Direct frontend endpoint for the Image Converter tool.
+    Uses parallel execution when more than 1 file is provided.
+
+    Body: {
+        "files": [{"path": "...", "outputFormat": "png"}, ...],
+        "outputMode": "replace" | "copy" | "virtual_drive",
+        "outputPath": "C:/...",   # required for virtual_drive mode
+        "quality": 85,
+        "preserveMetadata": true
+    }
+    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    try:
+        files = data.get("files", [])
+        if len(files) > 1:
+            raw = image_converter_tool.execute_parallel(data)
+        else:
+            raw = image_converter_tool.execute(data)
+        result = json.loads(raw)
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("Image converter failed")
+        return jsonify({"error": str(exc)}), 500
+
+
+@tools_bp.get("/created-drives")
+def get_created_drives():
+    """
+    Return the list of virtual drives created by tools (from tool_drives.json).
+    Used by the Tool Drives page in the frontend.
+    """
+    if not _TOOL_DRIVES_PATH.exists():
+        return jsonify({"drives": []})
+    try:
+        drives = json.loads(_TOOL_DRIVES_PATH.read_text(encoding="utf-8"))
+        if not isinstance(drives, list):
+            drives = []
+        return jsonify({"drives": drives})
+    except Exception as exc:
+        logger.error("Failed to load tool drives: %s", exc)
+        return jsonify({"drives": [], "error": str(exc)})

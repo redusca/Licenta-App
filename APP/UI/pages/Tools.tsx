@@ -5,7 +5,7 @@ import {
     Image, Music, Video, FileText, Archive, Box, Database,
     Code, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
     AudioWaveform, Clapperboard, LayoutGrid, List, ChevronRight,
-    Search, AlertCircle, RefreshCw,
+    Search, AlertCircle, RefreshCw, ExternalLink,
 } from 'lucide-react';
 import type { CategoryKey, CategoryMeta, ToolDefinition } from '../data/tools';
 import { useToolsCatalog } from '../hooks/useToolsCatalog';
@@ -92,6 +92,11 @@ function SkeletonCard() {
     );
 }
 
+// ── Tool runner routes (tools that have a dedicated runner page) ────────────
+const TOOL_RUNNER_ROUTES: Record<string, string> = {
+    'image-converter': '/tools/image-converter/run',
+};
+
 // ── Tool Card ───────────────────────────────────────────────────────────────
 
 function ToolCard({ tool }: { tool: ToolDefinition }) {
@@ -132,11 +137,20 @@ function ToolCard({ tool }: { tool: ToolDefinition }) {
             </div>
 
             {/* Footer */}
-            <Link to={`/tools/${tool.id}`}
-                className="mt-auto flex items-center justify-center gap-1.5 w-full py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
-                Details
-                <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
+            <div className="mt-auto flex gap-2">
+                <Link to={`/tools/${tool.id}`}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
+                    Details
+                    <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+                {TOOL_RUNNER_ROUTES[tool.id] && (
+                    <Link to={TOOL_RUNNER_ROUTES[tool.id]}
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Open
+                    </Link>
+                )}
+            </div>
         </div>
     );
 }

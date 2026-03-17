@@ -92,6 +92,18 @@ ipcMain.handle('dialog:selectFile', async () => {
     }
   });
 
+ipcMain.handle('dialog:selectFiles', async (_event, options?: { filters?: { name: string; extensions: string[] }[] }) => {
+    const dialogOptions: Electron.OpenDialogOptions = {
+      properties: ['openFile', 'multiSelections'],
+    };
+    if (options?.filters) {
+      dialogOptions.filters = options.filters;
+    }
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow!, dialogOptions);
+    if (canceled) return [];
+    return filePaths;
+  });
+
 ipcMain.handle('drive:getAvailableRoots', () => {
   return getAvailableDriveRoots();
 });

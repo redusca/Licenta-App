@@ -1,15 +1,15 @@
 import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
-import { 
-  LayoutDashboard, 
-  MessageSquare, 
-  FolderOpen, 
-  Blocks, 
-  Wrench, 
-  Settings, 
+import {
+  LayoutDashboard,
+  MessageSquare,
+  FolderOpen,
+  Blocks,
+  Wrench,
+  Settings,
   HardDrive,
-  User
+  User,
 } from 'lucide-react';
 
 export const Layout: React.FC = () => {

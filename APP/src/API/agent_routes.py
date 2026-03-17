@@ -33,6 +33,7 @@ _DEFAULT_CONFIG: dict = {
     "server_url": "http://localhost:8000",
     "api_key": "",               # agent API key generated on the server
     "container_url": "",         # only used in direct mode
+    "output_path": "",           # parent directory for tool-created virtual drives
 }
 
 
@@ -97,6 +98,9 @@ def save_config():
 
     if data.get("api_key"):
         cfg["api_key"] = data["api_key"]
+
+    if "output_path" in data:
+        cfg["output_path"] = data["output_path"]
 
     _save_config(cfg)
     return jsonify({"ok": True})

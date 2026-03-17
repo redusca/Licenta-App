@@ -4,7 +4,8 @@ import {
     ArrowLeft, Zap, CheckCircle, AlertCircle, Settings,
     Image, Music, Video, FileText, Archive, Box, Database,
     Code, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
-    AudioWaveform, Clapperboard, Tag, Cpu, FolderOpen, ChevronRight
+    AudioWaveform, Clapperboard, Tag, Cpu, FolderOpen, ChevronRight,
+    HardDrive, ExternalLink
 } from 'lucide-react';
 import type { ToolDefinition } from '../data/tools';
 import { useToolsCatalog } from '../hooks/useToolsCatalog';
@@ -234,6 +235,12 @@ function MockedRunner({ tool }: { tool: ToolDefinition }) {
     );
 }
 
+// ── Tool runner URL map ──────────────────────────────────────────────────────
+// Maps tool ID → route path for the full tool runner page.
+const TOOL_RUNNER_ROUTES: Record<string, string> = {
+    'image-converter': '/tools/image-converter/run',
+};
+
 // ── Main ToolDetail page ────────────────────────────────────────────────────
 
 export const ToolDetail: React.FC = () => {
@@ -373,7 +380,7 @@ export const ToolDetail: React.FC = () => {
                             <div className="space-y-4">
                                 {tool.fields.map(field => (
                                     <div key={field.key} className="flex gap-3">
-                                        <div className="mt-0.5 w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 mt-2" />
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0 mt-2" />
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <span className="text-sm font-medium">{field.label}</span>
@@ -439,10 +446,24 @@ export const ToolDetail: React.FC = () => {
                     {/* Runner panel */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
                         <h2 className="font-semibold text-base mb-4">Run Tool</h2>
-                        {tool.id === 'hello-agent'
-                            ? <HelloAgentRunner />
-                            : <MockedRunner tool={tool} />
-                        }
+
+                        {/* Tools with a dedicated runner page get Open Tool button */}
+                        {TOOL_RUNNER_ROUTES[tool.id] ? (
+                            <div className="space-y-3">
+                                <p className="text-sm text-slate-500">
+                                    Open the full tool interface to select files, configure options, and run the conversion.
+                                </p>
+                                <Link to={TOOL_RUNNER_ROUTES[tool.id]}
+                                    className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors text-sm">
+                                    <ExternalLink className="w-4 h-4" />
+                                    Open Tool
+                                </Link>
+                            </div>
+                        ) : tool.id === 'hello-agent' ? (
+                            <HelloAgentRunner />
+                        ) : (
+                            <MockedRunner tool={tool} />
+                        )}
                     </div>
                 </div>
             </div>
