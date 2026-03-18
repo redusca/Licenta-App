@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from utils.drive_manager import create_drive, add_file, add_folder, get_drive_config, delete_item, rename_item, paste_items, open_item, get_drive_tree, delete_drive, move_drive_contents, rename_drive_config
 from utils.mft_scan import scan_drive, search_volume, get_volume_stats, list_directory_mft, invalidate_cache, build_path_map
 from utils.drives_registry import load_registry, save_registry
@@ -393,3 +393,10 @@ def list_drive_files():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@drive_bp.route('/file', methods=['GET'])
+def serve_file():
+    path_arg = request.args.get('path')
+    if not path_arg or not os.path.exists(path_arg):
+        return jsonify({'error': 'File not found'}), 404
+    return send_file(path_arg)

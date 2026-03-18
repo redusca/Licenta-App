@@ -3,5 +3,15 @@
     "path": "D:\\DProjects\\Drives\\ImageConversionResults",
     "name": "ImageConversionResults",
     "tool": "image_converter"
+  },
+  {
+    "path": "C:\\Users\\redis\\Desktop\\Projects\\Licenta-App\\APP\\test\\RemovedBackgrounds",
+    "name": "RemovedBackgrounds",
+    "tool": "remove_background"
+  },
+  {
+    "path": "D:\\DProjects\\Drives\\RemovedBackgrounds",
+    "name": "RemovedBackgrounds",
+    "tool": "remove_background"
   }
 ]

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
     Folder,
     Search,
@@ -31,6 +32,7 @@ import {
     Filter,
     BarChart2,
 } from 'lucide-react';
+import { MediaPreviewModal } from '../components/MediaPreviewModal';
 
 // ─── file-type helpers ────────────────────────────────────────────────────────
 const IMAGE_EXTS   = new Set(['jpg','jpeg','png','gif','webp','bmp','svg','ico','tiff']);
@@ -103,9 +105,11 @@ interface TreeNode {
 }
 
 export const Files: React.FC = () => {
+    const location = useLocation();
     const [currentPath, setCurrentPath] = useState<string | null>(null);
     const [currentDrive, setCurrentDrive] = useState<DriveConfig | null>(null);
     const [files, setFiles] = useState<FileItem[]>([]);
+    const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
     const [loading, setLoading] = useState(false);
 
     // Device tracking
@@ -186,10 +190,21 @@ export const Files: React.FC = () => {
 
     // Tool-drive filter
     const [driveFilter, setDriveFilter] = useState<'all' | 'tool'>('all');
+    const [driveTypeFilter, setDriveTypeFilter] = useState<'all' | 'shortcut' | 'move'>('all');
     const [toolDrives, setToolDrives] = useState<{ path: string; name: string; tool: string }[]>([]);
 
     // Initial Load
     useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const urlPath = params.get('path');
+        if (urlPath && urlPath !== currentPath) {
+            // Find existing drive covering this path or assume it's a drive root
+            // For tool drives, we can create a temporary config
+            const name = urlPath.split(/[/\\]/).pop() || 'Drive';
+            setCurrentDrive({ path: urlPath, name, type: 'move' }); // Assume move is safer default for folders
+            setCurrentPath(urlPath);
+        }
+
         loadKnownDrives();
         loadToolDrives();
 
@@ -1031,9 +1046,10 @@ export const Files: React.FC = () => {
             );
         }
 
-        const totalPages = Math.ceil(knownDrives.length / DRIVES_PER_PAGE);
-        const safePage = Math.min(drivePage, totalPages - 1);
-        const pageDrives = knownDrives.slice(safePage * DRIVES_PER_PAGE, (safePage + 1) * DRIVES_PER_PAGE);
+        const filteredDrives = knownDrives.filter(d => driveTypeFilter === 'all' || d.type === driveTypeFilter);
+        const totalPages = Math.ceil(filteredDrives.length / DRIVES_PER_PAGE);
+        const safePage = Math.min(drivePage, totalPages - 1 >= 0 ? totalPages - 1 : 0);
+        const pageDrives = filteredDrives.slice(safePage * DRIVES_PER_PAGE, (safePage + 1) * DRIVES_PER_PAGE);
 
         return (
             <>
@@ -1042,7 +1058,7 @@ export const Files: React.FC = () => {
                 <div className="space-y-3 py-4 px-1">
                     {/* Header row: title + filter pills */}
                     <div className="flex items-center justify-between pl-1 mb-4">
-                        <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+                        <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
                             {driveFilter === 'tool' ? 'Tool Drives' : 'Your Drives'}
                         </div>
                         {toolDrives.length > 0 && (
@@ -1058,6 +1074,17 @@ export const Files: React.FC = () => {
                                     <Filter className="w-3 h-3" />
                                     Tool Drives
                                 </button>
+                            </div>
+                        )}
+                        {/* Type Filter */}
+                        {driveFilter === 'all' && (
+                            <div className="flex gap-1 ml-2 border-l border-slate-200 dark:border-slate-800 pl-2">
+                                <button onClick={() => setDriveTypeFilter('all')}
+                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveTypeFilter === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}>All Types</button>
+                                <button onClick={() => setDriveTypeFilter('shortcut')}
+                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveTypeFilter === 'shortcut' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}>Shortcut</button>
+                                <button onClick={() => setDriveTypeFilter('move')}
+                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveTypeFilter === 'move' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}>Move</button>
                             </div>
                         )}
                     </div>
@@ -1521,19 +1548,40 @@ export const Files: React.FC = () => {
                                 {sortedFiles.map((file, idx) => {
                                     const isCut = clipboard.mode === 'cut' && clipboard.items.some(i => i.path === file.path);
                                     const isSelected = selectedItems.has(file.path);
+                                    const ext = getExt(file.name);
+                                    const isImage = IMAGE_EXTS.has(ext);
+                                    const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
+
                                     return (
                                         <div key={file.path}
                                             className={`flex flex-col items-center p-3 rounded-xl cursor-pointer transition-all border group ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-400 shadow-sm' : 'border-transparent hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-200 dark:hover:border-slate-700'} ${isCut ? 'opacity-50' : ''}`}
                                             onClick={(e) => handleItemClick(e, file, idx)}
-                                            onDoubleClick={() => { if (file.is_dir) navigateTo(file.path); else openItem(file.path); }}
+                                            onDoubleClick={() => {
+                                                if (file.is_dir) { navigateTo(file.path); }
+                                                else if (isImage || isVideo) { setPreviewFile(file); }
+                                                else { openItem(file.path); }
+                                            }}
                                             onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItems(new Set([file.path])); setContextMenu({ x: e.clientX, y: e.clientY, item: file }); }}
                                         >
-                                            <div className="w-16 h-16 flex items-center justify-center mb-2 rounded-lg bg-slate-50 dark:bg-slate-800 group-hover:bg-slate-100 dark:group-hover:bg-slate-700 transition-colors">
-                                                {file.is_dir
-                                                    ? <Folder className="w-10 h-10 text-yellow-500 fill-current" />
-                                                    : getFileIcon(file.name, 'lg')}
+                                            <div className="w-full aspect-[4/3] flex items-center justify-center mb-2 rounded-lg bg-slate-50 dark:bg-slate-800 group-hover:bg-slate-100 dark:group-hover:bg-slate-700 transition-colors overflow-hidden relative border border-slate-100 dark:border-slate-700">
+                                                {file.is_dir ? (
+                                                    <Folder className="w-16 h-16 text-yellow-500 fill-current drop-shadow-sm" />
+                                                ) : isImage ? (
+                                                    <img src={`${API_URL}/file?path=${encodeURIComponent(file.path)}`} alt={file.name} className="w-full h-full object-cover" loading="lazy" />
+                                                ) : isVideo ? (
+                                                    <>
+                                                        <video src={`${API_URL}/file?path=${encodeURIComponent(file.path)}#t=1.0`} className="w-full h-full object-cover pointer-events-none" preload="metadata" />
+                                                        <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/5 transition-colors">
+                                                            <div className="bg-black/20 backdrop-blur-md p-2 rounded-full border border-white/20 shadow-sm">
+                                                                <Video className="w-5 h-5 text-white drop-shadow-md fill-white/20" />
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    getFileIcon(file.name, 'lg')
+                                                )}
                                             </div>
-                                            <p className={`text-xs text-center truncate w-full leading-tight ${isSelected ? 'font-semibold text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`} title={getDisplayName(file.name)}>
+                                            <p className={`text-xs text-center truncate w-full leading-tight px-1 ${isSelected ? 'font-semibold text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`} title={getDisplayName(file.name)}>
                                                 {getDisplayName(file.name)}
                                             </p>
                                             {!file.is_dir && (
@@ -1610,6 +1658,9 @@ export const Files: React.FC = () => {
             )}
 
             <DriveModals />
+            {previewFile && (
+                <MediaPreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
+            )}
         </div>
     );
 };

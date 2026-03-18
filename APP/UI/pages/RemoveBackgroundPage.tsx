@@ -10,12 +10,11 @@ import {
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif']);
-const OUTPUT_FORMATS = ['jpeg', 'png', 'webp', 'bmp', 'tiff', 'gif'];
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface DriveEntry { name: string; path: string; config?: { name: string } }
-interface FileItem { path: string; name: string; size: number; outputFormat: string }
+interface FileItem { path: string; name: string; size: number; outputFormat?: string }
 interface DirItem { name: string; path: string; is_dir: boolean; size: number }
 type OutputMode = 'replace' | 'copy' | 'virtual_drive';
 type FileStatus = 'pending' | 'converting' | 'done' | 'failed';
@@ -47,12 +46,10 @@ function FolderBrowser({
     drives,
     onPickFiles,
     onClose,
-    globalFormat,
 }: {
     drives: DriveEntry[];
     onPickFiles: (files: FileItem[]) => void;
     onClose: () => void;
-    globalFormat: string;
 }) {
     const [currentDrive, setCurrentDrive] = useState<DriveEntry | null>(null);
     const [currentPath, setCurrentPath] = useState('');
@@ -120,7 +117,7 @@ function FolderBrowser({
     const confirmSelection = () => {
         const picked: FileItem[] = entries
             .filter(e => !e.is_dir && selected.has(e.path))
-            .map(e => ({ path: e.path, name: e.name, size: e.size, outputFormat: globalFormat }));
+            .map(e => ({ path: e.path, name: e.name, size: e.size, outputFormat: 'png' }));
         onPickFiles(picked);
         onClose();
     };
@@ -250,13 +247,11 @@ function FolderBrowser({
 
 // ── Main page component ──────────────────────────────────────────────────────
 
-export const ImageConverterPage: React.FC = () => {
+export const RemoveBackgroundPage: React.FC = () => {
     const navigate = useNavigate();
     const [drives, setDrives] = useState<DriveEntry[]>([]);
     const [files, setFiles] = useState<FileItem[]>([]);
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    const [globalFormat, setGlobalFormat] = useState('webp');
-    const [quality, setQuality] = useState(85);
     const [outputMode, setOutputMode] = useState<OutputMode>('copy');
     const [outputPath, setOutputPath] = useState('');
     const [loadingDrives, setLoadingDrives] = useState(true);
@@ -300,7 +295,6 @@ export const ImageConverterPage: React.FC = () => {
             path: p,
             name: p.split(/[\\/]/).pop() || p,
             size: 0,
-            outputFormat: globalFormat,
         }));
         addFiles(newFiles);
     };
@@ -314,7 +308,7 @@ export const ImageConverterPage: React.FC = () => {
             const data = await res.json();
             const imageFiles: FileItem[] = (data.files || [])
                 .filter((f: any) => !f.is_dir && isImageFile(f.name))
-                .map((f: any) => ({ path: f.path, name: f.name, size: f.size || 0, outputFormat: globalFormat }));
+                .map((f: any) => ({ path: f.path, name: f.name, size: f.size || 0 }));
             addFiles(imageFiles);
         } catch {
             setConvError('Failed to list files in that location.');
@@ -327,16 +321,10 @@ export const ImageConverterPage: React.FC = () => {
         return next;
     });
 
-    const setFileFormat = (path: string, fmt: string) =>
-        setFiles(prev => prev.map(f => f.path === path ? { ...f, outputFormat: fmt } : f));
-
     const removeFile = (path: string) => {
         setFiles(prev => prev.filter(f => f.path !== path));
         setSelected(prev => { const n = new Set(prev); n.delete(path); return n; });
     };
-
-    const applyGlobalFormat = () =>
-        setFiles(prev => prev.map(f => ({ ...f, outputFormat: globalFormat })));
 
     const selectedFiles = files.filter(f => selected.has(f.path));
     const allSelected = files.length > 0 && files.every(f => selected.has(f.path));
@@ -370,14 +358,13 @@ export const ImageConverterPage: React.FC = () => {
         setFileStatuses(new Map(statusMap));
 
         try {
-            const res = await fetch(`${FLASK_BASE}/api/tools/image-converter/run`, {
+            const res = await fetch(`${FLASK_BASE}/api/tools/remove-background/run`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    files: selectedFiles.map(f => ({ path: f.path, outputFormat: f.outputFormat })),
+                    files: selectedFiles.map(f => ({ path: f.path, outputFormat: 'png' })),
                     outputMode,
                     outputPath,
-                    quality,
                     preserveMetadata: true,
                 }),
             });
@@ -428,7 +415,7 @@ export const ImageConverterPage: React.FC = () => {
                 <ChevronRight className="w-3.5 h-3.5" />
                 <Link to="/tools?category=image" className="hover:text-slate-300 transition-colors">Image</Link>
                 <ChevronRight className="w-3.5 h-3.5" />
-                <Link to="/tools/image-converter" className="hover:text-slate-300 transition-colors">Image Converter</Link>
+                <Link to="/tools/remove-background" className="hover:text-slate-300 transition-colors">Remove Background</Link>
                 <ChevronRight className="w-3.5 h-3.5" />
                 <span className="text-slate-300">Run</span>
             </nav>
@@ -440,11 +427,11 @@ export const ImageConverterPage: React.FC = () => {
                         <Image className="w-6 h-6 text-blue-400" />
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold">Image Converter</h1>
-                        <p className="text-sm text-slate-500">Batch convert images between formats</p>
+                        <h1 className="text-2xl font-bold">Remove Background</h1>
+                        <p className="text-sm text-slate-500">Automatically remove background from images</p>
                     </div>
                 </div>
-                <button onClick={() => navigate('/tools/image-converter')}
+                <button onClick={() => navigate('/tools/remove-background')}
                     className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors">
                     <ArrowLeft className="w-4 h-4" />
                     Back to Info
@@ -513,16 +500,6 @@ export const ImageConverterPage: React.FC = () => {
                                         {selectedFiles.length}/{files.length} selected
                                     </span>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <select value={globalFormat} onChange={e => setGlobalFormat(e.target.value)}
-                                        className="text-xs px-2 py-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-500/40">
-                                        {OUTPUT_FORMATS.map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
-                                    </select>
-                                    <button onClick={applyGlobalFormat}
-                                        className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">
-                                        Apply to all
-                                    </button>
-                                </div>
                             </div>
 
                             {/* File rows */}
@@ -561,10 +538,7 @@ export const ImageConverterPage: React.FC = () => {
                                                 <span className="text-xs text-slate-500 shrink-0">{fmtSize(file.size)}</span>
                                             )}
 
-                                            <select value={file.outputFormat} onChange={e => setFileFormat(file.path, e.target.value)}
-                                                className="text-xs px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-400 focus:outline-none shrink-0">
-                                                {OUTPUT_FORMATS.map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
-                                            </select>
+                                            
 
                                             <button onClick={() => removeFile(file.path)}
                                                 className="text-slate-600 hover:text-red-400 transition-colors shrink-0 p-1">
@@ -581,23 +555,6 @@ export const ImageConverterPage: React.FC = () => {
                 {/* ── Right: Settings + convert ── */}
                 <div className="space-y-4">
 
-                    {/* Quality */}
-                    {files.length > 0 && (
-                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-                            <div className="flex items-center justify-between mb-3">
-                                <p className="text-sm font-semibold text-slate-300">Quality (JPEG / WebP)</p>
-                                <span className="text-sm font-mono text-blue-400 font-bold">{quality}</span>
-                            </div>
-                            <input type="range" min={1} max={100} value={quality}
-                                onChange={e => setQuality(Number(e.target.value))}
-                                className="w-full accent-blue-500" />
-                            <div className="flex justify-between text-xs text-slate-600 mt-1">
-                                <span>1 — smaller file</span>
-                                <span>100 — best quality</span>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Output mode */}
                     {files.length > 0 && (
                         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
@@ -609,7 +566,7 @@ export const ImageConverterPage: React.FC = () => {
                                     { value: 'virtual_drive' as OutputMode, label: 'Virtual drive', desc: 'Save to ImageConversionResults drive.' },
                                 ]).map(opt => (
                                     <label key={opt.value} className="flex items-start gap-3 cursor-pointer group">
-                                        <input type="radio" name="imgconv-output" value={opt.value}
+                                        <input type="radio" name="rembg-output" value={opt.value}
                                             checked={outputMode === opt.value}
                                             onChange={() => setOutputMode(opt.value)}
                                             className="mt-0.5 accent-blue-500 shrink-0" />
@@ -687,7 +644,7 @@ export const ImageConverterPage: React.FC = () => {
                     drives={drives}
                     onPickFiles={addFiles}
                     onClose={() => setShowBrowser(false)}
-                    globalFormat={globalFormat}
+                    
                 />
             )}
         </div>

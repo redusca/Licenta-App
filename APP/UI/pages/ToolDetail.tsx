@@ -239,6 +239,7 @@ function MockedRunner({ tool }: { tool: ToolDefinition }) {
 // Maps tool ID → route path for the full tool runner page.
 const TOOL_RUNNER_ROUTES: Record<string, string> = {
     'image-converter': '/tools/image-converter/run',
+    'remove-background': '/tools/remove-background/run',
 };
 
 // ── Main ToolDetail page ────────────────────────────────────────────────────

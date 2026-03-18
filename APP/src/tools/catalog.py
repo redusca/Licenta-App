@@ -148,6 +148,49 @@ TOOLS: list[dict] = [
     },
 
     {
+        "id": "remove-background",
+        "name": "Remove Background",
+        "version": "1.0.0",
+        "description": "Batch-remove backgrounds from images.",
+        "longDescription": (
+            "Remove Background lets you batch-remove backgrounds from images using rembg. "
+            "It automatically detects the main subject and outputs a transparent PNG. "
+            "Works entirely locally using on-device models."
+        ),
+        "categories": ["image"],
+        "fileExtensions": [".jpg", ".jpeg", ".png", ".webp"],
+        "usesAI": True,
+        "icon": "ImageOff",
+        "accentColor": "blue",
+        "author": "Core Team",
+        "fields": [
+            {
+                "key": "inputFiles",
+                "label": "Input Images",
+                "type": "multifile",
+                "description": "One or more image files to process.",
+                "required": True,
+                "acceptedExtensions": [".jpg", ".jpeg", ".png", ".webp"],
+            },
+            {
+                "key": "preserveMetadata",
+                "label": "Preserve EXIF Metadata",
+                "type": "boolean",
+                "description": "When true, EXIF data (camera info, GPS, etc.) is copied to the output file.",
+                "required": False,
+                "default": True,
+            },
+        ],
+        "usageSteps": [
+            "Open the Remove Background tool from the Tools page and click 'Run Tool'.",
+            "Select one or more input images.",
+            "Choose an output mode: Replace originals, Copy in same folder, or save to a Virtual Drive.",
+            "Click Remove Background and review the results.",
+        ],
+        "tags": ["background", "remove", "rembg", "batch", "transparent", "png"],
+    },
+
+    {
         "id": "image-enhancer",
         "name": "AI Image Enhancer",
         "version": "0.9.1",

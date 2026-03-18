@@ -4,3 +4,4 @@ pyinstaller
 python-dotenv
 requests
 Pillow
+rembg
