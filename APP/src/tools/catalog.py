@@ -191,6 +191,81 @@ TOOLS: list[dict] = [
     },
 
     {
+        "id": "image-to-svg",
+        "name": "Image to SVG Vectorizer",
+        "version": "1.0.0",
+        "description": "Convert raster images to clean SVG vector files with copy-paste code output.",
+        "longDescription": (
+            "Image to SVG Vectorizer converts JPEG, PNG, WebP, and BMP images into scalable vector "
+            "SVG files using a fast, locally-running tracing engine (vtracer). "
+            "Choose between full color tracing or black-and-white binary mode. "
+            "After conversion, each result shows an inline SVG preview and lets you copy the raw SVG "
+            "markup to the clipboard for direct use in web pages, Figma, Illustrator, or any SVG editor. "
+            "No data leaves your machine — all processing is done locally."
+        ),
+        "categories": ["image"],
+        "fileExtensions": [".jpg", ".jpeg", ".png", ".webp", ".bmp"],
+        "usesAI": False,
+        "icon": "PenTool",
+        "accentColor": "violet",
+        "author": "Core Team",
+        "fields": [
+            {
+                "key": "inputFiles",
+                "label": "Input Images",
+                "type": "multifile",
+                "description": "One or more raster image files to vectorize.",
+                "required": True,
+                "acceptedExtensions": [".jpg", ".jpeg", ".png", ".webp", ".bmp"],
+            },
+            {
+                "key": "colormode",
+                "label": "Color Mode",
+                "type": "select",
+                "description": "'color' for full color SVG, 'binary' for black-and-white (faster, smaller file).",
+                "required": False,
+                "options": ["color", "binary"],
+                "default": "color",
+            },
+            {
+                "key": "hierarchical",
+                "label": "Layering Mode",
+                "type": "select",
+                "description": "How color layers are stacked in the SVG. 'stacked' layers shapes on top; 'cutout' punches holes.",
+                "required": False,
+                "options": ["stacked", "cutout"],
+                "default": "stacked",
+            },
+            {
+                "key": "filterSpeckle",
+                "label": "Speckle Filter (px)",
+                "type": "number",
+                "description": "Ignore noise pixels smaller than this area (in pixels). Higher = smoother result.",
+                "required": False,
+                "default": 4,
+            },
+            {
+                "key": "colorPrecision",
+                "label": "Color Precision (1-8)",
+                "type": "number",
+                "description": "Significant bits used for color quantisation. Lower reduces unique colors; higher preserves more detail.",
+                "required": False,
+                "default": 6,
+            },
+        ],
+        "usageSteps": [
+            "Open the Image to SVG Vectorizer from the Tools page and click 'Run Tool'.",
+            "Add one or more images using Browse Files, Browse Folder, or From Virtual Drive.",
+            "Choose a Color Mode: 'Color' for full-color output or 'Black & White' for outline/silhouette style.",
+            "Adjust the Speckle Filter to control how much noise gets smoothed out.",
+            "Select an output mode: Replace original, Copy alongside, or send to a Virtual Drive.",
+            "Click Vectorize — each result shows an inline SVG preview.",
+            "Use the 'Copy SVG Code' button to copy the ready-to-paste SVG markup.",
+        ],
+        "tags": ["svg", "vector", "vectorize", "convert", "trace", "vtracer", "batch", "scalable"],
+    },
+
+    {
         "id": "image-enhancer",
         "name": "AI Image Enhancer",
         "version": "0.9.1",

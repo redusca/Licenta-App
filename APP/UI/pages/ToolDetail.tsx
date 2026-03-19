@@ -5,7 +5,7 @@ import {
     Image, Music, Video, FileText, Archive, Box, Database,
     Code, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
     AudioWaveform, Clapperboard, Tag, Cpu, FolderOpen, ChevronRight,
-    HardDrive, ExternalLink
+    ExternalLink, PenTool, ImageOff
 } from 'lucide-react';
 import type { ToolDefinition } from '../data/tools';
 import { useToolsCatalog } from '../hooks/useToolsCatalog';
@@ -15,7 +15,7 @@ import { useToolsCatalog } from '../hooks/useToolsCatalog';
 const ICON_MAP: Record<string, React.ElementType> = {
     Image, Music, Video, FileText, Archive, Box, Database, Code,
     Zap, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
-    AudioWaveform, Clapperboard, Tag, Cpu,
+    AudioWaveform, Clapperboard, Tag, Cpu, PenTool, ImageOff,
 };
 
 function ToolIcon({ name, className }: { name: string; className?: string }) {
@@ -34,6 +34,7 @@ const COLOR_BG: Record<string, string> = {
     indigo: 'bg-indigo-500/10 border-indigo-500/20',
     green: 'bg-green-500/10 border-green-500/20',
     emerald: 'bg-emerald-500/10 border-emerald-500/20',
+    violet: 'bg-violet-500/10 border-violet-500/20',
 };
 const COLOR_TEXT: Record<string, string> = {
     blue: 'text-blue-400',
@@ -44,6 +45,7 @@ const COLOR_TEXT: Record<string, string> = {
     indigo: 'text-indigo-400',
     green: 'text-green-400',
     emerald: 'text-emerald-400',
+    violet: 'text-violet-400',
 };
 const COLOR_BADGE: Record<string, string> = {
     blue: 'bg-blue-500/15 text-blue-300 border border-blue-500/25',
@@ -54,6 +56,7 @@ const COLOR_BADGE: Record<string, string> = {
     indigo: 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/25',
     green: 'bg-green-500/15 text-green-300 border border-green-500/25',
     emerald: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/25',
+    violet: 'bg-violet-500/15 text-violet-300 border border-violet-500/25',
 };
 
 // ── Flask / config for hello agent ─────────────────────────────────────────
@@ -240,6 +243,7 @@ function MockedRunner({ tool }: { tool: ToolDefinition }) {
 const TOOL_RUNNER_ROUTES: Record<string, string> = {
     'image-converter': '/tools/image-converter/run',
     'remove-background': '/tools/remove-background/run',
+    'image-to-svg': '/tools/image-to-svg/run',
 };
 
 // ── Main ToolDetail page ────────────────────────────────────────────────────
@@ -455,7 +459,17 @@ export const ToolDetail: React.FC = () => {
                                     Open the full tool interface to select files, configure options, and run the conversion.
                                 </p>
                                 <Link to={TOOL_RUNNER_ROUTES[tool.id]}
-                                    className="flex items-center justify-center gap-2 w-full py-3 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg transition-colors text-sm">
+                                    className={`flex items-center justify-center gap-2 w-full py-3 font-semibold rounded-lg transition-colors text-sm text-white ${
+                                        tool.accentColor === 'violet' ? 'bg-violet-600 hover:bg-violet-500'
+                                        : tool.accentColor === 'rose' ? 'bg-rose-600 hover:bg-rose-500'
+                                        : tool.accentColor === 'amber' ? 'bg-amber-600 hover:bg-amber-500'
+                                        : tool.accentColor === 'green' ? 'bg-green-600 hover:bg-green-500'
+                                        : tool.accentColor === 'emerald' ? 'bg-emerald-600 hover:bg-emerald-500'
+                                        : tool.accentColor === 'purple' ? 'bg-purple-600 hover:bg-purple-500'
+                                        : tool.accentColor === 'cyan' ? 'bg-cyan-600 hover:bg-cyan-500'
+                                        : tool.accentColor === 'indigo' ? 'bg-indigo-600 hover:bg-indigo-500'
+                                        : 'bg-blue-600 hover:bg-blue-500'
+                                    }`}>
                                     <ExternalLink className="w-4 h-4" />
                                     Open Tool
                                 </Link>

@@ -30,6 +30,7 @@ from flask import Blueprint, jsonify, request
 from tools import hello as hello_tool
 from tools import image_converter as image_converter_tool
 from tools import remove_background as remove_background_tool
+from tools import image_to_svg as image_to_svg_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ _TOOLS: dict[str, object] = {
     "hello": hello_tool,
     "image_converter": image_converter_tool,
     "remove_background": remove_background_tool,
+    "image_to_svg": image_to_svg_tool,
 }
 
 
@@ -170,6 +172,40 @@ def remove_background_run():
         return jsonify(result)
     except Exception as exc:
         logger.exception("Remove background failed")
+        return jsonify({"error": str(exc)}), 500
+
+
+@tools_bp.post("/image-to-svg/run")
+def image_to_svg_run():
+    """
+    Direct frontend endpoint for the Image to SVG Vectorizer tool.
+    Uses parallel execution when more than 1 file is provided.
+
+    Body: {
+        "files": [{"path": "..."}, ...],
+        "outputMode": "replace" | "copy" | "virtual_drive",
+        "outputPath": "C:/...",   # required for virtual_drive mode
+        "colormode": "color" | "binary",
+        "hierarchical": "stacked" | "cutout",
+        "filterSpeckle": 4,
+        "colorPrecision": 6
+    }
+    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    try:
+        files = data.get("files", [])
+        if len(files) > 1:
+            raw = image_to_svg_tool.execute_parallel(data)
+        else:
+            raw = image_to_svg_tool.execute(data)
+        result = json.loads(raw)
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("Image to SVG vectorizer failed")
         return jsonify({"error": str(exc)}), 500
 
 

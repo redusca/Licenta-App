@@ -129,7 +129,7 @@ function FolderBrowser({
                 <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-3">
                         {currentDrive && currentPath.replace(/[\\/]+$/, '') !== currentDrive.path.replace(/[\\/]+$/, '') && (
-                            <button onClick={navigateUp}
+                            <button type="button" onClick={navigateUp}
                                 className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                                 <ChevronLeft className="w-4 h-4" />
                             </button>
@@ -145,7 +145,7 @@ function FolderBrowser({
                             </span>
                         )}
                     </div>
-                    <button onClick={onClose}
+                    <button type="button" onClick={onClose}
                         className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                         <X className="w-4 h-4" />
                     </button>
@@ -183,7 +183,7 @@ function FolderBrowser({
                             {/* Select all toggle */}
                             {imageEntries.length > 0 && (
                                 <div className="flex items-center gap-3 px-4 py-2 mb-1 border-b border-slate-200 dark:border-slate-800">
-                                    <button onClick={toggleAll}
+                                    <button type="button" onClick={toggleAll}
                                         className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${allImagesSelected
                                             ? 'bg-blue-500 border-blue-500 text-white'
                                             : someImagesSelected
@@ -229,11 +229,11 @@ function FolderBrowser({
                             {selected.size} file{selected.size !== 1 ? 's' : ''} selected
                         </span>
                         <div className="flex gap-2">
-                            <button onClick={onClose}
+                            <button type="button" onClick={onClose}
                                 className="text-sm px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-500 hover:text-slate-300 transition-colors">
                                 Cancel
                             </button>
-                            <button onClick={confirmSelection} disabled={selected.size === 0}
+                            <button type="button" onClick={confirmSelection} disabled={selected.size === 0}
                                 className="text-sm px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-medium transition-colors">
                                 Add {selected.size} file{selected.size !== 1 ? 's' : ''}
                             </button>
@@ -431,7 +431,7 @@ export const RemoveBackgroundPage: React.FC = () => {
                         <p className="text-sm text-slate-500">Automatically remove background from images</p>
                     </div>
                 </div>
-                <button onClick={() => navigate('/tools/remove-background')}
+                <button type="button" onClick={() => navigate('/tools/remove-background')}
                     className="flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors">
                     <ArrowLeft className="w-4 h-4" />
                     Back to Info
@@ -447,24 +447,24 @@ export const RemoveBackgroundPage: React.FC = () => {
                         <div className="flex items-center justify-between mb-3">
                             <p className="text-sm font-semibold text-slate-300">Add Files</p>
                             {files.length > 0 && (
-                                <button onClick={clearAll}
+                                <button type="button" onClick={clearAll}
                                     className="text-xs text-slate-500 hover:text-red-400 transition-colors">
                                     Clear all
                                 </button>
                             )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                            <button onClick={browseFiles}
+                            <button type="button" onClick={browseFiles}
                                 className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors">
                                 <FileImage className="w-4 h-4" />
                                 Browse Files
                             </button>
-                            <button onClick={browseFolder}
+                            <button type="button" onClick={browseFolder}
                                 className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors">
                                 <FolderOpen className="w-4 h-4" />
                                 Browse Folder
                             </button>
-                            <button onClick={() => setShowBrowser(true)} disabled={loadingDrives}
+                            <button type="button" onClick={() => setShowBrowser(true)} disabled={loadingDrives}
                                 className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-40">
                                 <HardDrive className="w-4 h-4" />
                                 From Virtual Drive
@@ -487,7 +487,7 @@ export const RemoveBackgroundPage: React.FC = () => {
                             {/* File list header */}
                             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
                                 <div className="flex items-center gap-3">
-                                    <button onClick={toggleAllFiles}
+                                    <button type="button" onClick={toggleAllFiles}
                                         className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${allSelected
                                             ? 'bg-blue-500 border-blue-500 text-white'
                                             : someSelected
@@ -510,7 +510,7 @@ export const RemoveBackgroundPage: React.FC = () => {
                                         <div key={file.path}
                                             className={`flex items-center gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors ${fileStatuses.get(file.path) === 'failed' ? 'bg-red-500/5' : fileStatuses.get(file.path) === 'done' ? 'bg-green-500/5' : ''
                                                 }`}>
-                                            <button onClick={() => toggleSelect(file.path)}
+                                            <button type="button" onClick={() => toggleSelect(file.path)}
                                                 className={`w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 ${selected.has(file.path)
                                                     ? 'bg-blue-500 border-blue-500 text-white'
                                                     : 'border-slate-400 hover:border-slate-300'
@@ -540,7 +540,7 @@ export const RemoveBackgroundPage: React.FC = () => {
 
                                             
 
-                                            <button onClick={() => removeFile(file.path)}
+                                            <button type="button" onClick={() => removeFile(file.path)}
                                                 className="text-slate-600 hover:text-red-400 transition-colors shrink-0 p-1">
                                                 <X className="w-3.5 h-3.5" />
                                             </button>
@@ -587,7 +587,7 @@ export const RemoveBackgroundPage: React.FC = () => {
 
                     {/* Convert button */}
                     {files.length > 0 && (
-                        <button onClick={convert} disabled={!canConvert}
+                        <button type="button" onClick={convert} disabled={!canConvert}
                             className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm shadow-lg shadow-blue-900/20">
                             {converting ? (
                                 <>
@@ -626,7 +626,7 @@ export const RemoveBackgroundPage: React.FC = () => {
                             {results.virtualDrivePath && (
                                 <div className="mt-2 text-left">
                                     <p className="text-xs text-green-400 mb-2">Saved to: {results.virtualDrivePath}</p>
-                                    <button onClick={() => navigate(`/files?path=${encodeURIComponent(results.virtualDrivePath)}`)}
+                                    <button type="button" onClick={() => navigate(`/files?path=${encodeURIComponent(results.virtualDrivePath)}`)}
                                         className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors">
                                         <HardDrive className="w-3.5 h-3.5" />
                                         Open Virtual Drive
@@ -650,3 +650,4 @@ export const RemoveBackgroundPage: React.FC = () => {
         </div>
     );
 };
+

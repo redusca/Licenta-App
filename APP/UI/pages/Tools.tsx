@@ -5,7 +5,7 @@ import {
     Image, Music, Video, FileText, Archive, Box, Database,
     Code, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
     AudioWaveform, Clapperboard, LayoutGrid, List, ChevronRight,
-    Search, AlertCircle, RefreshCw, ExternalLink,
+    Search, AlertCircle, RefreshCw, ExternalLink, PenTool, ImageOff,
 } from 'lucide-react';
 import type { CategoryKey, CategoryMeta, ToolDefinition } from '../data/tools';
 import { useToolsCatalog } from '../hooks/useToolsCatalog';
@@ -15,7 +15,7 @@ import { useToolsCatalog } from '../hooks/useToolsCatalog';
 const ICON_MAP: Record<string, React.ElementType> = {
     Image, Music, Video, FileText, Archive, Box, Database, Code,
     Zap, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
-    AudioWaveform, Clapperboard,
+    AudioWaveform, Clapperboard, PenTool, ImageOff,
 };
 
 function ToolIcon({ name, className }: { name: string; className?: string }) {
@@ -34,6 +34,7 @@ const COLOR_ICON: Record<string, string> = {
     indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
     green: 'bg-green-500/10 border-green-500/20 text-green-400',
     emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
+    violet: 'bg-violet-500/10 border-violet-500/20 text-violet-400',
 };
 
 const COLOR_SECTION: Record<string, string> = {
@@ -45,6 +46,7 @@ const COLOR_SECTION: Record<string, string> = {
     indigo: 'border-l-indigo-500',
     green: 'border-l-green-500',
     emerald: 'border-l-emerald-500',
+    violet: 'border-l-violet-500',
 };
 
 const COLOR_CAT_ICON: Record<string, string> = {
@@ -56,6 +58,7 @@ const COLOR_CAT_ICON: Record<string, string> = {
     indigo: 'text-indigo-400 bg-indigo-500/10',
     green: 'text-green-400 bg-green-500/10',
     emerald: 'text-emerald-400 bg-emerald-500/10',
+    violet: 'text-violet-400 bg-violet-500/10',
 };
 
 const COLOR_FILTER_ACTIVE: Record<string, string> = {
@@ -67,6 +70,7 @@ const COLOR_FILTER_ACTIVE: Record<string, string> = {
     indigo: 'bg-indigo-600 text-white border-indigo-600',
     green: 'bg-green-600 text-white border-green-600',
     emerald: 'bg-emerald-600 text-white border-emerald-600',
+    violet: 'bg-violet-600 text-white border-violet-600',
 };
 
 // ── Skeleton loader ─────────────────────────────────────────────────────────
@@ -95,6 +99,21 @@ function SkeletonCard() {
 // ── Tool runner routes (tools that have a dedicated runner page) ────────────
 const TOOL_RUNNER_ROUTES: Record<string, string> = {
     'image-converter': '/tools/image-converter/run',
+    'remove-background': '/tools/remove-background/run',
+    'image-to-svg': '/tools/image-to-svg/run',
+};
+
+// Maps tool accent color → Open button tailwind classes
+const COLOR_OPEN_BTN: Record<string, string> = {
+    blue: 'bg-blue-600 hover:bg-blue-500',
+    violet: 'bg-violet-600 hover:bg-violet-500',
+    rose: 'bg-rose-600 hover:bg-rose-500',
+    amber: 'bg-amber-600 hover:bg-amber-500',
+    cyan: 'bg-cyan-600 hover:bg-cyan-500',
+    indigo: 'bg-indigo-600 hover:bg-indigo-500',
+    green: 'bg-green-600 hover:bg-green-500',
+    emerald: 'bg-emerald-600 hover:bg-emerald-500',
+    purple: 'bg-purple-600 hover:bg-purple-500',
 };
 
 // ── Tool Card ───────────────────────────────────────────────────────────────
@@ -145,7 +164,9 @@ function ToolCard({ tool }: { tool: ToolDefinition }) {
                 </Link>
                 {TOOL_RUNNER_ROUTES[tool.id] && (
                     <Link to={TOOL_RUNNER_ROUTES[tool.id]}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors">
+                        className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-semibold transition-colors ${
+                            COLOR_OPEN_BTN[tool.accentColor] ?? COLOR_OPEN_BTN.blue
+                        }`}>
                         <ExternalLink className="w-3.5 h-3.5" />
                         Open
                     </Link>
