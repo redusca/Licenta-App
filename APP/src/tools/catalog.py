@@ -515,6 +515,52 @@ TOOLS: list[dict] = [
     },
 
     {
+        "id": "video-converter",
+        "name": "Video Converter",
+        "version": "1.0.0",
+        "description": "Convert videos between all major formats using FFmpeg.",
+        "longDescription": (
+            "Video Converter lets you batch-convert video files between all common formats (MP4, AVI, MKV, MOV, WMV, FLV, WebM). "
+            "It supports conversion to output modes such as overriding existing files, saving identically named duplicates next to them, "
+            "or exporting batch outputs into a pristine Virtual Drive sandbox. Powered natively by FFmpeg under the hood."
+        ),
+        "categories": ["video"],
+        "fileExtensions": [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpeg", ".mpg"],
+        "usesAI": False,
+        "icon": "Video",
+        "accentColor": "rose",
+        "author": "Core Team",
+        "fields": [
+            {
+                "key": "inputFiles",
+                "label": "Input Videos",
+                "type": "multifile",
+                "description": "One or more video files to convert.",
+                "required": True,
+                "acceptedExtensions": [".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpeg", ".mpg"],
+            },
+            {
+                "key": "outputFormat",
+                "label": "Output Format",
+                "type": "select",
+                "description": "Target video format for the converted files.",
+                "required": True,
+                "options": ["mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"],
+                "default": "mp4",
+            },
+        ],
+        "usageSteps": [
+            "Open the Video Converter from the Tools page and click 'Run Tool'.",
+            "Click 'From Drive' to load videos from a virtual drive, or 'Browse Folder' to pick any folder.",
+            "Check the videos you want to convert and set the target format per file (or use 'Apply to all').",
+            "Choose an output mode: Replace originals, Copy in same folder, or save to a Virtual Drive.",
+            "If using Virtual Drive mode, make sure the Output Path is set in Settings.",
+            "Click Convert and review the results.",
+        ],
+        "tags": ["convert", "format", "batch", "mp4", "avi", "mkv", "video"],
+    },
+
+    {
         "id": "video-summarizer",
         "name": "AI Video Summarizer",
         "version": "0.8.0",

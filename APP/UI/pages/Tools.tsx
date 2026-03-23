@@ -101,6 +101,7 @@ const TOOL_RUNNER_ROUTES: Record<string, string> = {
     'image-converter': '/tools/image-converter/run',
     'remove-background': '/tools/remove-background/run',
     'image-to-svg': '/tools/image-to-svg/run',
+    'video-converter': '/tools/video-converter/run',
 };
 
 // Maps tool accent color → Open button tailwind classes

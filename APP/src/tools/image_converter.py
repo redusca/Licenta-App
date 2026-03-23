@@ -87,8 +87,10 @@ def _save_tool_drives(drives: list) -> None:
 
 def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     drives = _load_tool_drives()
+    normalized_new = os.path.normcase(os.path.normpath(drive_path))
     for d in drives:
-        if d.get("path") == drive_path:
+        existing = d.get("path", "")
+        if existing and os.path.normcase(os.path.normpath(existing)) == normalized_new:
             return  # already registered
     drives.append({"path": drive_path, "name": name, "tool": tool})
     _save_tool_drives(drives)

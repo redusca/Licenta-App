@@ -98,8 +98,10 @@ def _save_tool_drives(drives: list) -> None:
 
 def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     drives = _load_tool_drives()
+    normalized_new = os.path.normcase(os.path.normpath(drive_path))
     for d in drives:
-        if d.get("path") == drive_path:
+        existing = d.get("path", "")
+        if existing and os.path.normcase(os.path.normpath(existing)) == normalized_new:
             return  # already registered
     drives.append({"path": drive_path, "name": name, "tool": tool})
     _save_tool_drives(drives)
@@ -158,10 +160,10 @@ def _vectorize_image(
             "Open a terminal and run:  pip install vtracer"
         )
 
-    # vtracer writes directly to the output path
+    # vtracer (Rust/PyO3) panics on Windows backslash paths — normalize to forward slashes
     vtracer.convert_image_to_svg_py(
-        src_path,
-        dst_path,
+        src_path.replace('\\', '/'),
+        dst_path.replace('\\', '/'),
         colormode=colormode,
         hierarchical=hierarchical,
         filter_speckle=filter_speckle,

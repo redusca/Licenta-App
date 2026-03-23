@@ -1426,7 +1426,16 @@ export const Files: React.FC = () => {
                                 <div
                                     key={file.path + idx}
                                     className={`flex items-center px-4 py-3 rounded-lg group cursor-pointer transition-all border border-transparent hover:bg-indigo-50 dark:hover:bg-indigo-900/10 hover:border-indigo-100`}
-                                    onClick={() => { if (file.is_dir) navigateTo(file.path); else openItem(file.path); }}
+                                    onClick={() => {
+                                        if (file.is_dir) { navigateTo(file.path); }
+                                        else {
+                                            const ext = getExt(file.name);
+                                            const isImage = IMAGE_EXTS.has(ext);
+                                            const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
+                                            if (isImage || isVideo) { setPreviewFile(file); }
+                                            else { openItem(file.path); }
+                                        }
+                                    }}
                                     onContextMenu={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();
@@ -1505,7 +1514,16 @@ export const Files: React.FC = () => {
                                     key={file.path}
                                     className={`flex items-center px-4 py-3 rounded-lg group cursor-pointer transition-all border border-transparent ${selectedItems.has(file.path) ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'} ${isCut ? 'opacity-50' : ''}`}
                                     onClick={(e) => handleItemClick(e, file, idx)}
-                                    onDoubleClick={() => { if (file.is_dir) navigateTo(file.path); else openItem(file.path); }}
+                                    onDoubleClick={() => {
+                                        if (file.is_dir) { navigateTo(file.path); }
+                                        else {
+                                            const ext = getExt(file.name);
+                                            const isImage = IMAGE_EXTS.has(ext);
+                                            const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
+                                            if (isImage || isVideo) { setPreviewFile(file); }
+                                            else { openItem(file.path); }
+                                        }
+                                    }}
                                     onContextMenu={(e) => {
                                         e.preventDefault();
                                         e.stopPropagation();

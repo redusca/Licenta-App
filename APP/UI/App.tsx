@@ -10,6 +10,7 @@ import { ToolDetail } from './pages/ToolDetail';
 import { ImageConverterPage } from './pages/ImageConverterPage';
 import { RemoveBackgroundPage } from './pages/RemoveBackgroundPage';
 import { ImageToSvgPage } from './pages/ImageToSvgPage';
+import { VideoConverterPage } from './pages/VideoConverterPage';
 import { Settings } from './pages/SettingsPage';
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
             <Route path="tools/image-converter/run" element={<ImageConverterPage />} />
             <Route path="tools/remove-background/run" element={<RemoveBackgroundPage />} />
             <Route path="tools/image-to-svg/run" element={<ImageToSvgPage />} />
+            <Route path="tools/video-converter/run" element={<VideoConverterPage />} />
             <Route path="tools/:id" element={<ToolDetail />} />
             <Route path="settings" element={<Settings />} />
           </Route>

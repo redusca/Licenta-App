@@ -1,12 +1,12 @@
 """
-Remove Background tool — batch-remove image backgrounds using rembg.
+Video Converter tool — batch-convert videos between formats using FFmpeg.
 
 Execution modes
 ---------------
 replace        : overwrite the original file with the converted version.
 copy           : place the converted file alongside the original (same folder).
-virtual_drive  : copy converted files into the RemovedBackgrounds virtual drive
-                 located at <output_path>/RemovedBackgrounds; creates the drive
+virtual_drive  : copy converted files into the VideoConversionResults virtual drive
+                 located at <output_path>/VideoConversionResults; creates the drive
                  (and registers it in tool_drives.json) if it does not already exist.
 """
 from __future__ import annotations
@@ -20,53 +20,24 @@ from pathlib import Path
 
 from config import APP_VERSION
 from migrations import get_latest_schema_version
-import requests
+import imageio_ffmpeg
+
+_FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-# __file__ = APP/src/tools/image_converter.py → .parent x3 = APP/
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 
 _CONFIG_FILENAME = ".drive_config.json"
-SUPPORTED_INPUT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-OUTPUT_FORMATS = {"png"}
+SUPPORTED_INPUT_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpeg", ".mpg"}
+OUTPUT_FORMATS = {"mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"}
 
 # ── Agent tool definition (used by /api/tools) ─────────────────────────────────
 
-def _ensure_model(model_name: str = "u2net") -> None:
-    """
-    Ensure the rembg model is downloaded to ~/.u2net to avoid
-    'fails to fetch' errors during execution due to timeouts or SSL issues.
-    """
-    try:
-        user_home = Path.home()
-        rembg_home = user_home / ".u2net"
-        model_path = rembg_home / f"{model_name}.onnx"
-
-        # Check if model exists and is not empty
-        if model_path.exists() and model_path.stat().st_size > 0:
-            return
-
-        print(f"Downloading {model_name} model to {model_path}...")
-        rembg_home.mkdir(parents=True, exist_ok=True)
-
-        url = f"https://github.com/danielgatis/rembg/releases/download/v0.0.0/{model_name}.onnx"
-        # Use a generous timeout for large file
-        response = requests.get(url, stream=True, timeout=60)
-        response.raise_for_status()
-
-        with open(model_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        print(f"Downloaded {model_name} successfully.")
-    except Exception as e:
-        print(f"Warning: Failed to pre-download rembg model: {e}")
-        # We don't raise here, let rembg try its own download method as backup.
-
 DEFINITION = {
-    "name": "remove_background",
+    "name": "video_converter",
     "description": (
-        "Batch-remove backgrounds from images using rembg. "
+        "Batch-convert video files between formats (MP4, AVI, MKV, MOV, WMV, FLV, WebM). "
         "Supports three output modes: replace originals, copy alongside, or virtual drive."
     ),
     "parameters": {
@@ -74,7 +45,7 @@ DEFINITION = {
         "properties": {
             "files": {
                 "type": "array",
-                "description": 'List of objects: [{"path": "...", "outputFormat": "png"}, ...]',
+                "description": 'List of objects: [{"path": "...", "outputFormat": "mp4"}, ...]',
                 "items": {"type": "object"},
             },
             "outputMode": {
@@ -86,19 +57,10 @@ DEFINITION = {
                 "type": "string",
                 "description": "Parent directory for the virtual drive (only for virtual_drive mode).",
             },
-            "quality": {
-                "type": "integer",
-                "description": "JPEG/WebP lossy quality 1–100 (default 85). Ignored (output is PNG).",
-            },
-            "preserveMetadata": {
-                "type": "boolean",
-                "description": "Copy EXIF metadata to PNG outputs (default true).",
-            },
         },
         "required": ["files", "outputMode"],
     },
 }
-
 
 # ── Tool-drives registry helpers ───────────────────────────────────────────────
 
@@ -110,11 +72,9 @@ def _load_tool_drives() -> list:
             return []
     return []
 
-
 def _save_tool_drives(drives: list) -> None:
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
     _TOOL_DRIVES_PATH.write_text(json.dumps(drives, indent=2), encoding="utf-8")
-
 
 def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     drives = _load_tool_drives()
@@ -126,16 +86,15 @@ def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     drives.append({"path": drive_path, "name": name, "tool": tool})
     _save_tool_drives(drives)
 
-
 # ── Virtual drive creation ─────────────────────────────────────────────────────
 
 def _ensure_virtual_drive(output_path: str) -> str:
     """
-    Ensure the RemovedBackgrounds virtual drive exists inside output_path.
+    Ensure the VideoConversionResults virtual drive exists inside output_path.
     Creates the folder + .drive_config.json if missing.
     Returns the full drive path.
     """
-    drive_name = "RemovedBackgrounds"
+    drive_name = "VideoConversionResults"
     drive_path = os.path.join(output_path, drive_name)
     os.makedirs(drive_path, exist_ok=True)
 
@@ -148,53 +107,49 @@ def _ensure_virtual_drive(output_path: str) -> str:
             "type": "move",
             "created_at": str(os.path.getctime(drive_path)),
             "app_version_created": APP_VERSION,
-            "created_by_tool": "remove_background",
+            "created_by_tool": "video_converter",
         }
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
         subprocess.call(["attrib", "+h", config_path], shell=True)
 
-    _register_tool_drive(drive_path, drive_name, "remove_background")
+    _register_tool_drive(drive_path, drive_name, "video_converter")
     return drive_path
 
+# ── Single-video conversion ────────────────────────────────────────────────────
 
-# ── Single-image conversion ────────────────────────────────────────────────────
-
-def _remove_background(
+def _convert_video(
     src_path: str,
+    out_format: str,
     dst_path: str,
-    preserve_metadata: bool = True,
 ) -> None:
-    """Open src_path, pass to rembg remove, save at dst_path."""
+    """Invoke ffmpeg to convert video format."""
+    cmd = [
+        _FFMPEG_EXE,
+        "-y",               # Overwrite output
+        "-i", src_path,     # Input file
+        # To avoid re-encoding if not strictly necessary, we could try `-c copy`,
+        # but formats often require specific codecs. Doing a standard transcode is safer.
+        dst_path
+    ]
+    
     try:
-        from PIL import Image
-    except ImportError:
-        raise RuntimeError(
-            "Pillow is not installed in the Python used by the backend. "
-            "Open a terminal and run:  pip install Pillow"
+        # Run ffmpeg, capture output for debugging if it fails
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False
         )
-    try:
-        from rembg import remove
-    except ImportError:
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg failed with exit code {result.returncode}.\n{result.stderr}")
+            
+    except FileNotFoundError:
         raise RuntimeError(
-            "rembg is not installed. "
-            "Open a terminal and run:  pip install rembg"
+            "ffmpeg is not installed or not in PATH. "
+            "Please install ffmpeg to use the Video Converter."
         )
-
-    img = Image.open(src_path)
-    output = remove(img)
-
-    save_kwargs: dict = {}
-    if preserve_metadata:
-        try:
-            exif_bytes = img.info.get("exif")
-            if exif_bytes:
-                save_kwargs["exif"] = exif_bytes
-        except Exception:
-            pass
-
-    output.save(dst_path, format="PNG", **save_kwargs)
-
 
 def _unique_path(path: str) -> str:
     """Return a non-colliding path by appending a numeric suffix if needed."""
@@ -207,20 +162,16 @@ def _unique_path(path: str) -> str:
         counter += 1
     return path
 
-
 # ── Public executor ────────────────────────────────────────────────────────────
 
 def execute(input: dict) -> str:
     """
-    Batch-remove backgrounds.  Called by POST /api/tools/execute and
-    POST /api/tools/remove-background/run.
+    Batch-convert videos.
     Returns a JSON string (for agent compatibility).
     """
-    _ensure_model()
     files: list = input.get("files", [])
     output_mode: str = input.get("outputMode", "copy")
     output_path: str = input.get("outputPath", "")
-    preserve_metadata: bool = bool(input.get("preserveMetadata", True))
 
     if not files:
         return json.dumps({"success": False, "error": "No files provided.", "results": []})
@@ -244,27 +195,33 @@ def execute(input: dict) -> str:
             results.append({"path": src, "success": False, "error": "File not found"})
             continue
 
-        ext = "png"
+        if raw_fmt not in OUTPUT_FORMATS:
+            results.append({"path": src, "success": False, "error": f"Unsupported format: {raw_fmt}"})
+            continue
+
+        ext = raw_fmt
         stem = Path(src).stem
 
         try:
             if output_mode == "replace":
-                tmp = src + ".img_rm_tmp"
-                _remove_background(src, tmp, preserve_metadata)
+                tmp = src + ".vid_conv_tmp." + ext
+                _convert_video(src, raw_fmt, tmp)
                 os.remove(src)
                 final = os.path.join(os.path.dirname(src), f"{stem}.{ext}")
                 final = _unique_path(final)
                 os.rename(tmp, final)
 
             elif output_mode == "copy":
-                candidate = os.path.join(os.path.dirname(src), f"{stem}_nobg.{ext}")
+                candidate = os.path.join(os.path.dirname(src), f"{stem}.{ext}")
+                if os.path.normcase(candidate) == os.path.normcase(src):
+                    candidate = f"{os.path.join(os.path.dirname(src), stem)}_copy.{ext}"
                 final = _unique_path(candidate)
-                _remove_background(src, final, preserve_metadata)
+                _convert_video(src, raw_fmt, final)
 
             else:  # virtual_drive
                 dest = os.path.join(virtual_drive_path, f"{stem}.{ext}")  # type: ignore[arg-type]
                 dest = _unique_path(dest)
-                _remove_background(src, dest, preserve_metadata)
+                _convert_video(src, raw_fmt, dest)
                 final = dest
 
             results.append({"path": src, "outputPath": final, "success": True})
@@ -284,58 +241,61 @@ def execute(input: dict) -> str:
 
     return json.dumps(response)
 
-
 # ── Single item processing (used by parallel executor) ───────────────────────
 
 def _process_single_item(
     item: dict,
     output_mode: str,
     virtual_drive_path: str | None,
-    preserve_metadata: bool,
 ) -> dict:
-    """Remove background of a single file and return its result dict."""
+    """Convert a single file and return its result dict."""
     src = item.get("path", "")
+    raw_fmt = item.get("outputFormat", "").lower().lstrip(".")
 
     if not src or not os.path.isfile(src):
         return {"path": src, "success": False, "error": "File not found"}
 
-    ext = "png"
+    if raw_fmt not in OUTPUT_FORMATS:
+        return {"path": src, "success": False, "error": f"Unsupported format: {raw_fmt}"}
+
+    ext = raw_fmt
     stem = Path(src).stem
 
     try:
         if output_mode == "replace":
-            tmp = src + ".img_rm_tmp"
-            _remove_background(src, tmp, preserve_metadata)
+            tmp = src + ".vid_conv_tmp." + ext
+            _convert_video(src, raw_fmt, tmp)
             os.remove(src)
             final = os.path.join(os.path.dirname(src), f"{stem}.{ext}")
             final = _unique_path(final)
             os.rename(tmp, final)
 
         elif output_mode == "copy":
-            candidate = os.path.join(os.path.dirname(src), f"{stem}_nobg.{ext}")
+            candidate = os.path.join(os.path.dirname(src), f"{stem}.{ext}")
+            if os.path.normcase(candidate) == os.path.normcase(src):
+                candidate = f"{os.path.join(os.path.dirname(src), stem)}_copy.{ext}"
             final = _unique_path(candidate)
-            _remove_background(src, final, preserve_metadata)
+            _convert_video(src, raw_fmt, final)
 
         else:  # virtual_drive
             dest = os.path.join(virtual_drive_path, f"{stem}.{ext}")  # type: ignore[arg-type]
             dest = _unique_path(dest)
-            _remove_background(src, dest, preserve_metadata)
+            _convert_video(src, raw_fmt, dest)
             final = dest
 
         return {"path": src, "outputPath": final, "success": True}
     except Exception as exc:
         return {"path": src, "success": False, "error": str(exc)}
 
-def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
+def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
     """
-    Parallel batch-remove. Uses a thread pool.
+    Parallel batch-convert. Uses a thread pool. Video conversion is CPU intensive,
+    so we default to 2 workers to avoid choking the machine.
     Returns a JSON string with results in original order.
     """
-    _ensure_model()
     files: list = input_data.get("files", [])
     output_mode: str = input_data.get("outputMode", "copy")
     output_path: str = input_data.get("outputPath", "")
-    preserve_metadata: bool = bool(input_data.get("preserveMetadata", True))
 
     if not files:
         return json.dumps({"success": False, "error": "No files provided.", "results": []})
@@ -350,19 +310,17 @@ def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
             })
         virtual_drive_path = _ensure_virtual_drive(output_path)
 
-    # For replace mode, run sequentially to avoid race conditions on same files
     if output_mode == "replace":
         workers = 1
     else:
         workers = min(max_workers, len(files))
 
-    # Map future → index to preserve order
     results: list = [None] * len(files)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         future_to_idx = {
             pool.submit(
                 _process_single_item,
-                item, output_mode, virtual_drive_path, preserve_metadata,
+                item, output_mode, virtual_drive_path,
             ): idx
             for idx, item in enumerate(files)
         }
