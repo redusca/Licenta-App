@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, RotateCw, ZoomIn, ZoomOut, Maximize, Play, Pause, FastForward } from 'lucide-react';
+import { X, RotateCw, ZoomIn, ZoomOut, FastForward } from 'lucide-react';
 
 interface FileItem {
     name: string;
@@ -21,7 +21,11 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({ file, onCl
     const [playbackRate, setPlaybackRate] = useState(1);
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(file.name);
+    let displayName = file.name;
+    if (displayName.toLowerCase().endsWith('.lnk')) {
+        displayName = displayName.slice(0, -4);
+    }
+    const isVideo = /\.(mp4|mov|avi|mkv|webm)$/i.test(displayName);
     const src = `${API_URL}?path=${encodeURIComponent(file.path)}`;
 
     // Reset state when file changes
@@ -51,7 +55,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({ file, onCl
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur flex flex-col animate-in fade-in duration-200" onClick={onClose}>
             {/* Toolbar */}
             <div className="flex items-center justify-between p-4 text-white bg-black/50" onClick={e => e.stopPropagation()}>
-                <div className="font-medium truncate max-w-xl">{file.name}</div>
+                <div className="font-medium truncate max-w-xl">{displayName}</div>
                 <div className="flex items-center gap-4">
                     {!isVideo && (
                         <>
@@ -96,7 +100,7 @@ export const MediaPreviewModal: React.FC<MediaPreviewModalProps> = ({ file, onCl
                     ) : (
                         <img
                             src={src}
-                            alt={file.name}
+                            alt={displayName}
                             className="max-w-full max-h-full transition-transform duration-200 ease-out"
                             style={{ transform: `rotate(${rotation}deg) scale(${scale})` }}
                         />

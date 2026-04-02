@@ -18,5 +18,15 @@
     "path": "D:\\DProjects\\Drives\\VideoConversionResults",
     "name": "VideoConversionResults",
     "tool": "video_converter"
+  },
+  {
+    "path": "D:\\DProjects\\Drives\\AudioConversionResults",
+    "name": "AudioConversionResults",
+    "tool": "audio_converter"
+  },
+  {
+    "path": "D:\\DProjects\\Drives\\My New Folder Drive",
+    "name": "My New Folder Drive",
+    "tool": "drive_creator"
   }
 ]

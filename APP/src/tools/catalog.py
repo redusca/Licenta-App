@@ -75,6 +75,13 @@ CATEGORIES: list[dict] = [
         "icon": "Zap",
         "description": "Connectivity and pipeline test utilities.",
     },
+    {
+        "key": "computer_tools",
+        "label": "Computer Tools",
+        "color": "slate",
+        "icon": "HardDrive",
+        "description": "System utilities, drive management, and folder operations.",
+    },
 ]
 
 # ── Tool catalog ──────────────────────────────────────────────────────────
@@ -321,6 +328,52 @@ TOOLS: list[dict] = [
     },
 
     # ── AUDIO ─────────────────────────────────────────────────────────────
+
+    {
+        "id": "audio-converter",
+        "name": "Audio Converter",
+        "version": "1.0.0",
+        "description": "Convert audio files between formats: MP3, WAV, M4A, AAC, FLAC, OGG.",
+        "longDescription": (
+            "Audio Converter lets you batch-convert audio files between common formats. "
+            "It supports conversion to output modes such as replacing existing files, saving identically named duplicates next to them, "
+            "or exporting batch outputs into a pristine Virtual Drive sandbox. Powered natively by FFmpeg under the hood."
+        ),
+        "categories": ["audio"],
+        "fileExtensions": [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".wma", ".mka"],
+        "usesAI": False,
+        "icon": "Music",
+        "accentColor": "purple",
+        "author": "Core Team",
+        "fields": [
+            {
+                "key": "inputFiles",
+                "label": "Input Audio",
+                "type": "multifile",
+                "description": "One or more audio files to convert.",
+                "required": True,
+                "acceptedExtensions": [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".wma", ".mka"],
+            },
+            {
+                "key": "outputFormat",
+                "label": "Output Format",
+                "type": "select",
+                "description": "Target audio format for the converted files.",
+                "required": True,
+                "options": ["mp3", "wav", "m4a", "aac", "flac", "ogg"],
+                "default": "mp3",
+            },
+        ],
+        "usageSteps": [
+            "Open the Audio Converter from the Tools page and click 'Run Tool'.",
+            "Click 'From Drive' to load audio from a virtual drive, or 'Browse Folder' to pick any folder.",
+            "Check the audio files you want to convert and set the target format per file (or use 'Apply to all').",
+            "Choose an output mode: Replace originals, Copy in same folder, or save to a Virtual Drive.",
+            "If using Virtual Drive mode, make sure the Output Path is set in Settings.",
+            "Click Convert and review the results.",
+        ],
+        "tags": ["convert", "format", "batch", "mp3", "wav", "audio"],
+    },
 
     {
         "id": "audio-transcriber",
@@ -1102,5 +1155,87 @@ TOOLS: list[dict] = [
             "Check that tool_calls are listed — this confirms the full pipeline is active.",
         ],
         "tags": ["test", "connectivity", "hello", "pipeline", "debug"],
+    },
+
+    {
+        "id": "3d-visualizer",
+        "name": "3D Visualizer",
+        "version": "1.0.0",
+        "description": "Preview 3D models (OBJ, GLTF, FBX) and apply custom textures.",
+        "longDescription": (
+            "3D Visualizer is a local, in-browser tool that allows you to preview 3D models "
+            "with interactive camera controls (rotate, pan, zoom). You can load a 3D object "
+            "file and optionally select an image texture to apply to its surface."
+        ),
+        "categories": ["3d"],
+        "fileExtensions": [".obj", ".fbx", ".glb", ".gltf", ".stl"],
+        "usesAI": False,
+        "icon": "Box",
+        "accentColor": "cyan",
+        "author": "Core Team",
+        "fields": [],
+        "usageSteps": [
+            "Click 'Run Tool' to open the 3D Visualizer.",
+            "Select an optional texture image.",
+            "Select a 3D object to load into the viewer.",
+            "Use your mouse to rotate and zoom around the preview."
+        ],
+        "tags": ["3d", "visualize", "preview", "texture", "model"],
+    },
+
+    {
+        "id": "drive-creator",
+        "name": "Drive Creator",
+        "version": "1.0.0",
+        "description": "Group files from a selected folder by category into a Virtual Drive.",
+        "longDescription": (
+            "Drive Creator allows you to quickly sift through any folder and gather all files "
+            "matching specific categories (like Images, Audio, Video, 3D Objects, etc.). "
+            "It will then instantly create a new Virtual Drive containing shortcuts to these files, "
+            "or optionally move them entirely. Built for lightning-fast scanning via MFT."
+        ),
+        "categories": ["computer_tools"],
+        "fileExtensions": [],
+        "usesAI": False,
+        "icon": "FolderTree",
+        "accentColor": "emerald",
+        "author": "Core Team",
+        "fields": [],
+        "usageSteps": [
+            "Open Drive Creator and click 'Run Tool'.",
+            "Select the Source Folder you want to scan.",
+            "Choose a file category to target (e.g., Images, Videos).",
+            "Give the new Virtual Drive a name.",
+            "Select whether to create shortcuts (safest) or move the original files.",
+            "Click 'Create Drive'."
+        ],
+        "tags": ["drive", "virtual drive", "organize", "shortcut", "move", "categorize"],
+    },
+
+    {
+        "id": "space-analyzer",
+        "name": "Space Analyzer",
+        "version": "1.0.0",
+        "description": "Visualize drive space using an interactive squarified treemap.",
+        "longDescription": (
+            "Space Analyzer instantly scans your selected drive via the NTFS Master File Table, "
+            "calculates recursive folder sizes, and displays memory usage in an interactive Treemap "
+            "similar to WizTree. Find what's taking up your disk space at a glance."
+        ),
+        "categories": ["computer_tools"],
+        "fileExtensions": [],
+        "usesAI": False,
+        "icon": "PieChart",
+        "accentColor": "slate",
+        "author": "Core Team",
+        "fields": [],
+        "usageSteps": [
+            "Click 'Run Tool' to open Space Analyzer.",
+            "Select a Drive letter (e.g. C or D).",
+            "Wait a brief moment for the fast MFT scan.",
+            "Explore the Treemap to see what folders use the most space.",
+            "Click into blocks to drill down, or use the path bar to go back."
+        ],
+        "tags": ["space", "analyzer", "wiztree", "storage", "treemap", "mft", "size", "disk"],
     },
 ]

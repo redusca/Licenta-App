@@ -45,17 +45,21 @@ type ViewMode      = 'list' | 'grid';
 type FileTypeFilter = 'all' | 'folder' | 'image' | 'doc' | 'media' | 'code' | 'archive' | 'shortcut';
 
 function getExt(name: string): string {
-    return (name.split('.').pop() ?? '').toLowerCase();
+    let basename = name.toLowerCase();
+    if (basename.endsWith('.lnk')) {
+        basename = basename.slice(0, -4);
+    }
+    return (basename.split('.').pop() ?? '');
 }
 function getTypeBucket(file: { is_dir: boolean; name: string }): FileTypeFilter {
     if (file.is_dir) return 'folder';
-    if (file.name.toLowerCase().endsWith('.lnk')) return 'shortcut';
     const ext = getExt(file.name);
     if (IMAGE_EXTS.has(ext))   return 'image';
     if (MEDIA_EXTS.has(ext))   return 'media';
     if (DOC_EXTS.has(ext))     return 'doc';
     if (CODE_EXTS.has(ext))    return 'code';
     if (ARCHIVE_EXTS.has(ext)) return 'archive';
+    if (file.name.toLowerCase().endsWith('.lnk')) return 'shortcut';
     return 'all';
 }
 function fmtBytes(bytes: number): string {

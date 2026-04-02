@@ -13,7 +13,7 @@ interface ToolDrive {
     tool: string;
 }
 
-const TOOL_LABELS: Record<string, { label: string; icon: React.ElementType; color: string }> = {
+const TOOL_LABELS: Record<string, { label: string; icon: any; color: string }> = {
     image_converter: { label: 'Image Converter', icon: Image, color: 'blue' },
 };
 

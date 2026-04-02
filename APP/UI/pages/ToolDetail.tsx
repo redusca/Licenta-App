@@ -12,7 +12,7 @@ import { useToolsCatalog } from '../hooks/useToolsCatalog';
 
 // ── Icon resolver ───────────────────────────────────────────────────────────
 
-const ICON_MAP: Record<string, React.ElementType> = {
+const ICON_MAP: Record<string, any> = {
     Image, Music, Video, FileText, Archive, Box, Database, Code,
     Zap, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
     AudioWaveform, Clapperboard, Tag, Cpu, PenTool, ImageOff,
@@ -244,6 +244,11 @@ const TOOL_RUNNER_ROUTES: Record<string, string> = {
     'image-converter': '/tools/image-converter/run',
     'remove-background': '/tools/remove-background/run',
     'image-to-svg': '/tools/image-to-svg/run',
+    'video-converter': '/tools/video-converter/run',
+    'audio-converter': '/tools/audio-converter/run',
+    '3d-visualizer': '/tools/3d-visualizer/run',
+    'drive-creator': '/tools/drive-creator/run',
+    'space-analyzer': '/tools/space-analyzer/run',
 };
 
 // ── Main ToolDetail page ────────────────────────────────────────────────────

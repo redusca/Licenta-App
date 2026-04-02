@@ -61,6 +61,52 @@ def create_shortcut(target, shortcut_path):
         if os.path.exists(vbs_file):
             os.remove(vbs_file)
 
+import re
+import tempfile
+
+_LNK_CACHE = {}
+
+def resolve_shortcut(lnk_path):
+    if lnk_path in _LNK_CACHE:
+        return _LNK_CACHE[lnk_path]
+    try:
+        with open(lnk_path, 'rb') as f:
+            data = f.read()
+            # Try utf-16le first
+            matches_u = re.findall(b'([a-zA-Z]\x00:\x00\\\x00(?:[^\x00]\x00)+)', data)
+            if matches_u:
+                 matches_u.sort(key=len, reverse=True)
+                 target = matches_u[0].decode('utf-16le')
+                 _LNK_CACHE[lnk_path] = target
+                 return target
+            # Fallback to ascii/utf-8
+            matches = re.findall(rb'[a-zA-Z]:\\[^\x00]+', data)
+            if matches:
+                 matches.sort(key=len, reverse=True)
+                 target = matches[0].decode('utf-8', errors='ignore')
+                 _LNK_CACHE[lnk_path] = target
+                 return target
+    except Exception:
+        pass
+        
+    # VBScript fallback if binary parse fails
+    vbs = f'''
+Set sh = WScript.CreateObject("WScript.Shell")
+Set sc = sh.CreateShortcut("{lnk_path}")
+WScript.Echo sc.TargetPath
+'''
+    fd, tmp = tempfile.mkstemp(suffix='.vbs')
+    os.close(fd)
+    try:
+        with open(tmp, 'w') as f: f.write(vbs)
+        out = subprocess.check_output(['cscript', '//nologo', tmp]).decode('utf-8', errors='ignore').strip()
+        _LNK_CACHE[lnk_path] = out
+        return out
+    except Exception:
+        return None
+    finally:
+        if os.path.exists(tmp): os.remove(tmp)
+
 def add_file(drive_path, file_path, mode='shortcut'):
     filename = os.path.basename(file_path)
     dest_path = os.path.join(drive_path, filename)

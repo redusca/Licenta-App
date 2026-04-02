@@ -4,7 +4,6 @@ import { ThemeToggle } from './ThemeToggle';
 import {
   LayoutDashboard,
   MessageSquare,
-  FolderOpen,
   Blocks,
   Wrench,
   Settings,

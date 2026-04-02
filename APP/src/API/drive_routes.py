@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, send_file
-from utils.drive_manager import create_drive, add_file, add_folder, get_drive_config, delete_item, rename_item, paste_items, open_item, get_drive_tree, delete_drive, move_drive_contents, rename_drive_config
+from utils.drive_manager import create_drive, add_file, add_folder, get_drive_config, delete_item, rename_item, paste_items, open_item, get_drive_tree, delete_drive, move_drive_contents, rename_drive_config, resolve_shortcut
 from utils.mft_scan import scan_drive, search_volume, get_volume_stats, list_directory_mft, invalidate_cache, build_path_map
 from utils.drives_registry import load_registry, save_registry
 from migrations import migrate_all_known_drives
@@ -399,4 +399,51 @@ def serve_file():
     path_arg = request.args.get('path')
     if not path_arg or not os.path.exists(path_arg):
         return jsonify({'error': 'File not found'}), 404
+        
+    if path_arg.lower().endswith('.lnk'):
+        target = resolve_shortcut(path_arg)
+        if target and os.path.exists(target):
+            path_arg = target
+            
     return send_file(path_arg)
+
+
+@drive_bp.route('/list-recursive', methods=['GET'])
+def list_recursive():
+    """
+    Recursively list ALL files inside a directory tree.
+    Returns flat list: [{name, path, size, is_dir}].
+    Used by the 3D Visualizer to find models & textures in nested subfolders.
+    """
+    root = request.args.get('path')
+    if not root or not os.path.isdir(root):
+        return jsonify({"error": "Invalid path"}), 400
+
+    MAX_FILES = 2000
+    results = []
+
+    def _walk(folder):
+        if len(results) >= MAX_FILES:
+            return
+        try:
+            with os.scandir(folder) as it:
+                for entry in it:
+                    if entry.name.startswith('.'):
+                        continue
+                    try:
+                        st = entry.stat()
+                    except OSError:
+                        continue
+                    results.append({
+                        "name":   entry.name,
+                        "path":   entry.path,
+                        "size":   st.st_size,
+                        "is_dir": entry.is_dir(),
+                    })
+                    if entry.is_dir() and len(results) < MAX_FILES:
+                        _walk(entry.path)
+        except (PermissionError, OSError):
+            pass
+
+    _walk(root)
+    return jsonify({"files": results, "truncated": len(results) >= MAX_FILES})

@@ -1,4 +1,4 @@
-﻿"""
+"""
 mft_scan.py
 ===========
 Direct NTFS Master File Table (MFT) scanner.
@@ -526,3 +526,134 @@ def list_directory_mft(drive_letter: str, dir_path: str) -> list | None:
             })
 
     return children
+
+
+import os
+
+def _fallback_space_analyzer(target_dir: str) -> dict:
+    """Fallback recursive size calculator using os.scandir when MFT isn't available."""
+    try:
+        if not os.path.exists(target_dir):
+            return {"error": "Path does not exist"}
+            
+        children = []
+        total_size = 0
+        
+        # Helper to get deep folder size
+        def get_dir_size(path):
+            total = 0
+            try:
+                with os.scandir(path) as it:
+                    for entry in it:
+                        try:
+                            if entry.is_file(follow_symlinks=False):
+                                total += entry.stat(follow_symlinks=False).st_size
+                            elif entry.is_dir(follow_symlinks=False):
+                                total += get_dir_size(entry.path)
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            return total
+
+        with os.scandir(target_dir) as it:
+            for entry in it:
+                try:
+                    stat = entry.stat(follow_symlinks=False)
+                    is_dir = entry.is_dir(follow_symlinks=False)
+                    size = get_dir_size(entry.path) if is_dir else stat.st_size
+                    total_size += size
+                    children.append({
+                        "name": entry.name,
+                        "full_path": entry.path,
+                        "is_dir": is_dir,
+                        "size": size,
+                        "created": stat.st_ctime,
+                        "modified": stat.st_mtime,
+                        "accessed": stat.st_atime,
+                    })
+                except Exception:
+                    continue
+                    
+        children.sort(key=lambda x: x["size"], reverse=True)
+        return {
+            "path": target_dir,
+            "total_size": total_size,
+            "children": children[:5000]
+        }
+    except Exception as e:
+        return {"error": f"Scandir fallback failed: {e}"}
+
+def get_space_analyzer_data(drive_letter: str, dir_path: str = None) -> dict:
+    """
+    Computes recursive folder sizes efficiently and returns the immediate
+    children of `dir_path` (or root if None) with their total sizes,
+    suitable for mapping in a Space Analyzer (WizTree clone).
+    """
+    cached = _ensure_cached(drive_letter)
+    if not cached:
+        # Fallback to slow os.scandir if MFT scanning fails (e.g. no Admin rights)
+        target = dir_path if dir_path else f"{drive_letter}:\\"
+        return _fallback_space_analyzer(target)
+
+    records = cached["records"]
+    path_map = cached["path_map"]
+
+    # Compute and cache recursive folder sizes once per drive scan
+    if "folder_sizes" not in cached:
+        parents = {r.get("record_num"): r.get("parent_ref") for r in records if r.get("record_num") is not None}
+        fsizes = {}
+        for r in records:
+            if r.get("is_dir") or r.get("size", 0) == 0:
+                continue
+            sz = r.get("size", 0)
+            curr = r.get("parent_ref")
+            visited = set()
+            while curr is not None and curr != _ROOT_RECORD_NUM and curr not in visited:
+                visited.add(curr)
+                fsizes[curr] = fsizes.get(curr, 0) + sz
+                curr = parents.get(curr)
+            if curr == _ROOT_RECORD_NUM:
+                fsizes[curr] = fsizes.get(curr, 0) + sz
+        cached["folder_sizes"] = fsizes
+
+    fsizes = cached["folder_sizes"]
+
+    target_rn = _ROOT_RECORD_NUM
+    if dir_path and dir_path.strip("\\/"):
+        norm_target = dir_path.rstrip("\\/").lower()
+        if not norm_target.endswith(":"):
+            for rn, path in path_map.items():
+                if path.rstrip("\\/").lower() == norm_target:
+                    target_rn = rn
+                    break
+
+    children = []
+    for r in records:
+        if r.get("parent_ref") == target_rn:
+            rn = r.get("record_num")
+            # For root, parent_ref can sometimes equal record_num in bad MFTs, exclude self
+            if rn == target_rn:
+                continue
+            is_dir = r.get("is_dir", False)
+            size = fsizes.get(rn, 0) if is_dir else r.get("size", 0)
+            children.append({
+                "name": r.get("name", ""),
+                "full_path": path_map.get(rn, "") if rn is not None else "",
+                "is_dir": is_dir,
+                "size": size,
+                "created": r.get("created", 0.0),
+                "modified": r.get("modified", 0.0),
+                "accessed": r.get("accessed", 0.0),
+            })
+
+    children.sort(key=lambda x: x["size"], reverse=True)
+    
+    total_size = fsizes.get(target_rn, 0) if target_rn in fsizes else sum(c["size"] for c in children)
+    target_path = path_map.get(target_rn, drive_letter.upper() + ":\\")
+
+    return {
+        "path": target_path,
+        "total_size": total_size,
+        "children": children[:5000]
+    }
