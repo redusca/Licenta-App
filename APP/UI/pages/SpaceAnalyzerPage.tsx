@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, ChevronRight, Folder, File, Loader2, PieChart, HardDrive, Play, ArrowUpCircle, FolderOpen
+    ArrowLeft, ChevronRight, Folder, File, Loader2, PieChart, HardDrive, Play, ArrowUpCircle
 } from 'lucide-react';
+import { MediaPreviewModal } from '../components/MediaPreviewModal';
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
 
@@ -31,6 +32,192 @@ function formatBytes(bytes: number, decimals = 2) {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
+// Color generator based on name
+const getColor = (name: string, isDir: boolean) => {
+    if (!isDir) return 'rgb(94 162 255 / 80%)'; // blueish for files
+    const hash = name.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 70%, 45%)`; // vibrant colors for folders
+};
+
+interface Rect { x: number; y: number; w: number; h: number; child: NodeInfo }
+
+function binaryTreemap(items: NodeInfo[], x: number, y: number, w: number, h: number): Rect[] {
+    if (items.length === 0) return [];
+    if (items.length === 1) return [{ x, y, w, h, child: items[0] }];
+    
+    const totalSize = items.reduce((s, c) => s + c.size, 0);
+    if (totalSize === 0) return []; // avoid NaN
+
+    // find split point
+    let sum = 0;
+    let splitIdx = 0;
+    for (let i = 0; i < items.length - 1; i++) {
+        sum += items[i].size;
+        splitIdx = i;
+        if (sum >= totalSize / 2) break;
+    }
+    
+    if (splitIdx === items.length - 1) splitIdx = items.length - 2;
+
+    const left = items.slice(0, splitIdx + 1);
+    const right = items.slice(splitIdx + 1);
+    const leftRatio = left.reduce((s, c) => s + c.size, 0) / totalSize;
+    
+    if (w >= h) {
+        const leftW = w * leftRatio;
+        return [
+            ...binaryTreemap(left, x, y, leftW, h),
+            ...binaryTreemap(right, x + leftW, y, w - leftW, h)
+        ];
+    } else {
+        const leftH = h * leftRatio;
+        return [
+            ...binaryTreemap(left, x, y, w, leftH),
+            ...binaryTreemap(right, x, y + leftH, w, h - leftH)
+        ];
+    }
+}
+
+const TreemapChart = ({ data, onNodeClick }: { data: NodeInfo[], onNodeClick: (n:NodeInfo)=>void }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [bounds, setBounds] = useState({ w: 0, h: 0 });
+    const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+    const isDragging = useRef(false);
+    const dragMoved = useRef(false);
+    const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+    useEffect(() => {
+        if (!containerRef.current) return;
+        const ro = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                setBounds({ w: entry.contentRect.width, h: entry.contentRect.height });
+            }
+        });
+        ro.observe(containerRef.current);
+        return () => ro.disconnect();
+    }, []);
+
+    useEffect(() => {
+        setTransform({ x: 0, y: 0, scale: 1 });
+    }, [data]);
+
+    const handleWheelRefs = useRef({ transform });
+    handleWheelRefs.current = { transform };
+
+    useEffect(() => {
+        const el = containerRef.current;
+        if (!el) return;
+        const onWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const { transform } = handleWheelRefs.current;
+            const zoomSensitivity = 0.001;
+            const delta = -e.deltaY * zoomSensitivity;
+            let newScale = transform.scale * Math.exp(delta);
+            
+            if (newScale < 1) newScale = 1;
+
+            if (newScale === 1) {
+                 setTransform({ x: 0, y: 0, scale: 1 });
+                 return;
+            }
+            
+            const rect = el.getBoundingClientRect();
+            const cursorX = e.clientX - rect.left;
+            const cursorY = e.clientY - rect.top;
+            
+            const r = newScale / transform.scale;
+            const newX = cursorX - (cursorX - transform.x) * r;
+            const newY = cursorY - (cursorY - transform.y) * r;
+            
+            setTransform({ x: newX, y: newY, scale: newScale });
+        };
+        el.addEventListener('wheel', onWheel, { passive: false });
+        return () => el.removeEventListener('wheel', onWheel);
+    }, []);
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        isDragging.current = true;
+        dragMoved.current = false;
+        dragStart.current = { x: e.clientX, y: e.clientY, panX: transform.x, panY: transform.y };
+        e.currentTarget.setPointerCapture(e.pointerId);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!isDragging.current) return;
+        const dx = e.clientX - dragStart.current.x;
+        const dy = e.clientY - dragStart.current.y;
+        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) dragMoved.current = true;
+        setTransform(prev => ({ ...prev, x: dragStart.current.panX + dx, y: dragStart.current.panY + dy }));
+    };
+
+    const handlePointerUp = (e: React.PointerEvent) => {
+        isDragging.current = false;
+        e.currentTarget.releasePointerCapture(e.pointerId);
+    };
+
+    const rects = useMemo(() => {
+        if (bounds.w === 0 || bounds.h === 0) return [];
+        const sorted = [...data].filter(c => c.size > 0).sort((a, b) => b.size - a.size);
+        const top = sorted.slice(0, 500); // 500 rects limits DOM nodes while being highly detailed
+        return binaryTreemap(top, 0, 0, bounds.w, bounds.h);
+    }, [data, bounds.w, bounds.h]);
+
+    return (
+        <div 
+            ref={containerRef}
+            className="w-full h-full relative cursor-grab active:cursor-grabbing overflow-hidden rounded bg-slate-950 touch-none select-none"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+        >
+            <div 
+                className="absolute inset-0 origin-top-left"
+                style={{ transform: `matrix(${transform.scale}, 0, 0, ${transform.scale}, ${transform.x}, ${transform.y})` }}
+            >
+                {rects.map((r, i) => {
+                    const isTooSmall = r.w * transform.scale < 40 || r.h * transform.scale < 20;
+
+                    return (
+                        <div 
+                            key={i}
+                            onClick={(e) => { 
+                                e.stopPropagation(); 
+                                if (!dragMoved.current) onNodeClick(r.child); 
+                            }}
+                            className="absolute border border-slate-900 group hover:z-10 hover:brightness-125 transition-all text-white overflow-hidden shadow-sm flex flex-col p-1.5"
+                            style={{ 
+                                left: r.x, top: r.y, width: r.w, height: r.h,
+                                backgroundColor: getColor(r.child.name, r.child.is_dir),
+                            }}
+                            title={`${r.child.name} (${formatBytes(r.child.size)})`}
+                        >
+                            {!isTooSmall && (
+                                <>
+                                    <span className="font-semibold text-xs truncate drop-shadow-md z-10 select-none">
+                                        {r.child.name}
+                                    </span>
+                                    <span className="text-[10px] text-white/80 truncate drop-shadow-md z-10 select-none">
+                                        {formatBytes(r.child.size)}
+                                    </span>
+                                </>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+            
+            {transform.scale > 1.05 && (
+                 <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur rounded text-xs font-mono text-emerald-400 pointer-events-none">
+                      {Math.round(transform.scale * 100)}%
+                 </div>
+            )}
+        </div>
+    );
+};
+
 export const SpaceAnalyzerPage: React.FC = () => {
     const navigate = useNavigate();
     
@@ -38,11 +225,52 @@ export const SpaceAnalyzerPage: React.FC = () => {
     const [driveLetter, setDriveLetter] = useState<string>('C');
     const [running, setRunning] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [previewNode, setPreviewNode] = useState<NodeInfo | null>(null);
     
+    // Loading State Simulator
+    const [loadingStep, setLoadingStep] = useState(0);
+    const [loadingFile, setLoadingFile] = useState("");
+
+    const scanSteps = [
+        "Initializing scan engine...",
+        "Querying Master File Table...",
+        "Parsing NTFS MFT records...",
+        "Building directory hierarchy...",
+        "Computing size aggregations...",
+        "Optimizing visualization map..."
+    ];
+
     const [data, setData] = useState<AnalysisData | null>(null);
     const [history, setHistory] = useState<string[]>([]); // stack of paths
     const [targetDirInput, setTargetDirInput] = useState<string>(''); // specific folder
     const [availableDrives, setAvailableDrives] = useState<string[]>([]);
+
+    useEffect(() => {
+        let intv: number, fileIntv: number;
+        if (running) {
+            setLoadingStep(0);
+            intv = window.setInterval(() => {
+                 setLoadingStep(prev => prev < scanSteps.length - 1 ? prev + 1 : prev);
+            }, 400);
+
+            const roots = targetDirInput ? [targetDirInput] : [`${driveLetter}:\\Windows\\System32`, `${driveLetter}:\\Users\\AppData`, `${driveLetter}:\\Program Files\\Common`];
+            const dirNames = ["Cache", "Data", "Temp", "Logs", "Index", "Binaries", "Lib"];
+            const sysNames = ["sys", "config", "registry", "cache", "manifest", "node", "core", "runtime"];
+            const exts = [".dll", ".sys", ".dat", ".idx", ".log", ".bin", ".db", ".pak"];
+            
+            fileIntv = window.setInterval(() => {
+                 const root = roots[Math.floor(Math.random() * roots.length)];
+                 const dName = dirNames[Math.floor(Math.random() * dirNames.length)];
+                 const fName = sysNames[Math.floor(Math.random() * sysNames.length)] + Math.floor(Math.random()*1000);
+                 const ext = exts[Math.floor(Math.random() * exts.length)];
+                 setLoadingFile(`${root}\\${dName}\\${fName}${ext}`);
+            }, 50);
+        }
+        return () => {
+           window.clearInterval(intv);
+           window.clearInterval(fileIntv);
+        };
+    }, [running, driveLetter, targetDirInput]);
 
     useEffect(() => {
         fetch(`${FLASK_BASE}/api/tools/space-analyzer/drives`)
@@ -81,7 +309,7 @@ export const SpaceAnalyzerPage: React.FC = () => {
     };
 
     // Fetch data for a specific path
-    const analyzePath = async (targetDir?: string) => {
+    const analyzePath = async (targetDir?: string, overwriteHistory?: string[]) => {
         setRunning(true);
         setErrorMsg(null);
 
@@ -101,10 +329,10 @@ export const SpaceAnalyzerPage: React.FC = () => {
                 setErrorMsg(result.error || "Failed to analyze drive.");
             } else {
                 setData(result.data);
-                if (targetDir) {
-                    if (history[history.length - 1] !== targetDir) {
-                        setHistory([...history, targetDir]);
-                    }
+                if (overwriteHistory) {
+                    setHistory(overwriteHistory);
+                } else if (targetDir) {
+                    setHistory(prev => prev.length > 0 && prev[prev.length - 1] === targetDir ? prev : [...prev, targetDir]);
                 } else {
                     setHistory([result.data.path]);
                 }
@@ -120,10 +348,7 @@ export const SpaceAnalyzerPage: React.FC = () => {
         if (node.is_dir) {
             analyzePath(node.full_path);
         } else {
-            // Preview file natively or handle somehow
-            if ((window as any).electronAPI) {
-                (window as any).electronAPI.invoke('open-path', node.full_path).catch(console.error);
-            }
+            setPreviewNode(node);
         }
     };
 
@@ -131,9 +356,8 @@ export const SpaceAnalyzerPage: React.FC = () => {
         if (history.length > 1) {
             const newHistory = [...history];
             newHistory.pop(); // remove current
-            const parent = newHistory.pop(); // remove parent to re-fetch it and add it back
-            setHistory(newHistory);
-            analyzePath(parent);
+            const parent = newHistory[newHistory.length - 1]; // next current
+            analyzePath(parent, newHistory);
         } else {
             analyzePath(); // root
         }
@@ -142,14 +366,6 @@ export const SpaceAnalyzerPage: React.FC = () => {
     const runTool = () => {
         setHistory([]);
         analyzePath(targetDirInput || undefined);
-    };
-
-    // Color generator based on name
-    const getColor = (name: string, isDir: boolean) => {
-        if (!isDir) return 'rgb(94 162 255 / 80%)'; // blueish for files
-        const hash = name.split('').reduce((acc, char) => char.charCodeAt(0) + ((acc << 5) - acc), 0);
-        const hue = Math.abs(hash) % 360;
-        return `hsl(${hue}, 70%, 45%)`; // vibrant colors for folders
     };
 
     return (
@@ -182,14 +398,14 @@ export const SpaceAnalyzerPage: React.FC = () => {
             </div>
 
             {/* Controls */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-sm flex items-end gap-4">
-                <div className="flex-1 max-w-sm">
-                    <label className="block text-xs text-slate-400 mb-1.5 uppercase font-semibold">Select Drive or Folder</label>
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-wrap items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <span className="text-xs text-slate-400 uppercase font-semibold whitespace-nowrap hidden sm:block">Target:</span>
                     <div className="relative">
                         <select 
                             value={targetDirInput ? 'FOLDER' : driveLetter} 
                             onChange={handleSelectChange}
-                            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 appearance-none pl-10"
+                            className="w-48 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 appearance-none pl-9"
                         >
                             {availableDrives.length === 0 && <option value="C">C:\ (Windows)</option>}
                             {availableDrives.map(d => (
@@ -198,20 +414,21 @@ export const SpaceAnalyzerPage: React.FC = () => {
                             <option disabled>──────────</option>
                             <option value="FOLDER">📁 Select Folder...</option>
                         </select>
-                        <HardDrive className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                        <HardDrive className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
                     </div>
-                    {targetDirInput && (
-                        <div className="mt-2 text-xs text-emerald-400 font-mono truncate px-1">
-                            {targetDirInput}
-                        </div>
-                    )}
                 </div>
-                
+
                 <button type="button" onClick={runTool} disabled={running}
-                    className="shrink-0 flex items-center justify-center gap-2 px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors text-sm shadow-lg shadow-emerald-900/20">
+                    className="shrink-0 flex items-center justify-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors text-sm shadow-sm">
                     {running && !data ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                    Analyze {driveLetter}:
+                    Analyze {targetDirInput ? 'Folder' : driveLetter + ':'}
                 </button>
+
+                {targetDirInput && (
+                    <div className="text-xs text-emerald-400 font-mono truncate px-2 border-l border-slate-700 max-w-sm flex-1">
+                        {targetDirInput}
+                    </div>
+                )}
             </div>
             
             {errorMsg && (
@@ -241,46 +458,30 @@ export const SpaceAnalyzerPage: React.FC = () => {
                         {/* Graphical Treemap (Slice & Dice approach) */}
                         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-4 h-[600px] flex overflow-hidden shadow-inner">
                             {running ? (
-                                <div className="w-full h-full flex items-center justify-center text-slate-500 flex-col gap-2">
-                                    <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-                                    <span>Scanning...</span>
+                                <div className="w-full h-full flex items-center justify-center text-slate-500 flex-col gap-6 p-8">
+                                    <Loader2 className="w-10 h-10 animate-spin text-emerald-500 mb-2" />
+                                    <div className="w-full max-w-sm flex flex-col gap-2">
+                                        <div className="flex justify-between items-end">
+                                             <span className="text-sm font-semibold text-emerald-400">{scanSteps[loadingStep]}</span>
+                                             <span className="text-xs text-slate-500">{Math.round(((loadingStep + 1) / scanSteps.length) * 100)}%</span>
+                                        </div>
+                                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden shadow-inner">
+                                            <div 
+                                                className="bg-emerald-500 h-full transition-all duration-300" 
+                                                style={{ width: `${((loadingStep + 1) / scanSteps.length) * 100}%` }}
+                                            />
+                                        </div>
+                                        <div className="text-[10px] text-slate-500 font-mono truncate mt-3 opactiy-80">
+                                            Scanning: {loadingFile}
+                                        </div>
+                                    </div>
                                 </div>
                             ) : data.children.length === 0 ? (
                                 <div className="w-full h-full flex items-center justify-center text-slate-500">
                                     Empty folder
                                 </div>
                             ) : (
-                                <div className="w-full h-full flex flex-wrap content-start gap-1 p-1 bg-slate-950 rounded border border-slate-800/50">
-                                    {data.children.slice(0, 50).map((child, i) => {
-                                        const pct = (child.size / data.total_size) * 100;
-                                        if (pct < 0.1) return null; // hide very small rects
-                                        
-                                        // simple flex grid layout proportionally
-                                        return (
-                                            <div 
-                                                key={i}
-                                                onClick={() => handleNodeClick(child)}
-                                                className="group relative cursor-pointer hover:brightness-125 transition-all text-white overflow-hidden shadow-sm flex flex-col p-2"
-                                                style={{ 
-                                                    flex: `${Math.max(1, child.size)} ${Math.max(1, child.size)} auto`,
-                                                    minWidth: `${Math.max(40, pct * 4)}px`,
-                                                    minHeight: '40px',
-                                                    height: `max(60px, ${pct}%)`,
-                                                    backgroundColor: getColor(child.name, child.is_dir),
-                                                }}
-                                                title={`${child.name} (${formatBytes(child.size)})`}
-                                            >
-                                                <span className="font-semibold text-xs truncate drop-shadow-md z-10 select-none">
-                                                    {child.name}
-                                                </span>
-                                                <span className="text-[10px] text-white/80 truncate drop-shadow-md z-10 select-none">
-                                                    {formatBytes(child.size)}
-                                                </span>
-                                                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                <TreemapChart data={data.children} onNodeClick={handleNodeClick} />
                             )}
                         </div>
 
@@ -315,6 +516,13 @@ export const SpaceAnalyzerPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            
+            {previewNode && (
+                <MediaPreviewModal 
+                    file={{ name: previewNode.name, path: previewNode.full_path, size: previewNode.size, is_dir: false }} 
+                    onClose={() => setPreviewNode(null)} 
+                />
             )}
         </div>
     );

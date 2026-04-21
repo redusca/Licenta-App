@@ -101,10 +101,13 @@ const TOOL_RUNNER_ROUTES: Record<string, string> = {
     'remove-background': '/tools/remove-background/run',
     'image-to-svg': '/tools/image-to-svg/run',
     'video-converter': '/tools/video-converter/run',
+    'video-compressor': '/tools/video-compressor/run',
     'audio-converter': '/tools/audio-converter/run',
     '3d-visualizer': '/tools/3d-visualizer/run',
     'drive-creator': '/tools/drive-creator/run',
     'space-analyzer': '/tools/space-analyzer/run',
+    'pdf-merger': '/tools/pdf-merger/run',
+    'model-converter': '/tools/model-converter/run',
 };
 
 // Maps tool accent color → Open button tailwind classes

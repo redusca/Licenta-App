@@ -33,9 +33,12 @@ from tools import image_converter as image_converter_tool
 from tools import remove_background as remove_background_tool
 from tools import image_to_svg as image_to_svg_tool
 from tools import video_converter as video_converter_tool
+from tools import video_compressor as video_compressor_tool
 from tools import audio_converter as audio_converter_tool
 from tools import drive_creator as drive_creator_tool
 from tools import space_analyzer as space_analyzer_tool
+from tools import pdf_merger as pdf_merger_tool
+from tools import model_converter as model_converter_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
@@ -54,9 +57,12 @@ _TOOLS: dict[str, object] = {
     "remove_background": remove_background_tool,
     "image_to_svg": image_to_svg_tool,
     "video_converter": video_converter_tool,
+    "video_compressor": video_compressor_tool,
     "audio_converter": audio_converter_tool,
     "drive_creator": drive_creator_tool,
     "space_analyzer": space_analyzer_tool,
+    "pdf_merger": pdf_merger_tool,
+    "model_converter": model_converter_tool,
 }
 
 
@@ -248,6 +254,36 @@ def video_converter_run():
         return jsonify({"error": str(exc)}), 500
 
 
+@tools_bp.post("/video-compressor/run")
+def video_compressor_run():
+    """
+    Direct frontend endpoint for the Video Compressor tool.
+    Uses parallel execution when more than 1 file is provided.
+
+    Body: {
+        "files": [{"path": "...", "codec": "h264", "crf": 28, "maxResolution": "original", "stripAudio": false}, ...],
+        "outputMode": "replace" | "copy" | "virtual_drive",
+        "outputPath": "C:/..."
+    }
+    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    try:
+        files = data.get("files", [])
+        if len(files) > 1:
+            raw = video_compressor_tool.execute_parallel(data)
+        else:
+            raw = video_compressor_tool.execute(data)
+        result = json.loads(raw)
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("Video compressor failed")
+        return jsonify({"error": str(exc)}), 500
+
+
 @tools_bp.post("/audio-converter/run")
 def audio_converter_run():
     """
@@ -276,6 +312,7 @@ def audio_converter_run():
     except Exception as exc:
         logger.exception("Audio converter failed")
         return jsonify({"error": str(exc)}), 500
+
 
 
 @tools_bp.post("/drive-creator/run")
@@ -327,6 +364,66 @@ def space_analyzer_run():
     except Exception as exc:
         logger.exception("Space analyzer failed")
         return jsonify({"error": str(exc)}), 500
+
+@tools_bp.post("/pdf-merger/run")
+def pdf_merger_run():
+    """
+    Direct frontend endpoint for the PDF Toolkit tool.
+
+    Body: {
+        "action": "merge" | "split" | "convert" | "reorder" | "page_info",
+        "files": [{"path": "..."}, ...],
+        "outputMode": "replace" | "copy" | "virtual_drive",
+        "outputPath": "C:/...",
+        "outputFilename": "merged",
+        "pageRanges": "1-3,5",
+        "convertTo": "docx" | "pdf",
+        "addBookmarks": true,
+        "pageOrder": [3, 1, 2]
+    }
+    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    logger.info("PDF merger request: action=%s, files=%s, outputMode=%s",
+                data.get("action"), data.get("files"), data.get("outputMode"))
+
+    try:
+        raw = pdf_merger_tool.execute(data)
+        result = json.loads(raw)
+        logger.info("PDF merger result: success=%s, error=%s", result.get("success"), result.get("error"))
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("PDF merger failed")
+        return jsonify({"error": str(exc)}), 500
+
+
+@tools_bp.post("/model-converter/run")
+def model_converter_run():
+    """
+    Direct frontend endpoint for the 3D Model Converter tool.
+
+    Body: {
+        "files": [{"path": "...", "outputFormat": "glb"}, ...],
+        "outputMode": "replace" | "copy" | "virtual_drive",
+        "outputPath": "C:/..."
+    }
+    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    try:
+        raw = model_converter_tool.execute(data)
+        result = json.loads(raw)
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("Model converter failed")
+        return jsonify({"error": str(exc)}), 500
+
 
 @tools_bp.get("/space-analyzer/drives")
 def space_analyzer_drives():

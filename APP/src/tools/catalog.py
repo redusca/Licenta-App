@@ -439,59 +439,7 @@ TOOLS: list[dict] = [
         "tags": ["transcribe", "speech-to-text", "whisper", "AI", "subtitle", "srt"],
     },
 
-    {
-        "id": "audio-normalizer",
-        "name": "Audio Normalizer",
-        "version": "1.1.0",
-        "description": "Normalize audio loudness to a target LUFS level without AI processing.",
-        "longDescription": (
-            "Audio Normalizer analyses the integrated loudness of an audio file and applies "
-            "dynamic range compression and gain adjustment to hit a target EBU R128 / LUFS value. "
-            "Useful for evening out volume differences between podcast episodes, music tracks, "
-            "or video narration. Processing is fully local — no AI required."
-        ),
-        "categories": ["audio"],
-        "fileExtensions": [".mp3", ".wav", ".ogg", ".flac", ".aac"],
-        "usesAI": False,
-        "icon": "AudioWaveform",
-        "accentColor": "purple",
-        "author": "Core Team",
-        "fields": [
-            {
-                "key": "audioFile",
-                "label": "Audio File",
-                "type": "file",
-                "description": "The audio file to normalize.",
-                "required": True,
-                "acceptedExtensions": [".mp3", ".wav", ".ogg", ".flac", ".aac"],
-            },
-            {
-                "key": "targetLufs",
-                "label": "Target Loudness (LUFS)",
-                "type": "number",
-                "description": "Integrated loudness target in LUFS. -14 is standard for streaming; -23 for broadcast.",
-                "required": False,
-                "default": -14,
-            },
-            {
-                "key": "outputFormat",
-                "label": "Output Format",
-                "type": "select",
-                "description": "Container format for the normalized audio.",
-                "required": False,
-                "options": ["mp3", "wav", "ogg", "flac"],
-                "default": "mp3",
-            },
-        ],
-        "usageSteps": [
-            "Click \"Run Tool\" to open the Audio Normalizer.",
-            "Upload your audio file.",
-            "Set the target LUFS level (-14 for streaming, -23 for broadcast).",
-            "Choose an output format.",
-            "Click Normalize and download the result.",
-        ],
-        "tags": ["normalize", "loudness", "LUFS", "EBU R128", "audio", "volume"],
-    },
+
 
     # ── VIDEO ─────────────────────────────────────────────────────────────
 
@@ -514,10 +462,10 @@ TOOLS: list[dict] = [
         "author": "Core Team",
         "fields": [
             {
-                "key": "videoFile",
-                "label": "Video File",
-                "type": "file",
-                "description": "The video file to compress.",
+                "key": "inputFiles",
+                "label": "Input Videos",
+                "type": "multifile",
+                "description": "One or more video files to compress.",
                 "required": True,
                 "acceptedExtensions": [".mp4", ".mkv", ".mov", ".avi", ".webm"],
             },
@@ -672,116 +620,83 @@ TOOLS: list[dict] = [
 
     {
         "id": "pdf-merger",
-        "name": "PDF Merger",
+        "name": "PDF Toolkit",
         "version": "2.0.0",
-        "description": "Combine multiple PDF files into a single document and reorder pages.",
+        "description": "Merge, split, reorder PDFs and convert between PDF and Word formats.",
         "longDescription": (
-            "PDF Merger lets you drag-and-drop multiple PDF files, reorder them (or individual pages), "
-            "and merge them into a single output PDF. It also supports adding blank pages, "
-            "rotating pages, and setting document metadata. No AI is involved — all operations "
-            "are done locally using a pure-Python PDF library."
+            "PDF Toolkit is an all-in-one document manipulation tool. Merge multiple PDFs into "
+            "a single file with drag-and-drop reordering, extract specific page ranges (split/cut), "
+            "and convert between PDF and Microsoft Word (.docx) formats — all processed entirely "
+            "locally using pure-Python libraries. No AI is involved."
         ),
         "categories": ["documents"],
-        "fileExtensions": [".pdf"],
+        "fileExtensions": [".pdf", ".docx"],
         "usesAI": False,
         "icon": "FileText",
         "accentColor": "amber",
         "author": "Core Team",
         "fields": [
             {
-                "key": "inputFiles",
-                "label": "PDF Files",
-                "type": "multifile",
-                "description": "Two or more PDF files to merge. Order determines the page sequence.",
+                "key": "action",
+                "label": "Action",
+                "type": "select",
+                "description": "The operation to perform: merge PDFs, split/extract pages, or convert formats.",
                 "required": True,
-                "acceptedExtensions": [".pdf"],
+                "options": ["merge", "split", "convert"],
+                "default": "merge",
+            },
+            {
+                "key": "inputFiles",
+                "label": "Input Files",
+                "type": "multifile",
+                "description": "PDF or DOCX files to process.",
+                "required": True,
+                "acceptedExtensions": [".pdf", ".docx"],
             },
             {
                 "key": "outputFilename",
                 "label": "Output Filename",
                 "type": "string",
-                "description": "Name for the merged PDF file (without extension).",
+                "description": "Base name for the merged PDF (without extension). Used in merge mode.",
                 "required": False,
                 "default": "merged",
+            },
+            {
+                "key": "pageRanges",
+                "label": "Page Ranges",
+                "type": "string",
+                "description": "Comma-separated page ranges for split mode, e.g. '1-3,5,7-9'.",
+                "required": False,
+                "default": "",
+            },
+            {
+                "key": "convertTo",
+                "label": "Convert To",
+                "type": "select",
+                "description": "Target format for conversion mode.",
+                "required": False,
+                "options": ["pdf", "docx"],
+                "default": "docx",
             },
             {
                 "key": "addBookmarks",
                 "label": "Add Bookmarks",
                 "type": "boolean",
-                "description": "Create a bookmark for the first page of each source document.",
+                "description": "Create a bookmark for the first page of each source document (merge only).",
                 "required": False,
                 "default": True,
             },
         ],
         "usageSteps": [
-            "Click \"Run Tool\" to open the PDF Merger.",
-            "Add two or more PDF files using the file picker.",
-            "Drag to reorder files if needed.",
-            "Optionally enable bookmarks, then click Merge.",
-            "Download the resulting merged PDF.",
+            "Click \"Run Tool\" to open the PDF Toolkit.",
+            "Choose an action tab: Merge & Reorder, Extract Pages, or Convert Format.",
+            "Add files using Browse Files or Browse Folder.",
+            "For merging, drag to reorder files, then click Merge.",
+            "For splitting, enter page ranges (e.g. '1-3,5') and click Extract.",
+            "For conversion, select PDF→DOCX or DOCX→PDF and click Convert.",
+            "Choose an output mode and review the results.",
         ],
-        "tags": ["pdf", "merge", "combine", "pages", "documents", "reorder"],
-    },
-
-    {
-        "id": "archive-extractor",
-        "name": "Archive Extractor",
-        "version": "1.4.0",
-        "description": "Extract ZIP, TAR, RAR, 7z and other archive formats in one click.",
-        "longDescription": (
-            "Archive Extractor decompresses archives in all common formats (ZIP, TAR.GZ, TAR.BZ2, "
-            "RAR, 7z, XZ) to a destination folder of your choice. It shows a live file tree "
-            "preview before extraction and supports password-protected archives. "
-            "All operations are local — no AI required."
-        ),
-        "categories": ["documents"],
-        "fileExtensions": [".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".rar", ".7z", ".xz"],
-        "usesAI": False,
-        "icon": "Archive",
-        "accentColor": "amber",
-        "author": "Core Team",
-        "fields": [
-            {
-                "key": "archiveFile",
-                "label": "Archive File",
-                "type": "file",
-                "description": "The compressed archive to extract.",
-                "required": True,
-                "acceptedExtensions": [".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".rar", ".7z", ".xz"],
-            },
-            {
-                "key": "outputDirectory",
-                "label": "Output Directory",
-                "type": "string",
-                "description": "Destination path where files will be extracted.",
-                "required": False,
-                "default": "./extracted",
-            },
-            {
-                "key": "password",
-                "label": "Password",
-                "type": "string",
-                "description": "Password for encrypted archives (leave blank if not password-protected).",
-                "required": False,
-            },
-            {
-                "key": "overwrite",
-                "label": "Overwrite Existing Files",
-                "type": "boolean",
-                "description": "Replace files that already exist in the output directory.",
-                "required": False,
-                "default": False,
-            },
-        ],
-        "usageSteps": [
-            "Click \"Run Tool\" to open the Archive Extractor.",
-            "Select or drag in the archive file.",
-            "Set the output directory (defaults to ./extracted).",
-            "Enter a password if the archive is encrypted.",
-            "Click Extract and monitor the progress.",
-            "Browse the extracted files in the output panel.",
-        ],
-        "tags": ["zip", "tar", "rar", "7z", "extract", "decompress", "archive"],
+        "tags": ["pdf", "merge", "combine", "split", "cut", "extract", "convert", "word", "docx", "reorder", "pages", "documents"],
     },
 
     # ── 3D & MODELING ─────────────────────────────────────────────────────
@@ -805,10 +720,10 @@ TOOLS: list[dict] = [
         "author": "Core Team",
         "fields": [
             {
-                "key": "inputFile",
-                "label": "3D Model File",
-                "type": "file",
-                "description": "The 3D model to convert.",
+                "key": "inputFiles",
+                "label": "3D Model Files",
+                "type": "multifile",
+                "description": "One or more 3D model files to convert.",
                 "required": True,
                 "acceptedExtensions": [".obj", ".fbx", ".glb", ".gltf", ".stl", ".ply", ".dae"],
             },
@@ -818,7 +733,7 @@ TOOLS: list[dict] = [
                 "type": "select",
                 "description": "Target 3D model format.",
                 "required": True,
-                "options": ["obj", "fbx", "glb", "gltf", "stl", "ply"],
+                "options": ["obj", "fbx", "glb", "gltf", "stl", "ply", "dae"],
                 "default": "glb",
             },
             {
@@ -832,59 +747,16 @@ TOOLS: list[dict] = [
         ],
         "usageSteps": [
             "Click \"Run Tool\" to open the 3D Model Converter.",
-            "Select the 3D model file you want to convert.",
-            "Choose the target format from the dropdown.",
+            "Add one or more 3D model files using Browse Files, Browse Folder, or From Virtual Drive.",
+            "Choose the target format per file or use 'Apply to all' to set a global format.",
+            "Choose an output mode: Replace originals, Copy in same folder, or save to a Virtual Drive.",
             "Click Convert and wait for the conversion to complete.",
-            "Download the converted model file.",
+            "Review the results — click 'Open' to reveal converted files.",
         ],
-        "tags": ["3d", "convert", "obj", "fbx", "gltf", "glb", "stl", "assimp"],
+        "tags": ["3d", "convert", "obj", "fbx", "gltf", "glb", "stl", "ply", "dae", "trimesh"],
     },
 
-    {
-        "id": "3d-analyzer",
-        "name": "AI 3D Scene Analyzer",
-        "version": "0.5.0",
-        "description": "Describe the contents and suggest optimisations for 3D scenes using AI.",
-        "longDescription": (
-            "AI 3D Scene Analyzer renders key views of a 3D model file, then asks a multimodal AI "
-            "to describe what it sees, estimate polygon counts, flag potential rendering issues "
-            "(non-manifold geometry, inverted normals), and suggest LOD or texture optimisations. "
-            "Great for QA in asset pipelines."
-        ),
-        "categories": ["3d"],
-        "fileExtensions": [".obj", ".fbx", ".glb", ".gltf"],
-        "usesAI": True,
-        "icon": "ScanSearch",
-        "accentColor": "cyan",
-        "author": "AI Labs",
-        "fields": [
-            {
-                "key": "modelFile",
-                "label": "3D Model File",
-                "type": "file",
-                "description": "The 3D scene or model file to analyse.",
-                "required": True,
-                "acceptedExtensions": [".obj", ".fbx", ".glb", ".gltf"],
-            },
-            {
-                "key": "analysisMode",
-                "label": "Analysis Mode",
-                "type": "select",
-                "description": "What aspect of the model to focus on.",
-                "required": False,
-                "options": ["overview", "geometry", "materials", "optimisation"],
-                "default": "overview",
-            },
-        ],
-        "usageSteps": [
-            "Click \"Run Tool\" to open the AI 3D Scene Analyzer.",
-            "Upload a 3D model in OBJ, FBX, or GLTF format.",
-            "Select an analysis mode.",
-            "Click Analyze and wait while the AI renders and inspects the scene.",
-            "Read the AI-generated report with findings and optimisation tips.",
-        ],
-        "tags": ["3d", "AI", "analyze", "scene", "mesh", "LOD", "optimize", "quality"],
-    },
+
 
     # ── DATABASE ──────────────────────────────────────────────────────────
 
@@ -941,129 +813,11 @@ TOOLS: list[dict] = [
         "tags": ["sqlite", "database", "sql", "query", "export", "csv", "schema"],
     },
 
-    {
-        "id": "csv-importer",
-        "name": "CSV → Database Importer",
-        "version": "1.2.0",
-        "description": "Import CSV files into a SQLite database with auto schema detection.",
-        "longDescription": (
-            "CSV Importer reads one or more CSV files, infers column types (integer, float, text, "
-            "date), creates the appropriate table schema, and bulk-inserts the data into a "
-            "target SQLite database. It handles malformed rows, encoding issues, and duplicate "
-            "detection. A preview shows the detected schema before import."
-        ),
-        "categories": ["database", "documents"],
-        "fileExtensions": [".csv", ".tsv"],
-        "usesAI": False,
-        "icon": "Table",
-        "accentColor": "indigo",
-        "author": "Core Team",
-        "fields": [
-            {
-                "key": "csvFiles",
-                "label": "CSV / TSV Files",
-                "type": "multifile",
-                "description": "One or more delimited text files to import.",
-                "required": True,
-                "acceptedExtensions": [".csv", ".tsv"],
-            },
-            {
-                "key": "delimiter",
-                "label": "Delimiter",
-                "type": "select",
-                "description": "Column separator used in the file.",
-                "required": False,
-                "options": ["comma", "semicolon", "tab", "pipe"],
-                "default": "comma",
-            },
-            {
-                "key": "targetDatabase",
-                "label": "Target Database File",
-                "type": "string",
-                "description": "Path to the SQLite file to write to. Created if it does not exist.",
-                "required": True,
-                "default": "output.sqlite",
-            },
-            {
-                "key": "skipDuplicates",
-                "label": "Skip Duplicate Rows",
-                "type": "boolean",
-                "description": "Ignore rows that already exist in the table (based on primary key).",
-                "required": False,
-                "default": True,
-            },
-        ],
-        "usageSteps": [
-            "Click \"Run Tool\" to open the CSV Importer.",
-            "Select one or more CSV or TSV files.",
-            "Verify the auto-detected schema in the preview.",
-            "Set the target SQLite file path.",
-            "Click Import and monitor the row-insertion progress.",
-            "Open the resulting database in SQLite Viewer for verification.",
-        ],
-        "tags": ["csv", "import", "sqlite", "schema", "bulk", "data", "tsv"],
-    },
+
 
     # ── PROGRAMMING ───────────────────────────────────────────────────────
 
-    {
-        "id": "code-formatter",
-        "name": "Code Formatter",
-        "version": "1.0.0",
-        "description": "Format source files with Prettier, Black, gofmt, and other popular formatters.",
-        "longDescription": (
-            "Code Formatter detects the language of each file and runs the appropriate "
-            "industry-standard formatter automatically: Prettier for JS/TS/CSS/HTML, "
-            "Black for Python, gofmt for Go, rustfmt for Rust, and clang-format for C/C++. "
-            "All formatters run locally; no AI is required."
-        ),
-        "categories": ["programming"],
-        "fileExtensions": [
-            ".js", ".ts", ".tsx", ".jsx", ".css", ".html",
-            ".py", ".go", ".rs", ".c", ".cpp", ".h",
-        ],
-        "usesAI": False,
-        "icon": "Code",
-        "accentColor": "green",
-        "author": "Core Team",
-        "fields": [
-            {
-                "key": "sourceFiles",
-                "label": "Source Files",
-                "type": "multifile",
-                "description": "Code files to format.",
-                "required": True,
-                "acceptedExtensions": [
-                    ".js", ".ts", ".tsx", ".jsx", ".css", ".html",
-                    ".py", ".go", ".rs", ".c", ".cpp", ".h",
-                ],
-            },
-            {
-                "key": "tabWidth",
-                "label": "Tab Width",
-                "type": "number",
-                "description": "Number of spaces per indentation level (Prettier / Black).",
-                "required": False,
-                "default": 4,
-            },
-            {
-                "key": "useTabs",
-                "label": "Use Tabs",
-                "type": "boolean",
-                "description": "Indent with hard tabs instead of spaces.",
-                "required": False,
-                "default": False,
-            },
-        ],
-        "usageSteps": [
-            "Click \"Run Tool\" to open the Code Formatter.",
-            "Select one or more source files.",
-            "Adjust indentation preferences if needed.",
-            "Click Format and review the diff.",
-            "Apply changes to overwrite files or download formatted versions.",
-        ],
-        "tags": ["format", "prettier", "black", "gofmt", "lint", "style", "code"],
-    },
+
 
     {
         "id": "code-explainer",

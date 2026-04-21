@@ -591,7 +591,7 @@ def get_space_analyzer_data(drive_letter: str, dir_path: str = None) -> dict:
     suitable for mapping in a Space Analyzer (WizTree clone).
     """
     cached = _ensure_cached(drive_letter)
-    if not cached:
+    if not cached or not cached.get("records"):
         # Fallback to slow os.scandir if MFT scanning fails (e.g. no Admin rights)
         target = dir_path if dir_path else f"{drive_letter}:\\"
         return _fallback_space_analyzer(target)
@@ -621,10 +621,10 @@ def get_space_analyzer_data(drive_letter: str, dir_path: str = None) -> dict:
 
     target_rn = _ROOT_RECORD_NUM
     if dir_path and dir_path.strip("\\/"):
-        norm_target = dir_path.rstrip("\\/").lower()
+        norm_target = dir_path.rstrip("\\/").replace("/", "\\").lower()
         if not norm_target.endswith(":"):
             for rn, path in path_map.items():
-                if path.rstrip("\\/").lower() == norm_target:
+                if path.rstrip("\\/").replace("/", "\\").lower() == norm_target:
                     target_rn = rn
                     break
 
