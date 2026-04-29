@@ -1,9 +1,48 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
+import fs from 'fs';
 
 let mainWindow: BrowserWindow | null;
 let pythonProcess: ChildProcess | null = null;
+let devicePollInterval: NodeJS.Timeout | null = null;
+let lastDriveRoots: string[] = [];
+
+function getAvailableDriveRoots(): string[] {
+  const roots: string[] = [];
+  for (const letter of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
+    const root = `${letter}:\\`;
+    try {
+      fs.readdirSync(root);
+      roots.push(root);
+    } catch {
+      // drive not accessible
+    }
+  }
+  return roots;
+}
+
+function startDevicePolling() {
+  lastDriveRoots = getAvailableDriveRoots();
+  devicePollInterval = setInterval(() => {
+    const current = getAvailableDriveRoots();
+    const added   = current.filter(r => !lastDriveRoots.includes(r));
+    const removed = lastDriveRoots.filter(r => !current.includes(r));
+    if (added.length > 0 || removed.length > 0) {
+      lastDriveRoots = current;
+      BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send('device:changed', { availableRoots: current, added, removed });
+      });
+    }
+  }, 2000);
+}
+
+function stopDevicePolling() {
+  if (devicePollInterval) {
+    clearInterval(devicePollInterval);
+    devicePollInterval = null;
+  }
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -29,6 +68,45 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+// IPC Handlers
+ipcMain.handle('dialog:selectDirectory', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow!, {
+    properties: ['openDirectory']
+  });
+  if (canceled) {
+    return null;
+  } else {
+    return filePaths[0];
+  }
+});
+
+ipcMain.handle('dialog:selectFile', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openFile']
+    });
+    if (canceled) {
+      return null;
+    } else {
+      return filePaths[0];
+    }
+  });
+
+ipcMain.handle('dialog:selectFiles', async (_event, options?: { filters?: { name: string; extensions: string[] }[] }) => {
+    const dialogOptions: Electron.OpenDialogOptions = {
+      properties: ['openFile', 'multiSelections'],
+    };
+    if (options?.filters) {
+      dialogOptions.filters = options.filters;
+    }
+    const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow!, dialogOptions);
+    if (canceled) return [];
+    return filePaths;
+  });
+
+ipcMain.handle('drive:getAvailableRoots', () => {
+  return getAvailableDriveRoots();
+});
 
 function startPythonBackend() {
   const isDev = !app.isPackaged;
@@ -75,6 +153,7 @@ function stopPythonBackend() {
 app.whenReady().then(() => {
   startPythonBackend();
   createWindow();
+  startDevicePolling();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -91,4 +170,5 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   stopPythonBackend();
+  stopDevicePolling();
 });

@@ -1,0 +1,29 @@
+# Electron app — only the root-level installer .exe is needed by the Dockerfile
+APP/release/win-unpacked/
+APP/node_modules/
+APP/dist-electron/
+APP/.vite/
+
+# React dev dependencies (dist/ is what gets copied, not node_modules)
+Server/Interface/node_modules/
+Server/Interface/.vite/
+
+# Python caches
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+
+# Local env files (secrets must come from env vars at runtime)
+**/.env
+!**/.env.example
+
+# Git and IDE
+.git/
+.github/
+.vscode/
+.idea/
+
+# Docs
+markdown/
+README.md

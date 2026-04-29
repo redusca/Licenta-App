@@ -1,0 +1,64 @@
+# -- Combined Server + Redis image --------------------------------------------
+# Runs Redis and the Licenta server in a single container via supervisord.
+# Postgres still needs to be provided externally (DATABASE_URL env var).
+#
+# Build from the repo root:
+#   docker build -t licenta-combined:latest -f Server/docker/Dockerfile.combined .
+#
+# Pre-requisites:
+#   1. Pre-build the React SPA: cd Server/Interface && npm install && npm run build
+#   2. Set DATABASE_URL, GOOGLE_API_KEY, JWT_SECRET, etc. via env / .env
+#
+# Run:
+#   docker run -p 8000:8000 --env-file Server/src/.env licenta-combined:latest
+
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    redis-server \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python dependencies
+COPY Server/src/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Application source
+COPY Server/src/ ./src/
+COPY Server/Database/ ./Database/
+COPY Server/migrations/ ./migrations/
+COPY Server/alembic.ini ./alembic.ini
+
+# Built React interface (must be pre-built)
+COPY Server/Interface/dist/ ./Interface/dist/
+
+# Container source
+RUN mkdir -p ./Container/docker ./Container/src
+COPY Container/docker/Dockerfile         ./Container/docker/Dockerfile
+COPY Container/docker/Dockerfile.runtime ./Container/Dockerfile.runtime
+COPY Container/docker/run.sh     ./Container/docker/run.sh
+COPY Container/docker/run.bat    ./Container/docker/run.bat
+COPY Container/docker/README.md  ./Container/docker/README.md
+COPY Container/src/              ./Container/src/
+
+# Release binaries
+RUN mkdir -p ./downloads
+COPY APP/release/*.exe ./downloads_tmp/
+RUN for f in ./downloads_tmp/*.exe; do \
+      dest="./downloads/$(basename "$f" | sed 's/ /-/g')"; \
+      cp "$f" "$dest"; \
+    done && rm -rf ./downloads_tmp
+
+ENV PYTHONPATH=/app/src:/app
+ENV REDIS_URL=redis://localhost:6379/0
+
+EXPOSE 8000
+
+# supervisord config
+COPY Server/docker/supervisord.conf /etc/supervisor/conf.d/licenta.conf
+
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]

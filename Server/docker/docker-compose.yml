@@ -1,0 +1,74 @@
+# Licenta Server — Production Docker Compose
+#
+# Usage (from repo root):
+#   docker compose -f Server/docker/docker-compose.yml up --build
+#
+# Pre-requisites:
+#   1. Copy Server/src/.env.example ? Server/src/.env and fill in secrets
+#   2. Build the React interface: cd Server/Interface && npm install && npm run build
+#
+# Services: postgres, redis, server (with embedded 5-worker agent pool)
+
+version: "3.9"
+
+services:
+
+  # -- PostgreSQL --------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: licenta
+      POSTGRES_USER: licenta
+      POSTGRES_PASSWORD: licenta
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U licenta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # -- Redis (task queue for the agent pool) ----------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # -- Licenta Server ---------------------------------------------------------
+  server:
+    image: europe-west10-docker.pkg.dev/licenta-ubb/licenta-server/server:latest
+    build:
+      context: ../..          # repo root so COPY Server/... and COPY Container/... work
+      dockerfile: Server/docker/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - ../src/.env           # JWT_SECRET, GOOGLE_API_KEY, GITHUB_TOKEN, etc.
+    environment:
+      DATABASE_URL: postgresql://licenta:licenta@postgres:5432/licenta
+      REDIS_URL: redis://redis:6379/0
+      AGENT_WORKER_COUNT: "5"
+      CONTAINER_IMAGE_NAME: licenta-container:latest
+      MODEL_NAME: gemini-2.5-flash
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Docker socket is still needed for the /api/containers/download endpoint
+      # (exports the container image as a tar for self-hosted users).
+      # If you do not need that feature you can remove this mount.
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local

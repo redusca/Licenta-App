@@ -1,0 +1,79 @@
+# Licenta Server — Local / Personal-Computer Docker Compose
+#
+# Usage (from repo root):
+#   docker compose -f Server/docker/docker-compose.dev.yml up --build
+#
+# All three services (postgres, redis, server) start on your local machine.
+# The server is built from source — no cloud registry needed.
+# Hot-reload is enabled via uvicorn --reload.
+#
+# Set your secrets in Server/src/.env (copy from .env.example).
+
+version: "3.9"
+
+services:
+
+  # -- PostgreSQL --------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: licenta
+      POSTGRES_USER: licenta
+      POSTGRES_PASSWORD: licenta
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"         # accessible from host for psql / DB tools
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U licenta"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # -- Redis (task queue for the agent pool) ----------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    ports:
+      - "6379:6379"         # accessible from host for redis-cli debugging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # -- Licenta Server (built locally, hot-reload) ----------------------------
+  server:
+    build:
+      context: ../..        # repo root
+      dockerfile: Server/docker/Dockerfile.dev
+    restart: unless-stopped
+    env_file:
+      - ../src/.env         # copy from .env.example and fill in your secrets
+    environment:
+      DATABASE_URL: postgresql://licenta:licenta@postgres:5432/licenta
+      REDIS_URL: redis://redis:6379/0
+      AGENT_WORKER_COUNT: "5"
+      CONTAINER_IMAGE_NAME: licenta-container:latest
+      MODEL_NAME: gemini-2.5-flash
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source so uvicorn --reload picks up changes without rebuild
+      - ../../Server/src:/app/src
+      - ../../Server/Database:/app/Database
+      # Mount built SPA so the server can serve it immediately (run: npm run build inside Server/Interface)
+      - ../../Server/Interface/dist:/app/Interface/dist:ro
+      # Docker socket for /api/containers/download (optional in dev)
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data_dev:
+    driver: local

@@ -1,15 +1,14 @@
 import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { ThemeToggle } from './ThemeToggle';
-import { 
-  LayoutDashboard, 
-  MessageSquare, 
-  FolderOpen, 
-  Blocks, 
-  Wrench, 
-  Settings, 
+import {
+  LayoutDashboard,
+  MessageSquare,
+  Blocks,
+  Wrench,
+  Settings,
   HardDrive,
-  User
+  User,
 } from 'lucide-react';
 
 export const Layout: React.FC = () => {
@@ -17,7 +16,7 @@ export const Layout: React.FC = () => {
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Home' },
-    { path: '/files', icon: FolderOpen, label: 'My Files' },
+    { path: '/files', icon: HardDrive, label: 'My Drive' },
     { path: '/chat', icon: MessageSquare, label: 'AI Agent' },
     { path: '/extensions', icon: Blocks, label: 'Extensions' },
     { path: '/tools', icon: Wrench, label: 'Tools' },
