@@ -259,3 +259,7 @@ Server/src/data/
 .drive_config.json
 .github/prompts/plan-serverAndContainer.prompt.md
 APP/data/agent_config.json
+/test_modele_ai/datasets
+/test_modele_ai/output_sd_x4
+/test_modele_ai/output_swin2sr
+/test_modele_ai/output_whisper
