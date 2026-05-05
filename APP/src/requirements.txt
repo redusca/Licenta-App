@@ -12,3 +12,8 @@ pdf2docx
 docx2pdf
 trimesh
 numpy
+python-docx
+mammoth
+markdown
+reportlab
+PyMuPDF

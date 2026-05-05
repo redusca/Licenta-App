@@ -252,6 +252,7 @@ const TOOL_RUNNER_ROUTES: Record<string, string> = {
     'space-analyzer': '/tools/space-analyzer/run',
     'pdf-merger': '/tools/pdf-merger/run',
     'model-converter': '/tools/model-converter/run',
+    'document-converter': '/tools/document-converter/run',
 };
 
 // ── Main ToolDetail page ────────────────────────────────────────────────────

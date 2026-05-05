@@ -38,5 +38,10 @@
     "path": "D:\\DProjects\\Drives\\ModelConversionResults",
     "name": "ModelConversionResults",
     "tool": "model_converter"
+  },
+  {
+    "path": "D:\\DProjects\\licentaFiles\\DocConvertResults",
+    "name": "DocConvertResults",
+    "tool": "document_converter"
   }
 ]

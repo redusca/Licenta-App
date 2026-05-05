@@ -68,6 +68,8 @@ services:
       - ../../Server/Interface/dist:/app/Interface/dist:ro
       # Docker socket for /api/containers/download (optional in dev)
       - /var/run/docker.sock:/var/run/docker.sock
+      # Persist HuggingFace model cache — avoids re-downloading multi-GB weights on every restart
+      - hf_cache:/root/.cache/huggingface
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,4 +78,6 @@ services:
 
 volumes:
   postgres_data_dev:
+    driver: local
+  hf_cache:
     driver: local

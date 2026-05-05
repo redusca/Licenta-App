@@ -18,3 +18,12 @@ langchain-core
 langgraph
 docker
 pillow
+numpy
+
+# AI / ML — required by the AI Gateway (lazy-loaded at inference time)
+torch
+transformers
+diffusers
+accelerate
+soundfile
+sentencepiece

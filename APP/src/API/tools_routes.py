@@ -39,6 +39,7 @@ from tools import drive_creator as drive_creator_tool
 from tools import space_analyzer as space_analyzer_tool
 from tools import pdf_merger as pdf_merger_tool
 from tools import model_converter as model_converter_tool
+from tools import document_converter as document_converter_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ _TOOLS: dict[str, object] = {
     "space_analyzer": space_analyzer_tool,
     "pdf_merger": pdf_merger_tool,
     "model_converter": model_converter_tool,
+    "document_converter": document_converter_tool,
 }
 
 
@@ -422,6 +424,36 @@ def model_converter_run():
         return jsonify(result)
     except Exception as exc:
         logger.exception("Model converter failed")
+        return jsonify({"error": str(exc)}), 500
+
+
+@tools_bp.post("/document-converter/run")
+def document_converter_run():
+    """
+    Direct frontend endpoint for the Document Converter tool.
+    Uses parallel execution when more than 1 file is provided.
+
+    Body: {
+        "files": [{"path": "...", "outputFormat": "pdf"}, ...],
+        "outputMode": "replace" | "copy" | "virtual_drive",
+        "outputPath": "C:/..."
+    }
+    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    try:
+        files = data.get("files", [])
+        if len(files) > 1:
+            raw = document_converter_tool.execute_parallel(data)
+        else:
+            raw = document_converter_tool.execute(data)
+        result = json.loads(raw)
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("Document converter failed")
         return jsonify({"error": str(exc)}), 500
 
 

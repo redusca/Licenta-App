@@ -21,6 +21,7 @@ from API.auth_routes import router as auth_router
 from API.container_routes import router as container_router
 from API.releases_routes import router as releases_router
 from API.agent_routes import router as agent_router
+from API.ai_gateway.router import router as ai_gateway_router
 from utils.agent_pool import AgentPool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
@@ -66,6 +67,7 @@ app.include_router(auth_router)
 app.include_router(container_router)
 app.include_router(releases_router)
 app.include_router(agent_router)
+app.include_router(ai_gateway_router)
 
 
 @app.get("/api/health", tags=["health"])

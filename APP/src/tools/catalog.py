@@ -699,6 +699,54 @@ TOOLS: list[dict] = [
         "tags": ["pdf", "merge", "combine", "split", "cut", "extract", "convert", "word", "docx", "reorder", "pages", "documents"],
     },
 
+    {
+        "id": "document-converter",
+        "name": "Document Converter",
+        "version": "1.0.0",
+        "description": "Convert between PDF, Word, TXT, HTML, Markdown, and image formats.",
+        "longDescription": (
+            "Document Converter is a versatile, all-local file format conversion tool. "
+            "Convert PDFs to editable Word documents, extract plain text from any document, "
+            "render PDFs as PNG images, turn Markdown into styled HTML or PDF, and much more. "
+            "All processing happens locally — no data leaves your machine. "
+            "Supports batch conversion with multiple files at once."
+        ),
+        "categories": ["documents"],
+        "fileExtensions": [".pdf", ".docx", ".doc", ".txt", ".html", ".htm", ".md"],
+        "usesAI": False,
+        "icon": "FileText",
+        "accentColor": "amber",
+        "author": "Core Team",
+        "fields": [
+            {
+                "key": "inputFiles",
+                "label": "Input Files",
+                "type": "multifile",
+                "description": "One or more document files to convert.",
+                "required": True,
+                "acceptedExtensions": [".pdf", ".docx", ".doc", ".txt", ".html", ".htm", ".md"],
+            },
+            {
+                "key": "outputFormat",
+                "label": "Output Format",
+                "type": "select",
+                "description": "Target format for the converted files.",
+                "required": True,
+                "options": ["pdf", "docx", "txt", "html", "png"],
+                "default": "pdf",
+            },
+        ],
+        "usageSteps": [
+            "Open the Document Converter from the Tools page and click 'Run Tool'.",
+            "Add one or more document files using Browse Files or Browse Folder.",
+            "Select the target output format for each file, or use 'Apply to all'.",
+            "Choose an output mode: Save in same folder, Replace originals, or save to a Virtual Drive.",
+            "Click Convert and review the results.",
+            "Click 'Open' to reveal converted files in your file explorer.",
+        ],
+        "tags": ["convert", "pdf", "docx", "word", "txt", "html", "markdown", "png", "documents", "format"],
+    },
+
     # ── 3D & MODELING ─────────────────────────────────────────────────────
 
     {
