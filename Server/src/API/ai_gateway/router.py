@@ -9,7 +9,6 @@ GET   /api/ai/status                → gateway health + per-model readiness
 POST  /api/ai/models/{name}/wake    → pre-load a specific model
 POST  /api/ai/models/{name}/unload  → release a model's resources
 POST  /api/ai/upscale/swin2sr       → super-resolve image ×2
-POST  /api/ai/upscale/sd-x4         → super-resolve image ×4 (text-guided)
 POST  /api/ai/transcribe/whisper    → transcribe audio to text
 """
 
@@ -17,15 +16,17 @@ from __future__ import annotations
 
 import base64
 import io
+import json as _json
 import logging
 from typing import Any
 
 import numpy as np
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from PIL import Image
 
-from .models import Swin2SRModel, SDx4UpscalerModel, WhisperModel
+from .models import Swin2SRModel, WhisperModel
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +35,10 @@ logger = logging.getLogger(__name__)
 # or explicitly via the /wake endpoint.
 
 _swin2sr = Swin2SRModel()
-_sd_x4 = SDx4UpscalerModel()
 _whisper = WhisperModel()
 
 _ALL_MODELS = {
     "swin2sr": _swin2sr,
-    "sd-x4": _sd_x4,
     "whisper": _whisper,
 }
 
@@ -113,7 +112,11 @@ async def wake_model(name: str):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unknown model '{name}'. Available: {list(_ALL_MODELS.keys())}",
         )
-    await model.ensure_loaded()
+    try:
+        await model.ensure_loaded()
+    except Exception as exc:
+        logger.exception("Failed to wake model '%s'", name)
+        raise HTTPException(status_code=500, detail=f"Failed to load model '{name}': {exc}")
     info = model.model_info
     return WakeResponseOut(
         message=f"Model {info.name} is ready",
@@ -163,39 +166,6 @@ async def upscale_swin2sr(
     return UpscaleResponseOut(image_base64=img_b64, format="png", metrics=result["metrics"])
 
 
-# ---------- SD ×4 Upscaler — Text-Guided Super-Resolution ×4 ----------
-
-
-@router.post("/upscale/sd-x4", response_model=UpscaleResponseOut)
-async def upscale_sd_x4(
-    file: UploadFile = File(..., description="Low-resolution image"),
-    prompt: str = Form("high quality, detailed", description="Text prompt to guide upscaling"),
-    num_inference_steps: int = Form(25, ge=1, le=100, description="Denoising steps"),
-    guidance_scale: float = Form(7.5, ge=1.0, le=20.0, description="Prompt guidance strength"),
-    seed: int = Form(42, description="Random seed (-1 for random)"),
-):
-    """Super-resolve an image ×4 using Stable Diffusion (text-guided).
-
-    This is a *generative* upscaler — it adds details based on the prompt.
-    """
-    image = await _read_upload_as_image(file)
-    actual_seed = seed if seed >= 0 else None
-
-    try:
-        result = await _sd_x4.process(
-            image=image,
-            prompt=prompt,
-            num_inference_steps=num_inference_steps,
-            guidance_scale=guidance_scale,
-            seed=actual_seed,
-        )
-    except Exception as exc:
-        logger.exception("SD x4 Upscaler inference failed")
-        raise HTTPException(status_code=500, detail=f"SD x4 Upscaler error: {exc}")
-
-    img_b64 = _pil_to_base64(result["sr_image"])
-    return UpscaleResponseOut(image_base64=img_b64, format="png", metrics=result["metrics"])
-
 
 # ---------- Whisper — Speech-to-Text ----------
 
@@ -229,6 +199,149 @@ async def transcribe_whisper(
     return TranscribeResponseOut(
         transcription=result["transcription"],
         metrics=result["metrics"],
+    )
+
+
+# ---------- Swin2SR — streaming SSE ----------
+
+
+@router.post("/upscale/swin2sr/stream")
+async def upscale_swin2sr_stream(
+    file: UploadFile = File(..., description="Low-resolution image (PNG / JPEG / WEBP)"),
+):
+    """Super-resolve ×2 with Swin2SR, streaming progress via Server-Sent Events.
+
+    Events emitted::
+
+        data: {"stage":"loading_model","message":"...","progress":0.05}
+        data: {"stage":"inference",    "message":"...","progress":0.4}
+        data: {"stage":"postprocess",  "message":"...","progress":0.9}
+        data: {"stage":"done","progress":1.0,"image_base64":"...","metrics":{...}}
+        data: {"stage":"error","message":"..."}   # on failure
+    """
+    image = await _read_upload_as_image(file)
+
+    async def _gen():
+        def _evt(data: dict) -> str:
+            return f"data: {_json.dumps(data)}\n\n"
+
+        already_loaded = _swin2sr.model_info.is_loaded
+        if already_loaded:
+            yield _evt({"stage": "loading_model", "message": "Swin2SR already loaded — preparing inference...", "progress": 0.3})
+        else:
+            yield _evt({"stage": "loading_model", "message": "Loading Swin2SR weights (first run ~2 min)...", "progress": 0.05})
+
+        try:
+            await _swin2sr.ensure_loaded()
+        except Exception as exc:
+            yield _evt({"stage": "error", "message": f"Failed to load model: {exc}"})
+            return
+
+        if not already_loaded:
+            yield _evt({"stage": "loading_model", "message": "Swin2SR model ready", "progress": 0.35})
+
+        _device = _swin2sr.model_info.device
+        if _device == "cpu":
+            yield _evt({
+                "stage": "inference",
+                "message": "Running on CPU — image will be capped at 512 px, inference ~30–120 s...",
+                "progress": 0.4,
+            })
+        else:
+            yield _evt({"stage": "inference", "message": f"Running super-resolution ×2 on {_device}...", "progress": 0.4})
+
+        try:
+            result = await _swin2sr.process(image=image)
+        except Exception as exc:
+            yield _evt({"stage": "error", "message": f"Inference failed: {exc}"})
+            return
+
+        yield _evt({"stage": "postprocess", "message": "Encoding output image...", "progress": 0.9})
+        img_b64 = _pil_to_base64(result["sr_image"])
+
+        yield _evt({
+            "stage": "done",
+            "progress": 1.0,
+            "image_base64": img_b64,
+            "format": "png",
+            "metrics": result["metrics"],
+        })
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------- Whisper — streaming SSE ----------
+
+
+@router.post("/transcribe/whisper/stream")
+async def transcribe_whisper_stream(
+    file: UploadFile = File(..., description="Audio file (WAV, MP3, FLAC, etc.)"),
+    language: str = Form(None, description="ISO-639 language code. None = auto"),
+    max_new_tokens: int = Form(256, ge=16, le=1024),
+    expected_text: str = Form(None, description="Ground-truth text for WER/CER (optional)"),
+):
+    """Transcribe audio with Whisper Large V3, streaming progress via Server-Sent Events.
+
+    Events::
+
+        data: {"stage":"loading_model","message":"...","progress":0.05}
+        data: {"stage":"inference",    "message":"...","progress":0.4}
+        data: {"stage":"done","progress":1.0,"transcription":"...","metrics":{...}}
+        data: {"stage":"error","message":"..."}
+    """
+    audio_array, sample_rate = await _read_upload_as_audio(file)
+
+    async def _gen():
+        def _evt(data: dict) -> str:
+            return f"data: {_json.dumps(data)}\n\n"
+
+        already_loaded = _whisper.model_info.is_loaded
+        if already_loaded:
+            yield _evt({"stage": "loading_model", "message": "Whisper already loaded — preprocessing audio...", "progress": 0.25})
+        else:
+            yield _evt({"stage": "loading_model", "message": "Loading Whisper Large V3 (~3 GB, first run ~3 min)...", "progress": 0.05})
+
+        try:
+            await _whisper.ensure_loaded()
+        except Exception as exc:
+            yield _evt({"stage": "error", "message": f"Failed to load model: {exc}"})
+            return
+
+        duration_s = len(audio_array) / sample_rate
+        if not already_loaded:
+            yield _evt({"stage": "loading_model", "message": f"Whisper ready — audio duration: {duration_s:.1f} s", "progress": 0.3})
+
+        _wdev = _whisper.model_info.device
+        _infer_note = " (CPU — may take several minutes)" if _wdev == "cpu" else f" on {_wdev}"
+        yield _evt({"stage": "inference", "message": f"Transcribing {duration_s:.1f} s of audio{_infer_note}...", "progress": 0.4})
+
+        try:
+            result = await _whisper.process(
+                audio=audio_array,
+                sample_rate=sample_rate,
+                language=language or None,
+                max_new_tokens=max_new_tokens,
+                expected_text=expected_text or None,
+            )
+        except Exception as exc:
+            yield _evt({"stage": "error", "message": f"Transcription failed: {exc}"})
+            return
+
+        yield _evt({
+            "stage": "done",
+            "progress": 1.0,
+            "transcription": result["transcription"],
+            "metrics": result["metrics"],
+        })
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

@@ -16,29 +16,35 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_table("containers")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing = inspector.get_table_names()
+
+    if "containers" in existing:
+        op.drop_table("containers")
     op.execute("DROP TYPE IF EXISTS containermode")
     op.execute("DROP TYPE IF EXISTS containerstatus")
 
-    op.create_table(
-        "agent_keys",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column(
-            "user_id",
-            postgresql.UUID(as_uuid=True),
-            sa.ForeignKey("users.id", ondelete="CASCADE"),
-            nullable=False,
-            unique=True,
-        ),
-        sa.Column("api_key", sa.String(128), nullable=False, unique=True),
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            nullable=False,
-            server_default=sa.func.now(),
-        ),
-    )
-    op.create_index("ix_agent_keys_api_key", "agent_keys", ["api_key"])
+    if "agent_keys" not in existing:
+        op.create_table(
+            "agent_keys",
+            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+            sa.Column(
+                "user_id",
+                postgresql.UUID(as_uuid=True),
+                sa.ForeignKey("users.id", ondelete="CASCADE"),
+                nullable=False,
+                unique=True,
+            ),
+            sa.Column("api_key", sa.String(128), nullable=False, unique=True),
+            sa.Column(
+                "created_at",
+                sa.DateTime(timezone=True),
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+        )
+        op.create_index("ix_agent_keys_api_key", "agent_keys", ["api_key"])
 
 
 def downgrade() -> None:

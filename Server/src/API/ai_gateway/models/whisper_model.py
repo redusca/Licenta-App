@@ -25,7 +25,7 @@ from ..base_model import BaseAIModel
 
 logger = logging.getLogger(__name__)
 
-MODEL_ID = "openai/whisper-large-v3"
+MODEL_ID = "openai/whisper-large-v3-turbo"
 TARGET_SAMPLE_RATE = 16_000
 
 
@@ -38,8 +38,7 @@ class WhisperModel(BaseAIModel):
             model_id=MODEL_ID,
             task="automatic-speech-recognition",
         )
-        self._processor = None
-        self._model = None
+        self._pipeline = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -48,21 +47,21 @@ class WhisperModel(BaseAIModel):
 
         def _load():
             import torch
-            from transformers import AutoProcessor, AutoModelForSpeechSeq2Seq
+            from transformers import pipeline
 
-            device = "cuda" if torch.cuda.is_available() else "cpu"
+            device = 0 if torch.cuda.is_available() else -1  # 0 = first GPU, -1 = CPU
             dtype = torch.float16 if torch.cuda.is_available() else torch.float32
 
-            processor = AutoProcessor.from_pretrained(MODEL_ID)
-            model = AutoModelForSpeechSeq2Seq.from_pretrained(
-                MODEL_ID, torch_dtype=dtype, low_cpu_mem_usage=True
+            pipe = pipeline(
+                "automatic-speech-recognition",
+                model=MODEL_ID,
+                torch_dtype=dtype,
+                device=device,
             )
-            model = model.to(device)
-            model.eval()
+            device_str = "cuda" if torch.cuda.is_available() else "cpu"
+            return pipe, device_str
 
-            return processor, model, device, dtype
-
-        self._processor, self._model, self._device, self._dtype = await asyncio.to_thread(_load)
+        self._pipeline, self._device = await asyncio.to_thread(_load)
 
     async def process(
         self,
@@ -100,11 +99,6 @@ class WhisperModel(BaseAIModel):
         def _infer():
             import torch
 
-            inputs = self._processor(
-                audio, sampling_rate=sample_rate, return_tensors="pt"
-            )
-            input_features = inputs.input_features.to(self._device, dtype=self._dtype)
-
             if torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
 
@@ -113,19 +107,19 @@ class WhisperModel(BaseAIModel):
                 generate_kwargs["language"] = language
 
             t0 = time.perf_counter()
-            with torch.no_grad():
-                generated_ids = self._model.generate(input_features, **generate_kwargs)
+            output = self._pipeline(
+                {"array": audio, "sampling_rate": sample_rate},
+                generate_kwargs=generate_kwargs,
+                return_timestamps=False,
+            )
             inference_time = time.perf_counter() - t0
 
             gpu_peak = 0
             if torch.cuda.is_available():
                 gpu_peak = torch.cuda.max_memory_allocated() / (1024 ** 2)
 
-            transcription = self._processor.batch_decode(
-                generated_ids, skip_special_tokens=True
-            )[0].strip()
-
-            num_tokens = len(generated_ids[0])
+            transcription = output["text"].strip()
+            num_tokens = len(transcription.split())  # approximate
 
             return transcription, inference_time, gpu_peak, num_tokens
 
@@ -154,10 +148,8 @@ class WhisperModel(BaseAIModel):
         return {"transcription": transcription, "metrics": metrics}
 
     async def unload(self) -> None:
-        del self._model
-        del self._processor
-        self._model = None
-        self._processor = None
+        del self._pipeline
+        self._pipeline = None
 
         try:
             import torch

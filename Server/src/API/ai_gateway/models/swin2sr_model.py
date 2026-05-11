@@ -48,11 +48,11 @@ class Swin2SRModel(BaseAIModel):
 
         def _load():
             import torch
-            from transformers import AutoImageProcessor, AutoModelForImageToImage
+            from transformers import AutoImageProcessor, Swin2SRForImageSuperResolution
 
             device = "cuda" if torch.cuda.is_available() else "cpu"
             processor = AutoImageProcessor.from_pretrained(MODEL_ID)
-            model = AutoModelForImageToImage.from_pretrained(MODEL_ID).to(device)
+            model = Swin2SRForImageSuperResolution.from_pretrained(MODEL_ID).to(device)
             model.eval()
             return processor, model, device
 
@@ -79,6 +79,21 @@ class Swin2SRModel(BaseAIModel):
             import torch
 
             img_rgb = img.convert("RGB")
+
+            # Swin2SR on CPU is O(n²) in patch count — cap to keep inference < ~3 min.
+            # On CUDA there's no size limit.
+            MAX_CPU_DIM = 512
+            orig_size = img_rgb.size
+            if self._device == "cpu" and max(img_rgb.size) > MAX_CPU_DIM:
+                ratio = MAX_CPU_DIM / max(img_rgb.size)
+                new_w = max(1, int(img_rgb.size[0] * ratio))
+                new_h = max(1, int(img_rgb.size[1] * ratio))
+                img_rgb = img_rgb.resize((new_w, new_h), Image.LANCZOS)
+                logger.warning(
+                    "CPU mode: resized %dx%d → %dx%d (MAX_CPU_DIM=%d)",
+                    orig_size[0], orig_size[1], new_w, new_h, MAX_CPU_DIM,
+                )
+
             inputs = self._processor(images=img_rgb, return_tensors="pt")
             pixel_values = inputs["pixel_values"].to(self._device)
 

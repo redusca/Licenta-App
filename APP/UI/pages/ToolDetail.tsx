@@ -253,6 +253,8 @@ const TOOL_RUNNER_ROUTES: Record<string, string> = {
     'pdf-merger': '/tools/pdf-merger/run',
     'model-converter': '/tools/model-converter/run',
     'document-converter': '/tools/document-converter/run',
+    'image-enhancer': '/tools/image-enhancer/run',
+    'audio-transcriber': '/tools/audio-transcriber/run',
 };
 
 // ── Main ToolDetail page ────────────────────────────────────────────────────

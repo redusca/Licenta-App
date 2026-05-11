@@ -26,7 +26,7 @@ import logging
 import os
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response, stream_with_context
 
 from tools import hello as hello_tool
 from tools import image_converter as image_converter_tool
@@ -539,6 +539,417 @@ def blend_to_glb():
         return jsonify({"error": "Blender conversion timed out (120s)"}), 500
     except Exception as exc:
         return jsonify({"error": f"Blender conversion error: {exc}"}), 500
+
+
+_AI_GATEWAY_BASE = "http://127.0.0.1:8000"
+
+
+@tools_bp.get("/ai-gateway/status")
+def ai_gateway_status():
+    """Proxy to the AI Gateway status endpoint."""
+    import requests as _req
+    try:
+        r = _req.get(f"{_AI_GATEWAY_BASE}/api/ai/status", timeout=5)
+        return jsonify(r.json()), r.status_code
+    except _req.exceptions.ConnectionError:
+        return jsonify({"status": "offline", "error": "AI Gateway is not running"}), 503
+
+
+@tools_bp.get("/preview")
+def file_preview():
+    """Serve a local file for in-app preview."""
+    from flask import send_file
+    path = request.args.get("path", "")
+    if not path or not os.path.isfile(path):
+        return jsonify({"error": "File not found"}), 404
+    try:
+        return send_file(path)
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@tools_bp.post("/image-enhancer/run")
+def image_enhancer_run():
+    """
+    Proxy to AI Gateway: Swin2SR ×2 super-resolution.
+
+    Body: {
+        "filePath": "C:/...",
+        "outputMode": "copy" | "virtual_drive",
+        "outputPath": "C:/..."
+    }
+    Response: { success, outputPath, previewBase64, metrics }
+    """
+    import base64
+    import requests as _req
+
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    file_path: str = data.get("filePath", "")
+    output_mode: str = data.get("outputMode", "copy")
+    output_path: str = data.get("outputPath", "")
+
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify({"error": "File not found or invalid path"}), 400
+
+    ext = os.path.splitext(file_path)[1].lower()
+    mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+    mime = mime_map.get(ext, "image/png")
+
+    try:
+        with open(file_path, "rb") as fh:
+            raw = fh.read()
+        resp = _req.post(
+            f"{_AI_GATEWAY_BASE}/api/ai/upscale/swin2sr",
+            files={"file": (os.path.basename(file_path), raw, mime)},
+            timeout=(10, 900),
+        )
+        resp.raise_for_status()
+        result = resp.json()
+    except _req.exceptions.ConnectionError:
+        return jsonify({"error": "AI Gateway is not running. Start the Server (port 8000) first."}), 503
+    except _req.exceptions.Timeout:
+        return jsonify({"error": "Request timed out — the model may still be loading. Try again in a moment."}), 504
+    except _req.exceptions.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.response.json().get("detail", "")
+        except Exception:
+            pass
+        return jsonify({"error": f"AI Gateway error: {detail or str(exc)}"}), 500
+    except Exception as exc:
+        logger.exception("Image enhancer proxy failed")
+        return jsonify({"error": str(exc)}), 500
+
+    try:
+        img_bytes = base64.b64decode(result["image_base64"])
+        base_name = os.path.splitext(os.path.basename(file_path))[0]
+        out_filename = f"{base_name}_upscaled.png"
+
+        if output_mode == "virtual_drive" and output_path:
+            out_dir = os.path.join(output_path, "ImageEnhancerResults")
+            os.makedirs(out_dir, exist_ok=True)
+        else:
+            out_dir = os.path.dirname(file_path)
+
+        out_file = os.path.join(out_dir, out_filename)
+        with open(out_file, "wb") as fh:
+            fh.write(img_bytes)
+
+        return jsonify({
+            "success": True,
+            "outputPath": out_file,
+            "previewBase64": result["image_base64"],
+            "metrics": result.get("metrics", {}),
+        })
+    except Exception as exc:
+        logger.exception("Image enhancer save failed")
+        return jsonify({"error": f"Failed to save output: {exc}"}), 500
+
+
+@tools_bp.post("/audio-transcriber/run")
+def audio_transcriber_run():
+    """
+    Proxy to AI Gateway: Whisper Large V3 speech-to-text.
+
+    Body: {
+        "filePath": "C:/...",
+        "language": "en" | "ro" | ... | "auto",
+        "maxNewTokens": 256,
+        "expectedText": "",
+        "outputMode": "copy" | "virtual_drive" | "",
+        "outputPath": "C:/..."
+    }
+    Response: { success, transcription, outputPath?, metrics }
+    """
+    import requests as _req
+
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    file_path: str = data.get("filePath", "")
+    language: str | None = data.get("language") or None
+    if language == "auto":
+        language = None
+    max_new_tokens: int = int(data.get("maxNewTokens", 256))
+    expected_text: str | None = data.get("expectedText") or None
+    output_mode: str = data.get("outputMode", "")
+    output_path: str = data.get("outputPath", "")
+
+    if not file_path or not os.path.isfile(file_path):
+        return jsonify({"error": "File not found or invalid path"}), 400
+
+    try:
+        with open(file_path, "rb") as fh:
+            raw = fh.read()
+
+        form_data: dict = {"max_new_tokens": str(max_new_tokens)}
+        if language:
+            form_data["language"] = language
+        if expected_text:
+            form_data["expected_text"] = expected_text
+
+        resp = _req.post(
+            f"{_AI_GATEWAY_BASE}/api/ai/transcribe/whisper",
+            files={"file": (os.path.basename(file_path), raw)},
+            data=form_data,
+            timeout=(10, 1200),
+        )
+        resp.raise_for_status()
+        result = resp.json()
+    except _req.exceptions.ConnectionError:
+        return jsonify({"error": "AI Gateway is not running. Start the Server (port 8000) first."}), 503
+    except _req.exceptions.Timeout:
+        return jsonify({"error": "Request timed out — the model may still be loading. Try again in a moment."}), 504
+    except _req.exceptions.HTTPError as exc:
+        detail = ""
+        try:
+            detail = exc.response.json().get("detail", "")
+        except Exception:
+            pass
+        return jsonify({"error": f"AI Gateway error: {detail or str(exc)}"}), 500
+    except Exception as exc:
+        logger.exception("Audio transcriber proxy failed")
+        return jsonify({"error": str(exc)}), 500
+
+    out_file: str | None = None
+    if output_mode in ("copy", "virtual_drive"):
+        try:
+            base_name = os.path.splitext(os.path.basename(file_path))[0]
+            out_filename = f"{base_name}_transcript.txt"
+            if output_mode == "virtual_drive" and output_path:
+                out_dir = os.path.join(output_path, "TranscriptResults")
+                os.makedirs(out_dir, exist_ok=True)
+            else:
+                out_dir = os.path.dirname(file_path)
+            out_file = os.path.join(out_dir, out_filename)
+            with open(out_file, "w", encoding="utf-8") as fh:
+                fh.write(result["transcription"])
+        except Exception as exc:
+            logger.warning("Transcriber: failed to save transcript: %s", exc)
+            out_file = None
+
+    return jsonify({
+        "success": True,
+        "transcription": result["transcription"],
+        "outputPath": out_file,
+        "metrics": result.get("metrics", {}),
+    })
+
+
+@tools_bp.post("/image-enhancer/stream")
+def image_enhancer_stream():
+    """
+    SSE proxy: streams Swin2SR progress events from the AI Gateway to the frontend.
+
+    Body: same as /image-enhancer/run
+    Stream: SSE events with stage/message/progress, final event adds outputPath.
+    """
+    import requests as _req
+    import base64
+
+    data = request.get_json(force=True) or {}
+    file_path: str = data.get("filePath", "")
+    output_mode: str = data.get("outputMode", "copy")
+    output_path: str = data.get("outputPath", "")
+
+    def _err_event(msg: str) -> str:
+        return f'data: {json.dumps({"stage": "error", "message": msg})}\n\n'
+
+    if not file_path or not os.path.isfile(file_path):
+        def _err():
+            yield _err_event("File not found or invalid path")
+        return Response(stream_with_context(_err()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    ext = os.path.splitext(file_path)[1].lower()
+    mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
+    mime = mime_map.get(ext, "image/png")
+    filename = os.path.basename(file_path)
+    dir_path = os.path.dirname(file_path)
+
+    try:
+        with open(file_path, "rb") as fh:
+            file_bytes = fh.read()
+    except Exception as exc:
+        def _err():
+            yield _err_event(f"Cannot read file: {exc}")
+        return Response(stream_with_context(_err()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    def _generate():
+        try:
+            resp = _req.post(
+                f"{_AI_GATEWAY_BASE}/api/ai/upscale/swin2sr/stream",
+                files={"file": (filename, file_bytes, mime)},
+                stream=True,
+                timeout=(10, 900),
+            )
+        except _req.exceptions.ConnectionError:
+            yield _err_event("AI Gateway is not running. Start the Server (port 8000) first.")
+            return
+        except _req.exceptions.Timeout:
+            yield _err_event("Connection to AI Gateway timed out.")
+            return
+        except Exception as exc:
+            yield _err_event(str(exc))
+            return
+
+        buf = b""
+        for chunk in resp.iter_content(chunk_size=None):
+            if not chunk:
+                continue
+            buf += chunk
+            while b"\n\n" in buf:
+                evt_raw, buf = buf.split(b"\n\n", 1)
+                evt_text = evt_raw.decode("utf-8", errors="replace")
+                for line in evt_text.split("\n"):
+                    if not line.startswith("data: "):
+                        continue
+                    json_str = line[6:]
+                    try:
+                        evt = json.loads(json_str)
+                    except Exception:
+                        continue
+
+                    if evt.get("stage") == "done" and "image_base64" in evt:
+                        try:
+                            img_bytes = base64.b64decode(evt["image_base64"])
+                            base_name = os.path.splitext(filename)[0]
+                            out_fname = f"{base_name}_upscaled.png"
+                            if output_mode == "virtual_drive" and output_path:
+                                out_dir = os.path.join(output_path, "ImageEnhancerResults")
+                                os.makedirs(out_dir, exist_ok=True)
+                            else:
+                                out_dir = dir_path
+                            out_file = os.path.join(out_dir, out_fname)
+                            with open(out_file, "wb") as fh:
+                                fh.write(img_bytes)
+                            evt["outputPath"] = out_file
+                        except Exception as save_exc:
+                            evt["saveError"] = str(save_exc)
+                        yield f"data: {json.dumps(evt)}\n\n"
+                    else:
+                        yield f"data: {json_str}\n\n"
+
+    return Response(
+        stream_with_context(_generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@tools_bp.post("/audio-transcriber/stream")
+def audio_transcriber_stream():
+    """
+    SSE proxy: streams Whisper progress events from the AI Gateway to the frontend.
+
+    Body: same as /audio-transcriber/run
+    Stream: SSE events with stage/message/progress, final event adds outputPath.
+    """
+    import requests as _req
+
+    data = request.get_json(force=True) or {}
+    file_path: str = data.get("filePath", "")
+    language: str | None = data.get("language") or None
+    if language == "auto":
+        language = None
+    max_new_tokens: int = int(data.get("maxNewTokens", 256))
+    expected_text: str | None = data.get("expectedText") or None
+    output_mode: str = data.get("outputMode", "")
+    output_path: str = data.get("outputPath", "")
+
+    def _err_event(msg: str) -> str:
+        return f'data: {json.dumps({"stage": "error", "message": msg})}\n\n'
+
+    if not file_path or not os.path.isfile(file_path):
+        def _err():
+            yield _err_event("File not found or invalid path")
+        return Response(stream_with_context(_err()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    filename = os.path.basename(file_path)
+    dir_path = os.path.dirname(file_path)
+
+    try:
+        with open(file_path, "rb") as fh:
+            file_bytes = fh.read()
+    except Exception as exc:
+        def _err():
+            yield _err_event(f"Cannot read file: {exc}")
+        return Response(stream_with_context(_err()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    form_data: dict = {"max_new_tokens": str(max_new_tokens)}
+    if language:
+        form_data["language"] = language
+    if expected_text:
+        form_data["expected_text"] = expected_text
+
+    def _generate():
+        try:
+            resp = _req.post(
+                f"{_AI_GATEWAY_BASE}/api/ai/transcribe/whisper/stream",
+                files={"file": (filename, file_bytes)},
+                data=form_data,
+                stream=True,
+                timeout=(10, 1200),
+            )
+        except _req.exceptions.ConnectionError:
+            yield _err_event("AI Gateway is not running. Start the Server (port 8000) first.")
+            return
+        except _req.exceptions.Timeout:
+            yield _err_event("Connection to AI Gateway timed out.")
+            return
+        except Exception as exc:
+            yield _err_event(str(exc))
+            return
+
+        buf = b""
+        for chunk in resp.iter_content(chunk_size=None):
+            if not chunk:
+                continue
+            buf += chunk
+            while b"\n\n" in buf:
+                evt_raw, buf = buf.split(b"\n\n", 1)
+                evt_text = evt_raw.decode("utf-8", errors="replace")
+                for line in evt_text.split("\n"):
+                    if not line.startswith("data: "):
+                        continue
+                    json_str = line[6:]
+                    try:
+                        evt = json.loads(json_str)
+                    except Exception:
+                        continue
+
+                    if evt.get("stage") == "done":
+                        if output_mode in ("copy", "virtual_drive"):
+                            try:
+                                base_name = os.path.splitext(filename)[0]
+                                out_fname = f"{base_name}_transcript.txt"
+                                if output_mode == "virtual_drive" and output_path:
+                                    out_dir = os.path.join(output_path, "TranscriptResults")
+                                    os.makedirs(out_dir, exist_ok=True)
+                                else:
+                                    out_dir = dir_path
+                                out_file = os.path.join(out_dir, out_fname)
+                                with open(out_file, "w", encoding="utf-8") as fh:
+                                    fh.write(evt.get("transcription", ""))
+                                evt["outputPath"] = out_file
+                            except Exception as save_exc:
+                                logger.warning("Transcriber stream: save failed: %s", save_exc)
+                        yield f"data: {json.dumps(evt)}\n\n"
+                    else:
+                        yield f"data: {json_str}\n\n"
+
+    return Response(
+        stream_with_context(_generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @tools_bp.get("/created-drives")

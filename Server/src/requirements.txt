@@ -22,8 +22,8 @@ numpy
 
 # AI / ML — required by the AI Gateway (lazy-loaded at inference time)
 torch
+torchvision
 transformers
-diffusers
 accelerate
 soundfile
 sentencepiece
