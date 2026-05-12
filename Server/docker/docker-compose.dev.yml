@@ -70,6 +70,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Persist HuggingFace model cache — avoids re-downloading multi-GB weights on every restart
       - hf_cache:/root/.cache/huggingface
+    # Allows the container to reach the host machine via host.docker.internal
+    # (needed for tool callback_url when running integration tests from a notebook)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy

@@ -12,6 +12,7 @@ pydantic[email]
 email-validator
 python-multipart
 redis[asyncio]
+groq
 langchain
 langchain-google-genai
 langchain-core

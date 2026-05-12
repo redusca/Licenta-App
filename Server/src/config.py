@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     MODEL_NAME: str = "gemini-2.5-flash"
     MAX_AGENT_ITERATIONS: int = 10
 
+    # Groq - planning agent
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
+
     # Container image name (only needed for the ZIP download feature)
     CONTAINER_IMAGE_NAME: str = "licenta-container:latest"
 

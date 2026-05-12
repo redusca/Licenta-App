@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-ChildItem -Path 'C:\\\\Users\\\\redis\\\\Desktop\\\\Projects\\\\Licenta-App' | Select-Object Name | head -30\")",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && head -50 \"{}\"')"
+    ]
+  }
+}

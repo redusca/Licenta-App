@@ -24,6 +24,8 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
+import uuid
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request, Response, stream_with_context
@@ -49,6 +51,20 @@ tools_bp = Blueprint("tools", __name__)
 # Path to the tool-drives registry written by image_converter
 _TOOL_DRIVES_PATH = Path(__file__).parent.parent.parent / "data" / "tool_drives.json"
 
+# ── Human-in-the-loop pending tool system ─────────────────────────────────────
+# Maps request_id → pending dict with threading.Event for blocking /execute
+
+_PENDING: dict[str, dict] = {}
+_PENDING_LOCK = threading.Lock()
+
+# Tools that require user approval before the agent can run them.
+# Individual tool DEFINITION dicts may also set requires_approval=True/False.
+_APPROVAL_REQUIRED = frozenset({
+    "image_converter", "remove_background", "image_to_svg",
+    "video_converter", "video_compressor", "audio_converter",
+    "drive_creator", "pdf_merger", "model_converter", "document_converter",
+})
+
 # ── Tool registry ─────────────────────────────────────────────────────────────
 # Maps tool name → executor module.  Add new tools here.
 
@@ -73,9 +89,12 @@ _TOOLS: dict[str, object] = {
 @tools_bp.post("/execute")
 def execute():
     """
-    Execute a tool on behalf of the agent container.
+    Execute a tool on behalf of the agent server.
 
-    The container calls this when the LLM decides to invoke a tool.
+    If the tool is in _APPROVAL_REQUIRED (or its DEFINITION sets
+    requires_approval=True), this endpoint blocks until the user
+    approves or rejects via /api/tools/approve or /api/tools/reject.
+    The agent server has a 120 s timeout for tool callbacks.
     """
     data = request.get_json(force=True)
     if not data:
@@ -88,6 +107,38 @@ def execute():
     if tool is None:
         logger.warning("Unknown tool requested: %s", tool_name)
         return jsonify({"error": f"Unknown tool: '{tool_name}'"}), 404
+
+    definition: dict = getattr(tool, "DEFINITION", {})
+    needs_approval = (
+        tool_name in _APPROVAL_REQUIRED
+        or definition.get("requires_approval", False)
+    )
+
+    if needs_approval:
+        req_id = str(uuid.uuid4())
+        event = threading.Event()
+        safe_defn = {k: v for k, v in definition.items() if k != "callback_url"}
+        with _PENDING_LOCK:
+            _PENDING[req_id] = {
+                "id": req_id,
+                "tool": tool_name,
+                "input": tool_input,
+                "definition": safe_defn,
+                "event": event,
+                "approved": None,
+                "modified_input": None,
+            }
+        logger.info("Tool '%s' waiting for approval (req %s)", tool_name, req_id)
+        approved = event.wait(timeout=110)  # slightly under the 120 s server timeout
+        with _PENDING_LOCK:
+            pending = _PENDING.pop(req_id, None)
+
+        if not approved or pending is None or pending.get("approved") is not True:
+            logger.info("Tool '%s' rejected or timed out", tool_name)
+            return jsonify({"result": f"[Rejected] User declined to run '{tool_name}'."}), 200
+
+        tool_input = pending.get("modified_input") or tool_input
+        logger.info("Tool '%s' approved, running", tool_name)
 
     try:
         result: str = tool.execute(tool_input)
@@ -127,6 +178,53 @@ def get_catalog():
         "tools": CATALOG_TOOLS,
         "categories": CATALOG_CATEGORIES,
     })
+
+
+@tools_bp.get("/pending")
+def get_pending_approvals():
+    """Return all tool executions currently waiting for user approval."""
+    with _PENDING_LOCK:
+        result = [
+            {
+                "id": v["id"],
+                "tool": v["tool"],
+                "input": v["input"],
+                "definition": v["definition"],
+            }
+            for v in _PENDING.values()
+        ]
+    return jsonify(result)
+
+
+@tools_bp.post("/approve/<request_id>")
+def approve_tool(request_id: str):
+    """
+    Approve a pending tool execution.
+    Body (optional): { "input": { ...modified_args } }
+    """
+    with _PENDING_LOCK:
+        pending = _PENDING.get(request_id)
+    if not pending:
+        return jsonify({"error": "Request not found or already resolved"}), 404
+    body = request.get_json(force=True) or {}
+    pending["approved"] = True
+    pending["modified_input"] = body.get("input") or pending["input"]
+    pending["event"].set()
+    logger.info("Tool '%s' approved (req %s)", pending["tool"], request_id)
+    return jsonify({"ok": True})
+
+
+@tools_bp.post("/reject/<request_id>")
+def reject_tool(request_id: str):
+    """Reject a pending tool execution."""
+    with _PENDING_LOCK:
+        pending = _PENDING.get(request_id)
+    if not pending:
+        return jsonify({"error": "Request not found or already resolved"}), 404
+    pending["approved"] = False
+    pending["event"].set()
+    logger.info("Tool '%s' rejected (req %s)", pending["tool"], request_id)
+    return jsonify({"ok": True})
 
 
 @tools_bp.post("/image-converter/run")
