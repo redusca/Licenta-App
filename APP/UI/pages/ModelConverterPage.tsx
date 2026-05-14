@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Box, ChevronRight, HardDrive, FolderOpen,
     RefreshCw, X, CheckCircle, AlertCircle, FileBox,
-    Folder, ChevronLeft, Check, Minus, Play, Loader2,
+    Folder, ChevronLeft, Check, Minus, Play, Loader2, ExternalLink,
 } from 'lucide-react';
 
 // ── Constants ────────────────────────────────────────────────────────────────

@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 DEFINITION = {
     "name": "drive_creator",
     "description": "Scans a folder for specific extensions and creates a virtual drive containing them.",
+    "input_instructions": (
+        "sourceFolder: the folder to scan — use ask_user(input_type='folder') to pick from the app's virtual drives. "
+        "extensions: list of extensions to include, e.g. ['.jpg', '.png', '.mp4']. "
+        "driveName: name for the new virtual drive (string). "
+        "action: 'shortcuts' to create shortcut links (non-destructive) or 'move' to relocate the actual files. "
+        "outputPath: the base folder where the new virtual drive will be created — use ask_user(input_type='folder') to pick from the app's virtual drives."
+    ),
+    "output_description": (
+        "JSON {success, total, succeeded, failed, virtualDrivePath, results:[{path, success, error?}]}"
+    ),
     "parameters": {
         "type": "object",
         "properties": {
@@ -73,11 +83,8 @@ def execute(input_data: dict) -> str:
 
     cached = None
     try:
-        from utils.mft_scan import _mft_cache
-        drive_letter_upper = drive_letter.upper()
-        if drive_letter_upper in _mft_cache:
-            _mft_cache.pop(drive_letter_upper, None)  # Force fresh MFT read
-
+        from utils.mft_scan import invalidate_cache
+        invalidate_cache(drive_letter)  # Force fresh MFT read for accuracy
         cached = _ensure_cached(drive_letter)
     except Exception as exc:
         logger.error(f"MFT scan failed: {exc}")

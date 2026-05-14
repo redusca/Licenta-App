@@ -81,6 +81,18 @@ DEFINITION = {
         },
         "required": ["action", "files"],
     },
+    "input_instructions": (
+        "files: array of {path} — use ask_user(input_type='file') to pick PDF or DOCX files from virtual drives. "
+        "action: 'merge' (combine PDFs), 'split' (extract page ranges), or 'convert' (PDF↔DOCX). "
+        "outputMode: 'replace' overwrites original, 'copy' places result alongside, 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives. "
+        "outputFilename: base name for merged/split output (no extension). "
+        "pageRanges: for split action, comma-separated ranges like '1-3,5,7-9'. "
+        "convertTo: 'pdf' or 'docx' for convert action."
+    ),
+    "output_description": (
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+    ),
 }
 
 # ── Tool-drives registry helpers ───────────────────────────────────────────────

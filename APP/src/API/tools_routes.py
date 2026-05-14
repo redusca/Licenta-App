@@ -30,6 +30,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request, Response, stream_with_context
 
+from tools import ask_user as ask_user_tool
 from tools import hello as hello_tool
 from tools import image_converter as image_converter_tool
 from tools import remove_background as remove_background_tool
@@ -69,6 +70,7 @@ _APPROVAL_REQUIRED = frozenset({
 # Maps tool name → executor module.  Add new tools here.
 
 _TOOLS: dict[str, object] = {
+    "ask_user": ask_user_tool,
     "hello": hello_tool,
     "image_converter": image_converter_tool,
     "remove_background": remove_background_tool,

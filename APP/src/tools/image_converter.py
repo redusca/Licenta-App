@@ -38,6 +38,15 @@ DEFINITION = {
         "Batch-convert image files between formats (JPEG, PNG, WebP, BMP, TIFF, GIF). "
         "Supports three output modes: replace originals, copy alongside, or virtual drive."
     ),
+    "input_instructions": (
+        "files: array of {path, outputFormat} — use ask_user(input_type='file') to pick each file from a virtual drive. "
+        "outputFormat per file: 'jpeg', 'png', 'webp', 'bmp', 'tiff', or 'gif'. "
+        "outputMode: 'replace' overwrites the original, 'copy' places result alongside, 'virtual_drive' saves into a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+    ),
+    "output_description": (
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+    ),
     "parameters": {
         "type": "object",
         "properties": {

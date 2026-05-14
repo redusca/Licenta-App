@@ -39,6 +39,16 @@ DEFINITION = {
         "Batch-convert raster images (JPEG, PNG, WebP, BMP) to SVG vector files using vtracer. "
         "Supports three output modes: replace originals, copy alongside, or virtual drive."
     ),
+    "input_instructions": (
+        "files: array of {path} — use ask_user(input_type='file') to pick each raster image from a virtual drive. "
+        "Supported inputs: JPEG, PNG, WebP, BMP. Output is always SVG. "
+        "outputMode: 'replace' removes original, 'copy' places SVG alongside, 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives. "
+        "colormode: 'color' (default) or 'binary' (black-and-white)."
+    ),
+    "output_description": (
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, svgContent?, error?}], virtualDrivePath?}"
+    ),
     "parameters": {
         "type": "object",
         "properties": {

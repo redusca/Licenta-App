@@ -37,6 +37,17 @@ DEFINITION = {
         "Reduce video file size using H.264/H.265 with configurable CRF. "
         "Supports batch processing and output mode selection."
     ),
+    "input_instructions": (
+        "files: array of {path, codec?, crf?, maxResolution?, stripAudio?} — use ask_user(input_type='file') to pick each video from a virtual drive. "
+        "codec: 'h264' (default) or 'h265'. crf: quality 0-51, default 28 (lower = better quality). "
+        "maxResolution: 'original', '1080p', '720p', '480p', or '360p'. stripAudio: true to remove audio. "
+        "outputMode: 'replace' overwrites original, 'copy' adds _compressed suffix, 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+    ),
+    "output_description": (
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?} "
+        "— output files are always MP4 format."
+    ),
     "parameters": {
         "type": "object",
         "properties": {

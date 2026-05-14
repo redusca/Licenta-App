@@ -40,6 +40,15 @@ DEFINITION = {
         "Batch-convert video files between formats (MP4, AVI, MKV, MOV, WMV, FLV, WebM). "
         "Supports three output modes: replace originals, copy alongside, or virtual drive."
     ),
+    "input_instructions": (
+        "files: array of {path, outputFormat} — use ask_user(input_type='file') to pick each video from a virtual drive. "
+        "outputFormat per file: 'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', or 'webm'. "
+        "outputMode: 'replace' overwrites original, 'copy' places result alongside, 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+    ),
+    "output_description": (
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+    ),
     "parameters": {
         "type": "object",
         "properties": {

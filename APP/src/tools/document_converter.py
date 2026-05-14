@@ -77,6 +77,17 @@ DEFINITION = {
         },
         "required": ["files", "outputMode"],
     },
+    "input_instructions": (
+        "files: array of {path, outputFormat} — use ask_user(input_type='file') to pick each document from a virtual drive. "
+        "Supported inputs: PDF, DOCX, DOC, TXT, HTML, Markdown. "
+        "outputFormat per file: 'pdf', 'docx', 'txt', 'html', or 'png' (PDF pages as images). "
+        "outputMode: 'replace' places result alongside with new extension, 'copy' adds _converted suffix, 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+    ),
+    "output_description": (
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, pages?, error?}], virtualDrivePath?} "
+        "— PDF→PNG produces a ZIP when the source has multiple pages."
+    ),
 }
 
 # ── Tool-drives registry helpers ───────────────────────────────────────────────

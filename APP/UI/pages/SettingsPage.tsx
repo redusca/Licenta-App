@@ -4,20 +4,15 @@ import { Server, Key, CheckCircle, AlertCircle, FolderOpen, FolderCog } from 'lu
 const FLASK = 'http://127.0.0.1:5000/api/agent';
 
 interface AgentConfig {
-    mode: 'server_proxy' | 'direct';
     server_url: string;
-    api_key: string;
     api_key_set: boolean;
-    container_url: string;
     output_path: string;
 }
 
 export const Settings: React.FC = () => {
-    const [mode, setMode] = useState<'server_proxy' | 'direct'>('server_proxy');
     const [serverUrl, setServerUrl] = useState('http://localhost:8000');
     const [apiKey, setApiKey] = useState('');
     const [apiKeySet, setApiKeySet] = useState(false);
-    const [containerUrl, setContainerUrl] = useState('');
     const [outputPath, setOutputPath] = useState('');
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
@@ -28,10 +23,8 @@ export const Settings: React.FC = () => {
         fetch(`${FLASK}/config`)
             .then(r => r.json())
             .then((cfg: AgentConfig) => {
-                setMode(cfg.mode);
                 setServerUrl(cfg.server_url || 'http://localhost:8000');
                 setApiKeySet(cfg.api_key_set ?? false);
-                setContainerUrl(cfg.container_url || '');
                 setOutputPath(cfg.output_path || '');
             })
             .catch(() => setError('Could not reach local backend.'))
@@ -56,10 +49,9 @@ export const Settings: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    mode,
+                    mode: 'server_proxy',
                     server_url: serverUrl,
                     api_key: apiKey,
-                    container_url: containerUrl,
                     output_path: outputPath,
                 }),
             });
@@ -73,9 +65,7 @@ export const Settings: React.FC = () => {
         }
     };
 
-    const isConfigured = mode === 'server_proxy'
-        ? serverUrl && apiKeySet
-        : containerUrl && apiKeySet;
+    const isConfigured = serverUrl && apiKeySet;
 
     return (
         <div className="space-y-6 max-w-2xl">
@@ -100,60 +90,21 @@ export const Settings: React.FC = () => {
                         <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
                     )}
 
-                    {/* Mode toggle */}
+                    {/* Server URL */}
                     <div>
-                        <label className="block text-xs text-slate-500 mb-2">Connection mode</label>
-                        <div className="flex gap-2">
-                            {(['server_proxy', 'direct'] as const).map(m => (
-                                <button
-                                    key={m}
-                                    onClick={() => { setMode(m); setSaved(false); }}
-                                    className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${mode === m
-                                        ? 'bg-blue-600 text-white border-blue-600'
-                                        : 'border-slate-300 dark:border-slate-600 text-slate-500 hover:border-slate-400'}`}
-                                >
-                                    {m === 'server_proxy' ? '🖥  Server Proxy' : '🔌  Direct to Container'}
-                                </button>
-                            ))}
-                        </div>
-                        <p className="text-xs text-slate-500 mt-1.5">
-                            {mode === 'server_proxy'
-                                ? 'Requests route through your server: APP → SERVER → CONTAINER. Use the API key shown on the server\'s Containers page after deploying.'
-                                : 'Connects directly to the container. Requires the container URL and its API key.'}
-                        </p>
+                        <label className="block text-xs text-slate-500 mb-1.5">Server URL</label>
+                        <input
+                            type="text"
+                            value={serverUrl}
+                            onChange={e => { setServerUrl(e.target.value); setSaved(false); }}
+                            className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                            placeholder="https://your-server.example.com"
+                        />
                     </div>
-
-                    {/* Server URL (server_proxy only) */}
-                    {mode === 'server_proxy' && (
-                        <div>
-                            <label className="block text-xs text-slate-500 mb-1.5">Server URL</label>
-                            <input
-                                type="text"
-                                value={serverUrl}
-                                onChange={e => { setServerUrl(e.target.value); setSaved(false); }}
-                                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                                placeholder="https://your-server.example.com"
-                            />
-                        </div>
-                    )}
-
-                    {/* Container URL (direct only) */}
-                    {mode === 'direct' && (
-                        <div>
-                            <label className="block text-xs text-slate-500 mb-1.5">Container URL</label>
-                            <input
-                                type="text"
-                                value={containerUrl}
-                                onChange={e => { setContainerUrl(e.target.value); setSaved(false); }}
-                                className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                                placeholder="http://localhost:49200"
-                            />
-                        </div>
-                    )}
 
                     {/* API Key */}
                     <div>
-                        <label className="block text-xs text-slate-500 mb-1.5 flex items-center gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
                             <Key className="w-3 h-3" />
                             API Key
                             {apiKeySet && <span className="text-green-400">(saved)</span>}
@@ -166,9 +117,7 @@ export const Settings: React.FC = () => {
                             placeholder={apiKeySet ? '••••••••  (leave blank to keep existing)' : 'Paste the API key from the server\'s Containers page'}
                         />
                         <p className="text-xs text-slate-500 mt-1">
-                            {mode === 'server_proxy'
-                                ? 'The API key is generated when you deploy a container on the server. Open the server web UI → Containers → copy the key.'
-                                : 'The API key shown after starting the container locally (in the terminal or .env file).'}
+                            The API key is generated when you deploy a container on the server. Open the server web UI → Containers → copy the key.
                         </p>
                     </div>
 
@@ -195,7 +144,7 @@ export const Settings: React.FC = () => {
 
                 <div className="px-6 py-5 space-y-4">
                     <div>
-                        <label className="block text-xs text-slate-500 mb-1.5 flex items-center gap-1.5">
+                        <label className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
                             <FolderOpen className="w-3 h-3" />
                             Output Path
                         </label>

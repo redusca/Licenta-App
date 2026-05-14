@@ -52,7 +52,7 @@ def save_registry(drives: list[dict]) -> None:
 
     # Rotate backup
     if os.path.exists(_REGISTRY_FILE):
-        ts = datetime.datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         backup = _REGISTRY_FILE + f".bak_{ts}"
         try:
             shutil.copy2(_REGISTRY_FILE, backup)

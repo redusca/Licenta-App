@@ -63,12 +63,15 @@ def _get_groq():
 # ---------------------------------------------------------------------------
 
 _PLAN_SYSTEM = """\
-You are a smart AI assistant that decides how to handle each user request.
+You are the AI assistant built into a desktop file-management application.
+You help users manage files, virtual drives, and media using the tools listed below.
+You do NOT have internet access. Answer only from the tool list and conversation history.
 
 IMPORTANT — choose the simplest approach that works:
 
 ANSWER DIRECTLY with a single "llm" step when the request is:
-  • A question you can answer from general knowledge ("What is X?", "How does Y work?")
+  • A question about what you can do / what tools are available
+    → prompt MUST include the full tool list so the executor can answer accurately
   • A suggestion, recommendation, opinion, or advice request
   • A continuation of a conversation (follow-up questions, clarifications)
   • A greeting, thanks, or small talk
@@ -77,8 +80,15 @@ ANSWER DIRECTLY with a single "llm" step when the request is:
 
 USE TOOLS when the request explicitly requires:
   • File system access (list, read, move, delete, create files or folders)
-  • External data the LLM cannot know without fetching
-  • Operations that produce side effects in the user's environment
+  • Operations that produce side effects in the user's environment (convert, compress, merge…)
+
+ATTACHED FILES — when the user message contains "[Attached context: ...]":
+  • Parse the file paths and detect their extensions
+  • Check each extension against the requested tool's supported input formats (from input_instructions)
+  • If the files are valid inputs → use them directly in the tool's "files" or "sourceFolder" parameter
+  • If a file type is NOT supported by the tool → tell the user which extensions ARE supported
+  • If the request is ambiguous about which tool to use → pick the best matching tool based on file extensions
+  • NEVER ask the user to re-specify files that are already attached
 
 Available tools:
 {tools_desc}
@@ -116,10 +126,13 @@ RULES:
 - Only add tool steps when the task genuinely needs them.
 - Maximum 5 steps. Never create steps just to look thorough.
 - tool.input keys must exactly match the tool's parameter schema.
+- NEVER suggest internet searches or external services — you only use the listed tools.
 """
 
 _EXECUTOR_SYSTEM = """\
-You are completing one step of a multi-step task.
+You are the AI assistant built into a desktop file-management application.
+You help users manage files, virtual drives, and media. You do NOT have internet access.
+Only answer from the information below — never invent external services or URLs.
 
 Overall task: {task}
 
@@ -129,18 +142,23 @@ Steps already completed:
 Your assignment for this step: {prompt}
 
 Be focused and concise — only address this step, not the whole task.
+Use markdown formatting: **bold** for emphasis, bullet lists for multiple items, \
+`code` for file paths or technical values.
 """
 
 _SYNTHESIZER_SYSTEM = """\
-You are a helpful assistant.
+You are the AI assistant built into a desktop file-management application.
+You help users manage files, virtual drives, and media. You do NOT have internet access.
 
 The user asked: {task}
 
 All execution steps have been completed. Here are the results:
 {step_results}
 
-Write a clear, direct final answer for the user. Incorporate the results naturally. \
+Write a clear, direct final answer for the user. Incorporate the results naturally.
 Do not list step numbers or raw JSON — just answer the question.
+Use markdown formatting: **bold** for emphasis, bullet lists for multiple items, \
+`code` for file paths or technical values, headers (##) only for long structured answers.
 """
 
 # ---------------------------------------------------------------------------
@@ -155,7 +173,12 @@ def _tools_desc(tools: list[dict]) -> str:
         props = json.dumps(
             t.get("parameters", {}).get("properties", {}), ensure_ascii=False
         )
-        lines.append(f"- {t['name']}: {t['description']}\n  parameters: {props}")
+        line = f"- {t['name']}: {t['description']}\n  parameters: {props}"
+        if t.get("input_instructions"):
+            line += f"\n  input_instructions: {t['input_instructions']}"
+        if t.get("output_description"):
+            line += f"\n  output_description: {t['output_description']}"
+        lines.append(line)
     return "\n".join(lines)
 
 
@@ -223,13 +246,17 @@ async def _stream_llm_step(
     task: str,
     past_steps: list[dict],
     history: list[dict],
+    tools: list[dict] | None = None,
 ) -> AsyncGenerator[str, None]:
     client = _get_groq()
     past_str = "\n".join(
         f"Step {s['id']} ({s['description']}): {s['result']}" for s in past_steps
     ) or "None yet"
+    full_prompt = prompt
+    if tools:
+        full_prompt = f"{prompt}\n\nAvailable tools for reference:\n{_tools_desc(tools)}"
     system = _EXECUTOR_SYSTEM.format(
-        task=task, past_steps=past_str, prompt=prompt
+        task=task, past_steps=past_str, prompt=full_prompt
     )
 
     stream = await client.chat.completions.create(
@@ -445,7 +472,7 @@ async def run_planning_agent(
             }
             chunks: list[str] = []
             try:
-                async for chunk in _stream_llm_step(step_prompt, message, step_results, history):
+                async for chunk in _stream_llm_step(step_prompt, message, step_results, history, tools):
                     yield {"type": "llm_chunk", "step_id": step_id, "content": chunk, "message": chunk}
                     chunks.append(chunk)
                 result = "".join(chunks)

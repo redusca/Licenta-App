@@ -62,6 +62,16 @@ DEFINITION = {
         },
         "required": ["files", "outputMode"],
     },
+    "input_instructions": (
+        "files: array of {path, outputFormat} — use ask_user(input_type='file') to pick each 3D model from a virtual drive. "
+        "Supported inputs: OBJ, FBX, GLB, GLTF, STL, PLY, DAE. "
+        "outputFormat per file: 'obj', 'stl', 'ply', 'glb', 'gltf' (trimesh); 'fbx' or 'dae' requires Blender installed. "
+        "outputMode: 'replace' overwrites original, 'copy' places result alongside, 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+    ),
+    "output_description": (
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+    ),
 }
 
 # ── Tool-drives registry helpers ───────────────────────────────────────────────

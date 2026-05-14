@@ -10,10 +10,36 @@ drive_bp = Blueprint('drive', __name__)
 
 @drive_bp.route('/registry', methods=['GET'])
 def get_registry():
-    """Return the backend-persisted list of known drives."""
+    """Return known drives (user drives + tool-created drives), filtered to paths that exist."""
     try:
         drives = load_registry()
-        return jsonify({"success": True, "drives": drives})
+
+        # Also include tool-created drives from tool_drives.json
+        import json as _json
+        from pathlib import Path as _Path
+        _tool_drives_path = _Path(__file__).parent.parent.parent / "data" / "tool_drives.json"
+        tool_drives: list = []
+        if _tool_drives_path.exists():
+            try:
+                tool_drives = _json.loads(_tool_drives_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+
+        # Merge: user drives first, then tool drives not already in user list
+        seen = {os.path.normcase(os.path.normpath(d.get("path", ""))) for d in drives if d.get("path")}
+        for td in tool_drives:
+            tp = td.get("path", "")
+            if tp and os.path.normcase(os.path.normpath(tp)) not in seen:
+                drives.append({"path": tp, "name": td.get("name", os.path.basename(tp))})
+                seen.add(os.path.normcase(os.path.normpath(tp)))
+
+        # Filter to only paths that still exist on disk, and auto-clean the registry
+        existing = [d for d in drives if os.path.isdir(d.get('path', ''))]
+        user_existing = [d for d in load_registry() if os.path.isdir(d.get('path', ''))]
+        if len(user_existing) != len(load_registry()):
+            save_registry(user_existing)
+
+        return jsonify({"success": True, "drives": existing})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
