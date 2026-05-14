@@ -3,11 +3,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useNavigate } from 'react-router-dom';
 import {
-  Send, Bot, User, Loader2, CheckCircle2, XCircle,
-  Wrench, Brain, ChevronDown, ChevronRight,
+  Send, Loader2, CheckCircle2, XCircle,
+  ChevronDown, ChevronRight, ChevronLeft,
   Plus, Trash2, AlertCircle, Eye, EyeOff,
   Paperclip, HardDrive, FileText, X, Upload,
-  History, MessageSquare, ChevronLeft, ExternalLink,
+  ExternalLink, Sparkles, History,
 } from 'lucide-react';
 import { ToolApprovalCard, PendingTool } from '../components/ToolApprovalModal';
 import { FolderPickerModal } from '../components/FolderPickerModal';
@@ -67,7 +67,6 @@ function loadHistory(): HistoryChat[] {
 }
 
 function saveHistory(list: HistoryChat[]): void {
-  // Keep newest 30 chats; cap entries per chat at 60
   const trimmed = list.slice(0, 30).map(c => ({
     ...c,
     entries: c.entries.slice(-60),
@@ -81,15 +80,66 @@ function titleFromEntries(entries: ChatEntry[]): string {
   return first.content.slice(0, 50) + (first.content.length > 50 ? '…' : '');
 }
 
-// ── Small sub-components ──────────────────────────────────────────────────────
+function fmtDate(ts: number): string {
+  const d = new Date(ts);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+  if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7)  return d.toLocaleDateString([], { weekday: 'short' });
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
 
-const StepIcon: React.FC<{ status: LiveStep['status']; type: LiveStep['type'] }> = ({ status, type }) => {
-  if (status === 'running') return <Loader2 className="w-3.5 h-3.5 text-blue-500 animate-spin shrink-0" />;
-  if (status === 'done')    return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />;
-  if (status === 'error')   return <XCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />;
-  return type === 'tool'
-    ? <Wrench className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-    : <Brain className="w-3.5 h-3.5 text-slate-400 shrink-0" />;
+// ── Avatar ────────────────────────────────────────────────────────────────────
+
+const Avatar: React.FC<{ kind: 'bot' | 'user' }> = ({ kind }) => {
+  if (kind === 'bot') {
+    return (
+      <div style={{
+        width: 32, height: 32, borderRadius: 'var(--r-control)', flexShrink: 0,
+        background: 'var(--accent-soft)', color: 'var(--accent)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Sparkles size={15} />
+      </div>
+    );
+  }
+  return (
+    <div style={{
+      width: 32, height: 32, borderRadius: 'var(--r-control)', flexShrink: 0,
+      background: 'var(--surface-2)', color: 'var(--ink-2)',
+      border: '1px solid var(--border)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontWeight: 600, fontSize: 13,
+    }}>
+      A
+    </div>
+  );
+};
+
+// ── Attachment chip ───────────────────────────────────────────────────────────
+
+const AttachmentChip: React.FC<{ a: Attachment; onRemove?: () => void }> = ({ a, onRemove }) => {
+  const tone = a.type === 'drive' ? 'sky' : 'sage';
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '4px 9px', fontSize: 11.5, fontWeight: 500,
+      background: `var(--c-${tone}-bg)`, color: `var(--c-${tone})`,
+      borderRadius: 'var(--r-pill)', maxWidth: 180,
+    }}>
+      {a.type === 'drive' ? <HardDrive size={11} /> : <FileText size={11} />}
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          style={{ marginLeft: 2, display: 'flex', alignItems: 'center', color: 'inherit', opacity: 0.7 }}
+        >
+          <X size={10} />
+        </button>
+      )}
+    </span>
+  );
 };
 
 // ── Result renderer ────────────────────────────────────────────────────────────
@@ -110,7 +160,6 @@ const ResultView: React.FC<{ raw: string }> = ({ raw }) => {
     const parsed = JSON.parse(trimmed);
     if (typeof parsed !== 'object' || parsed === null) throw new Error('primitive');
 
-    // Detect a drive/folder path worth linking to
     if (parsed.virtualDrivePath) {
       drivePath = parsed.virtualDrivePath;
     } else if (parsed.outputPath && looksLikeFolder(parsed.outputPath)) {
@@ -120,86 +169,115 @@ const ResultView: React.FC<{ raw: string }> = ({ raw }) => {
     if (Array.isArray(parsed.files)) {
       const files = parsed.files as any[];
       node = (
-        <div className="space-y-0.5">
-          <p className="text-xs text-slate-400 mb-1">{files.length} item(s)</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4 }}>{files.length} item(s)</p>
           {files.slice(0, 8).map((f: any, i: number) => (
-            <div key={i} className="flex items-center gap-1.5 text-xs font-mono text-slate-600 dark:text-slate-400 truncate">
-              <span className="text-slate-400 shrink-0">→</span>
-              <span className="truncate">{f.name || f.path || String(f)}</span>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-2)', overflow: 'hidden' }}>
+              <span style={{ color: 'var(--faint)', flexShrink: 0 }}>→</span>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name || f.path || String(f)}</span>
               {f.size != null && (
-                <span className="text-slate-400 shrink-0">
+                <span style={{ color: 'var(--faint)', flexShrink: 0 }}>
                   {f.size > 1048576 ? `${(f.size / 1048576).toFixed(1)} MB` : `${(f.size / 1024).toFixed(0)} KB`}
                 </span>
               )}
             </div>
           ))}
-          {files.length > 8 && <p className="text-xs text-slate-400">…and {files.length - 8} more</p>}
+          {files.length > 8 && <p style={{ fontSize: 11, color: 'var(--muted)' }}>…and {files.length - 8} more</p>}
         </div>
       );
     } else if ('success' in parsed || 'error' in parsed) {
       if (parsed.error) {
-        node = <span className="text-xs text-red-500">{String(parsed.error)}</span>;
+        node = <span style={{ fontSize: 11.5, color: 'var(--c-clay)' }}>{String(parsed.error)}</span>;
       } else {
         const summary = parsed.total != null
           ? `${parsed.succeeded ?? parsed.total}/${parsed.total} succeeded`
           : parsed.outputPath ?? (parsed.virtualDrivePath ?? 'Done');
-        node = <span className="text-xs text-emerald-600 dark:text-emerald-400">{summary}</span>;
+        node = <span style={{ fontSize: 11.5, color: 'var(--c-sage)' }}>{summary}</span>;
       }
     } else {
       const str = JSON.stringify(parsed);
-      node = <span className="text-xs font-mono text-slate-500 break-all">{str.length > 240 ? str.slice(0, 240) + '…' : str}</span>;
+      node = <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-2)', wordBreak: 'break-all' }}>{str.length > 240 ? str.slice(0, 240) + '…' : str}</span>;
     }
   } catch {
-    node = <span className="text-xs text-slate-600 dark:text-slate-400 wrap-break-word">{trimmed.length > 300 ? trimmed.slice(0, 300) + '…' : trimmed}</span>;
+    node = <span style={{ fontSize: 11.5, color: 'var(--ink-2)', wordBreak: 'break-word' }}>{trimmed.length > 300 ? trimmed.slice(0, 300) + '…' : trimmed}</span>;
   }
 
   return (
-    <div className="space-y-2">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {node}
       {drivePath && (
         <button
           onClick={() => navigate(`/files?path=${encodeURIComponent(drivePath!)}`)}
-          className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline transition-colors mt-1"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 500, color: 'var(--accent-ink)', marginTop: 4 }}
         >
-          <ExternalLink className="w-3 h-3 shrink-0" />
-          Open in My Drive
+          <ExternalLink size={12} />
+          Open in My Drives
         </button>
       )}
     </div>
   );
 };
 
-// ── Step row with expandable result ──────────────────────────────────────────
+// ── Plan step row ─────────────────────────────────────────────────────────────
 
-const StepRow: React.FC<{ step: LiveStep }> = ({ step }) => {
-  const [expanded, setExpanded] = useState(false);
+const PlanStep: React.FC<{ step: LiveStep }> = ({ step }) => {
+  const [open, setOpen] = useState(false);
   const hasResult = (step.status === 'done' || step.status === 'error') && !!step.result;
+
+  const dotColor: Record<LiveStep['status'], string> = {
+    done:    'var(--c-sage)',
+    running: 'var(--accent)',
+    pending: 'transparent',
+    error:   'var(--c-clay)',
+  };
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <StepIcon status={step.status} type={step.type} />
-        <span className={`text-xs flex-1 min-w-0 truncate ${
-          step.status === 'running' ? 'text-blue-600 dark:text-blue-400 font-medium' :
-          step.status === 'done'    ? 'text-emerald-600 dark:text-emerald-400' :
-          step.status === 'error'   ? 'text-red-500' :
-          'text-slate-500 dark:text-slate-400'
-        }`}>{step.description}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{
+          width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+          background: step.status === 'pending' ? 'transparent' : dotColor[step.status],
+          color: 'var(--page)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: step.status === 'pending' ? '1.5px dashed var(--border-2)' : 'none',
+        }}>
+          {step.status === 'done'    && <CheckCircle2 size={11} />}
+          {step.status === 'running' && <Loader2 size={10} className="spin" />}
+          {step.status === 'error'   && <XCircle size={11} />}
+          {step.status === 'pending' && <span style={{ width: 4, height: 4, borderRadius: 999, background: 'var(--faint)', display: 'block' }} />}
+        </span>
+        <span style={{
+          fontSize: 13, flex: 1, minWidth: 0,
+          color: step.status === 'pending' ? 'var(--muted)' : 'var(--ink)',
+          fontWeight: step.status === 'running' ? 600 : 500,
+        }}>
+          {step.description}
+        </span>
         {step.type === 'tool' && step.tool && (
-          <span className="text-xs text-slate-400 font-mono shrink-0">({step.tool})</span>
+          <code style={{
+            fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--muted)',
+            background: 'var(--surface-2)', padding: '2px 6px', borderRadius: 4, flexShrink: 0,
+          }}>
+            {step.tool}
+          </code>
         )}
         {hasResult && (
           <button
-            onClick={() => setExpanded(v => !v)}
-            className="shrink-0 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-            title={expanded ? 'Hide output' : 'Show output'}
+            onClick={() => setOpen(v => !v)}
+            style={{ flexShrink: 0, padding: 4, color: 'var(--muted)', display: 'flex', alignItems: 'center' }}
+            title={open ? 'Hide output' : 'Show output'}
           >
-            {expanded ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+            {open ? <EyeOff size={13} /> : <Eye size={13} />}
           </button>
         )}
       </div>
-      {expanded && hasResult && (
-        <div className="mt-1.5 ml-5 px-3 py-2 bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-700 rounded-xl">
+      {open && hasResult && (
+        <div style={{
+          marginTop: 8, marginLeft: 30, padding: '10px 12px',
+          background: 'var(--page)', border: '1px solid var(--border)',
+          borderRadius: 8, fontSize: 11.5, fontFamily: 'var(--font-mono)',
+          color: 'var(--ink-2)',
+        }}>
           <ResultView raw={step.result!} />
         </div>
       )}
@@ -207,90 +285,99 @@ const StepRow: React.FC<{ step: LiveStep }> = ({ step }) => {
   );
 };
 
-// ── Attachment chips ──────────────────────────────────────────────────────────
-
-const AttachmentChip: React.FC<{ a: Attachment; onRemove?: () => void }> = ({ a, onRemove }) => (
-  <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-500/15 border border-blue-400/30 rounded-lg text-xs font-mono text-blue-700 dark:text-blue-300 max-w-55">
-    {a.type === 'drive'
-      ? <HardDrive className="w-3 h-3 shrink-0 text-blue-500" />
-      : <FileText className="w-3 h-3 shrink-0 text-blue-400" />
-    }
-    <span className="truncate">{a.name}</span>
-    {onRemove && (
-      <button onClick={onRemove} className="shrink-0 ml-0.5 text-blue-400 hover:text-red-500 transition-colors">
-        <X className="w-2.5 h-2.5" />
-      </button>
-    )}
-  </span>
-);
-
 // ── Run card ──────────────────────────────────────────────────────────────────
 
 const RunCard: React.FC<{ run: LiveRun; planOpen: boolean; onTogglePlan: () => void }> = ({
   run, planOpen, onTogglePlan,
-}) => (
-  <div className="flex gap-3">
-    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-      <Bot className="w-5 h-5 text-white" />
-    </div>
-    <div className="flex-1 max-w-[80%]">
-      <div className="flex items-baseline gap-2 mb-1.5">
-        <span className="text-sm font-semibold">Agent</span>
-      </div>
-      <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tl-none p-4 space-y-3">
+}) => {
+  const doneCount = run.plan.filter(s => s.status === 'done').length;
+  const totalCount = run.plan.length;
+  const progress = totalCount > 0 ? (doneCount / totalCount) * 100 : 0;
 
-        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-          <span className="italic">{run.status}</span>
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+      <Avatar kind="bot" />
+      <div style={{ flex: 1, maxWidth: '80%' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>Agent</span>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 11, color: 'var(--accent-ink)', background: 'var(--accent-soft)',
+            padding: '2px 8px', borderRadius: 999, fontWeight: 500,
+          }}>
+            <Loader2 size={8} className="spin" />
+            {run.status}
+          </span>
         </div>
-
-        {run.plan.length > 0 && (
-          <div>
-            <button
-              onClick={onTogglePlan}
-              className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors mb-1.5"
-            >
-              {planOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              Plan ({run.plan.length} step{run.plan.length !== 1 ? 's' : ''})
-            </button>
-            {planOpen && (
-              <div className="space-y-2 pl-1">
-                {run.plan.map(step => (
-                  <StepRow key={step.id} step={step} />
-                ))}
+        <div style={{
+          padding: 16, borderRadius: 'var(--r-card)',
+          background: 'var(--surface)', border: '1px solid var(--border)',
+        }}>
+          {run.plan.length > 0 && (
+            <>
+              <button
+                onClick={onTogglePlan}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 11.5, fontWeight: 600, color: 'var(--ink-2)',
+                  marginBottom: planOpen ? 12 : 0,
+                }}
+              >
+                {planOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                Plan · {run.plan.length} step{run.plan.length !== 1 ? 's' : ''}
+              </button>
+              {planOpen && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {run.plan.map(step => <PlanStep key={step.id} step={step} />)}
+                </div>
+              )}
+              {totalCount > 0 && (
+                <div style={{
+                  marginTop: 14, paddingTop: 12,
+                  borderTop: '1px dashed var(--border)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  fontSize: 12, color: 'var(--muted)',
+                }}>
+                  <span style={{ fontFamily: 'var(--font-mono)' }}>{doneCount} / {totalCount} steps</span>
+                  <div style={{ flex: 1, height: 4, background: 'var(--surface-2)', borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ width: `${progress}%`, height: '100%', background: 'var(--accent)', borderRadius: 2, transition: 'width .3s var(--ease)' }} />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+          {run.synthesis && (
+            <div style={{ marginTop: run.plan.length > 0 ? 14 : 0, fontSize: 14, color: 'var(--ink)', lineHeight: 1.6 }}>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.synthesis}</ReactMarkdown>
               </div>
-            )}
-          </div>
-        )}
-
-        {run.synthesis && (
-          <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.synthesis}</ReactMarkdown>
-            <span className="inline-block w-0.5 h-4 bg-blue-500 ml-0.5 animate-pulse align-middle" />
-          </div>
-        )}
+              <span style={{ display: 'inline-block', width: 2, height: 16, background: 'var(--accent)', marginLeft: 2, verticalAlign: 'middle', animation: 'pulse-soft 1.2s ease-in-out infinite' }} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-// ── Markdown-rendered assistant bubble ────────────────────────────────────────
+// ── Assistant bubble ──────────────────────────────────────────────────────────
 
 const AssistantBubble: React.FC<{ content: string }> = ({ content }) => (
-  <div className="flex gap-3">
-    <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center shrink-0">
-      <Bot className="w-5 h-5 text-white" />
-    </div>
-    <div className="flex-1 max-w-[80%]">
-      <div className="flex items-baseline gap-2 mb-1.5">
-        <span className="text-sm font-semibold">Agent</span>
+  <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+    <Avatar kind="bot" />
+    <div style={{ maxWidth: '80%', flex: 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>Agent</span>
       </div>
-      <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-tl-none px-4 py-3">
-        <div className="prose prose-sm dark:prose-invert max-w-none
-          prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5
-          prose-headings:mt-2 prose-headings:mb-1
-          prose-code:bg-slate-200 dark:prose-code:bg-slate-700 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs
-          prose-pre:bg-slate-200 dark:prose-pre:bg-slate-700 prose-pre:rounded-xl prose-pre:p-3">
+      <div style={{
+        padding: '12px 16px',
+        background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 'var(--r-card)', borderTopLeftRadius: 6,
+      }}>
+        <div
+          className="prose prose-sm dark:prose-invert max-w-none"
+          style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--ink)' }}
+        >
           <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
         </div>
       </div>
@@ -298,100 +385,138 @@ const AssistantBubble: React.FC<{ content: string }> = ({ content }) => (
   </div>
 );
 
+// ── User bubble ───────────────────────────────────────────────────────────────
+
 const UserBubble: React.FC<{ content: string; attachments?: Attachment[] }> = ({ content, attachments }) => (
-  <div className="flex gap-3 flex-row-reverse">
-    <div className="w-9 h-9 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
-      <User className="w-5 h-5 text-orange-600" />
-    </div>
-    <div className="flex-1 max-w-[80%] flex flex-col items-end">
-      <div className="flex items-baseline gap-2 mb-1.5">
-        <span className="text-sm font-semibold">You</span>
-      </div>
-      <div className="bg-blue-500 text-white rounded-2xl rounded-tr-none px-4 py-3 text-sm leading-relaxed">
+  <div style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse', alignItems: 'flex-start' }}>
+    <Avatar kind="user" />
+    <div style={{ maxWidth: '75%' }}>
+      <div style={{
+        background: 'var(--accent)', color: 'var(--on-accent)',
+        padding: '12px 16px', borderRadius: 'var(--r-card)',
+        borderTopRightRadius: 6,
+        fontSize: 14, lineHeight: 1.55,
+      }}>
         {content}
-        {attachments && attachments.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {attachments.map(a => (
-              <AttachmentChip key={a.id} a={a} />
-            ))}
-          </div>
-        )}
       </div>
+      {attachments && attachments.length > 0 && (
+        <div style={{ marginTop: 6, display: 'flex', gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          {attachments.map(a => <AttachmentChip key={a.id} a={a} />)}
+        </div>
+      )}
     </div>
   </div>
 );
 
+// ── Error bubble ──────────────────────────────────────────────────────────────
+
 const ErrorBubble: React.FC<{ content: string }> = ({ content }) => (
-  <div className="flex items-start gap-2 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400">
-    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+  <div style={{
+    display: 'flex', alignItems: 'flex-start', gap: 8,
+    padding: '12px 16px',
+    background: 'var(--c-clay-bg)',
+    borderRadius: 'var(--r-card)',
+    fontSize: 13.5, color: 'var(--c-clay)',
+  }}>
+    <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
     <span>{content}</span>
   </div>
 );
 
 // ── History panel ─────────────────────────────────────────────────────────────
 
-function fmtDate(ts: number): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
-  if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 7)  return d.toLocaleDateString([], { weekday: 'short' });
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
-
 interface HistoryPanelProps {
   history: HistoryChat[];
   currentId: string | null;
   onSelect: (chat: HistoryChat) => void;
   onDelete: (id: string) => void;
+  onNew: () => void;
   onClose: () => void;
 }
 
-const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, currentId, onSelect, onDelete, onClose }) => (
-  <div className="w-60 shrink-0 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-white dark:bg-slate-900 overflow-hidden">
-    <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-200 dark:border-slate-800">
-      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Chat History</span>
+const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, currentId, onSelect, onDelete, onNew, onClose }) => (
+  <aside style={{
+    width: 260, flexShrink: 0,
+    background: 'var(--surface)', borderRight: '1px solid var(--border)',
+    display: 'flex', flexDirection: 'column', overflow: 'hidden',
+  }}>
+    <div style={{ padding: '18px 16px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '.1em' }}>Chats</span>
       <button
         onClick={onClose}
-        className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+        style={{ padding: 6, borderRadius: 'var(--r-control)', color: 'var(--muted)', display: 'flex', alignItems: 'center', transition: 'all .15s var(--ease)' }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; }}
       >
-        <ChevronLeft className="w-4 h-4" />
+        <ChevronLeft size={14} />
       </button>
     </div>
-    <div className="flex-1 overflow-y-auto py-1">
+    <div style={{ padding: '0 12px 8px' }}>
+      <button
+        onClick={onNew}
+        className="btn btn-primary"
+        style={{ width: '100%', justifyContent: 'center' }}
+      >
+        <Plus size={14} /> New chat
+      </button>
+    </div>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px 12px' }}>
       {history.length === 0 ? (
-        <p className="text-xs text-slate-400 text-center py-8 px-3">No chat history yet</p>
+        <p style={{ fontSize: 12, color: 'var(--faint)', textAlign: 'center', padding: '24px 12px' }}>No chat history yet</p>
       ) : (
-        history.map(chat => (
-          <div
-            key={chat.id}
-            className={`group relative flex items-start gap-2 px-3 py-2.5 cursor-pointer transition-colors ${
-              chat.id === currentId
-                ? 'bg-blue-50 dark:bg-blue-900/30'
-                : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
-            }`}
-            onClick={() => onSelect(chat)}
-          >
-            <MessageSquare className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${chat.id === currentId ? 'text-blue-500' : 'text-slate-400'}`} />
-            <div className="flex-1 min-w-0">
-              <p className={`text-xs font-medium truncate ${chat.id === currentId ? 'text-blue-700 dark:text-blue-300' : 'text-slate-700 dark:text-slate-300'}`}>
-                {chat.title}
-              </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">{fmtDate(chat.updatedAt)}</p>
-            </div>
-            <button
-              onClick={e => { e.stopPropagation(); onDelete(chat.id); }}
-              className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-red-500 transition-all shrink-0"
-              title="Delete chat"
+        history.map(chat => {
+          const isActive = chat.id === currentId;
+          return (
+            <div
+              key={chat.id}
+              style={{
+                position: 'relative',
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3,
+                width: '100%', padding: '10px 12px', borderRadius: 10, marginBottom: 2,
+                background: isActive ? 'var(--accent-soft)' : 'transparent',
+                cursor: 'pointer',
+                transition: 'background .12s var(--ease)',
+              }}
+              onClick={() => onSelect(chat)}
+              onMouseEnter={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+              onMouseLeave={e => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <Trash2 className="w-3 h-3" />
-            </button>
-          </div>
-        ))
+              <span style={{
+                fontSize: 12.5, lineHeight: 1.35,
+                color: isActive ? 'var(--accent-ink)' : 'var(--ink-2)',
+                fontWeight: isActive ? 600 : 500,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                width: '100%', display: 'block', paddingRight: 20,
+              }}>
+                {chat.title}
+              </span>
+              <span style={{ fontSize: 10.5, color: 'var(--faint)' }}>{fmtDate(chat.updatedAt)}</span>
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(chat.id); }}
+                style={{
+                  position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                  padding: 4, color: 'var(--muted)', display: 'flex', alignItems: 'center',
+                  borderRadius: 6, opacity: 0.4, transition: 'all .15s',
+                }}
+                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--c-clay)'; (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; (e.currentTarget as HTMLElement).style.opacity = '0.4'; }}
+                title="Delete chat"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          );
+        })
       )}
     </div>
-  </div>
+    <div style={{ padding: '12px 14px', borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--c-sage)', boxShadow: '0 0 0 4px var(--c-sage-bg)', flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, color: 'var(--ink)', fontWeight: 500 }}>Connected · Planning Agent</div>
+        <div style={{ fontSize: 10.5, color: 'var(--faint)', fontFamily: 'var(--font-mono)', marginTop: 1 }}>12 tools available</div>
+      </div>
+    </div>
+  </aside>
 );
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -405,28 +530,24 @@ export const Chat: React.FC = () => {
   const [pendingTool, setPendingTool] = useState<PendingTool | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
 
-  // ── History state ──────────────────────────────────────────────────────────
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<HistoryChat[]>([]);
   const [currentHistoryId, setCurrentHistoryId] = useState<string | null>(null);
 
-  // ── Attachment state ───────────────────────────────────────────────────────
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachPicker, setAttachPicker] = useState<'file' | 'drive' | null>(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Scroll to bottom ───────────────────────────────────────────────────────
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [entries, live?.synthesis, pendingTool]);
 
-  // ── Close attach menu on outside click ────────────────────────────────────
   useEffect(() => {
     if (!showAttachMenu) return;
     const handler = (e: MouseEvent) => {
@@ -438,7 +559,6 @@ export const Chat: React.FC = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, [showAttachMenu]);
 
-  // ── Auto-save current chat to history ─────────────────────────────────────
   useEffect(() => {
     if (!currentHistoryId || entries.length === 0) return;
     setHistory(prev => {
@@ -452,12 +572,10 @@ export const Chat: React.FC = () => {
     });
   }, [entries, currentHistoryId]);
 
-  // ── Init on mount ──────────────────────────────────────────────────────────
   useEffect(() => {
     const h = loadHistory();
     setHistory(h);
     if (h.length > 0) {
-      // Restore the most recent chat
       const latest = h[0];
       setChatId(latest.chatId ?? null);
       setEntries(Array.isArray(latest.entries) ? latest.entries : []);
@@ -476,7 +594,6 @@ export const Chat: React.FC = () => {
       if (!res.ok) throw new Error(data.error || 'Failed to create chat');
       const newId = data.chat_id as string;
       setChatId(newId);
-      // Create a history entry for this new chat
       const newEntry: HistoryChat = {
         id: newId,
         chatId: newId,
@@ -496,7 +613,6 @@ export const Chat: React.FC = () => {
     }
   };
 
-  // ── Recreate server chat on 404 (server restart wiped session) ───────────
   const recreateChat = async (): Promise<string | null> => {
     try {
       const res = await fetch(`${AGENT}/chat/create`, { method: 'POST' });
@@ -520,7 +636,6 @@ export const Chat: React.FC = () => {
     }
   };
 
-  // ── Poll for pending tool approvals while streaming ────────────────────────
   useEffect(() => {
     if (!live) return;
     const id = setInterval(async () => {
@@ -534,13 +649,11 @@ export const Chat: React.FC = () => {
     return () => clearInterval(id);
   }, [live, pendingTool]);
 
-  // ── SSE event handler ──────────────────────────────────────────────────────
   const handleEvent = useCallback((evt: any) => {
     switch (evt.type) {
       case 'status':
         setLive(prev => prev ? { ...prev, status: evt.message ?? prev.status } : null);
         break;
-
       case 'plan':
         setPlanOpen(true);
         setLive(prev => prev ? {
@@ -555,7 +668,6 @@ export const Chat: React.FC = () => {
           })),
         } : null);
         break;
-
       case 'step_start':
         setLive(prev => {
           if (!prev) return null;
@@ -570,7 +682,6 @@ export const Chat: React.FC = () => {
           };
         });
         break;
-
       case 'step_done':
         setLive(prev => {
           if (!prev) return null;
@@ -582,7 +693,6 @@ export const Chat: React.FC = () => {
           };
         });
         break;
-
       case 'tool_error':
         setLive(prev => {
           if (!prev) return null;
@@ -594,11 +704,9 @@ export const Chat: React.FC = () => {
           };
         });
         break;
-
       case 'final_chunk':
         setLive(prev => prev ? { ...prev, synthesis: prev.synthesis + (evt.content ?? '') } : null);
         break;
-
       case 'final':
         setEntries(prev => [...prev, {
           id: `a-${Date.now()}`,
@@ -607,7 +715,6 @@ export const Chat: React.FC = () => {
         }]);
         setLive(null);
         break;
-
       case 'error':
         setEntries(prev => [...prev, {
           id: `e-${Date.now()}`,
@@ -616,22 +723,17 @@ export const Chat: React.FC = () => {
         }]);
         setLive(null);
         break;
-
       default:
         break;
     }
   }, []);
-
-  // ── Attachment handlers ────────────────────────────────────────────────────
 
   const handleAttachSelect = (path: string) => {
     const name = path.split(/[\\/]/).pop() ?? path;
     const type = attachPicker!;
     setAttachments(prev => [...prev, {
       id: `att-${Date.now()}-${Math.random()}`,
-      type,
-      path,
-      name,
+      type, path, name,
     }]);
     setAttachPicker(null);
   };
@@ -653,7 +755,6 @@ export const Chat: React.FC = () => {
   const removeAttachment = (id: string) =>
     setAttachments(prev => prev.filter(a => a.id !== id));
 
-  // ── Send message ───────────────────────────────────────────────────────────
   const sendMessage = async () => {
     const msg = input.trim();
     if (!msg || live || !chatId) return;
@@ -678,7 +779,6 @@ export const Chat: React.FC = () => {
     setLive({ status: 'Connecting…', plan: [], synthesis: '' });
     setPlanOpen(true);
 
-    // Returns false if the server returned 404 (chat session gone)
     const doStream = async (cid: string): Promise<boolean> => {
       const resp = await fetch(`${AGENT}/chat/stream`, {
         method: 'POST',
@@ -719,7 +819,6 @@ export const Chat: React.FC = () => {
     try {
       const ok = await doStream(chatId);
       if (!ok) {
-        // Server lost the chat (restart) — recreate and retry once
         const newId = await recreateChat();
         if (newId) {
           await doStream(newId);
@@ -737,7 +836,6 @@ export const Chat: React.FC = () => {
     }
   };
 
-  // ── Approve / reject tool ──────────────────────────────────────────────────
   const approveTool = async (id: string, modifiedInput: Record<string, any>) => {
     setPendingTool(null);
     await fetch(`${TOOLS}/approve/${id}`, {
@@ -752,7 +850,6 @@ export const Chat: React.FC = () => {
     await fetch(`${TOOLS}/reject/${id}`, { method: 'POST' }).catch(() => { /* ignore */ });
   };
 
-  // ── New chat ───────────────────────────────────────────────────────────────
   const newChat = async () => {
     if (live) return;
     readerRef.current?.cancel();
@@ -765,7 +862,6 @@ export const Chat: React.FC = () => {
     await initChat();
   };
 
-  // ── Switch to history chat ─────────────────────────────────────────────────
   const switchToChat = (chat: HistoryChat) => {
     if (live) return;
     readerRef.current?.cancel();
@@ -777,7 +873,6 @@ export const Chat: React.FC = () => {
     setAttachments([]);
   };
 
-  // ── Delete history chat ────────────────────────────────────────────────────
   const deleteHistoryChat = (id: string) => {
     const updated = history.filter(c => c.id !== id);
     saveHistory(updated);
@@ -790,13 +885,11 @@ export const Chat: React.FC = () => {
     setPendingTool(null);
 
     if (updated.length > 0) {
-      // Restore the most recent remaining chat
       const next = updated[0];
       setChatId(next.chatId);
       setEntries(next.entries);
       setCurrentHistoryId(next.id);
     } else {
-      // No history left — start fresh
       setEntries([]);
       setChatId(null);
       setCurrentHistoryId(null);
@@ -804,223 +897,295 @@ export const Chat: React.FC = () => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
 
+  const SUGGESTED = [
+    'What tools do you have?',
+    'Convert all images in a drive to PNG',
+    'Merge PDFs from a folder',
+    'Scan my drives for large files',
+  ];
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full overflow-hidden">
+    <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
-      {/* History panel */}
+      {/* History sidebar */}
       {historyOpen && (
         <HistoryPanel
           history={history}
           currentId={currentHistoryId}
           onSelect={chat => { switchToChat(chat); }}
           onDelete={deleteHistoryChat}
+          onNew={newChat}
           onClose={() => setHistoryOpen(false)}
         />
       )}
 
-      {/* Main chat area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main area */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: 'var(--page)' }}>
 
-        {/* Toolbar */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setHistoryOpen(v => !v)}
-              className={`p-1.5 rounded-lg transition-colors ${
-                historyOpen
-                  ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-600'
-                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-              title="Chat history"
-            >
-              <History className="w-4 h-4" />
-            </button>
-            <Bot className="w-5 h-5 text-blue-600" />
-            <span className="font-semibold text-slate-700 dark:text-slate-300">Planning Agent</span>
-            {chatId && (
-              <span className="text-xs text-slate-400 font-mono hidden sm:block">
-                #{chatId.slice(0, 8)}
-              </span>
-            )}
-          </div>
+        {/* Thin top toolbar */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 16px', flexShrink: 0,
+          borderBottom: '1px solid var(--border)',
+          background: 'var(--surface)',
+        }}>
+          <button
+            onClick={() => setHistoryOpen(v => !v)}
+            title="Chat history"
+            style={{
+              padding: 7, borderRadius: 'var(--r-control)', display: 'flex', alignItems: 'center',
+              color: historyOpen ? 'var(--accent-ink)' : 'var(--muted)',
+              background: historyOpen ? 'var(--accent-soft)' : 'transparent',
+              transition: 'all .15s var(--ease)',
+            }}
+            onMouseEnter={e => { if (!historyOpen) { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; } }}
+            onMouseLeave={e => { if (!historyOpen) { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; } }}
+          >
+            <History size={15} />
+          </button>
+
+          {chatId && (
+            <span style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
+              #{chatId.slice(0, 8)}
+            </span>
+          )}
+
+          <div style={{ flex: 1 }} />
+
           <button
             onClick={newChat}
             disabled={!!live}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 disabled:opacity-40 transition-colors"
-            title="Start new conversation"
+            className="btn btn-secondary"
+            style={{ fontSize: 12, padding: '6px 12px', opacity: live ? 0.4 : 1 }}
           >
-            <Plus className="w-3.5 h-3.5" />
-            New chat
+            <Plus size={13} /> New chat
           </button>
         </div>
 
         {/* Init error */}
         {initError && (
-          <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-700 dark:text-red-400 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{initError}</span>
+          <div style={{
+            margin: '12px 20px', padding: '12px 16px',
+            background: 'var(--c-clay-bg)', borderRadius: 'var(--r-card)',
+            fontSize: 13, color: 'var(--c-clay)',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <AlertCircle size={15} style={{ flexShrink: 0 }} />
+            <span style={{ flex: 1 }}>{initError}</span>
             <button
               onClick={initChat}
-              className="ml-auto underline hover:no-underline text-xs"
+              style={{ fontSize: 12, textDecoration: 'underline', color: 'inherit' }}
             >
               Retry
             </button>
           </div>
         )}
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto space-y-5 pr-1">
+        {/* Conversation */}
+        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px 24px 8px' }}>
+          <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Empty state */}
-          {entries.length === 0 && !live && (
-            <div className="flex flex-col items-center justify-center h-full text-center gap-4 select-none">
-              <div className="w-16 h-16 rounded-full bg-blue-600/10 flex items-center justify-center">
-                <Bot className="w-8 h-8 text-blue-600" />
+            {/* Empty state */}
+            {entries.length === 0 && !live && (
+              <div style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', textAlign: 'center', gap: 18,
+                padding: '24px 20px',
+                userSelect: 'none',
+              }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: 'var(--r-lg)',
+                  background: 'var(--accent-soft)', color: 'var(--accent)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Sparkles size={26} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 20, fontWeight: 600, color: 'var(--ink)', letterSpacing: 'var(--display-tracking)', marginBottom: 6 }}>
+                    How can I help?
+                  </p>
+                  <p style={{ fontSize: 13.5, color: 'var(--muted)', maxWidth: 320, lineHeight: 1.5 }}>
+                    Ask me to organize files, convert media, analyze storage, or anything else.
+                  </p>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%', maxWidth: 480 }}>
+                  {SUGGESTED.map(hint => (
+                    <button
+                      key={hint}
+                      onClick={() => { setInput(hint); inputRef.current?.focus(); }}
+                      style={{
+                        textAlign: 'left', fontSize: 12.5, padding: '10px 14px',
+                        borderRadius: 'var(--r-card)',
+                        background: 'var(--surface)', border: '1px solid var(--border)',
+                        color: 'var(--ink-2)', lineHeight: 1.4,
+                        transition: 'all .15s var(--ease)',
+                      }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)'; }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface)'; (e.currentTarget as HTMLElement).style.borderColor = 'var(--border)'; }}
+                    >
+                      {hint}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-slate-700 dark:text-slate-300 text-lg">
-                  How can I help?
-                </p>
-                <p className="text-sm text-slate-400 mt-1 max-w-xs">
-                  Ask me to organize files, convert media, analyze storage, or anything else.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 w-full max-w-md">
-                {[
-                  'What tools do you have?',
-                  'Convert images to PNG',
-                  'Merge these PDFs',
-                  'Scan my virtual drive for large files',
-                ].map(hint => (
-                  <button
-                    key={hint}
-                    onClick={() => { setInput(hint); inputRef.current?.focus(); }}
-                    className="text-left text-xs px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors"
-                  >
-                    {hint}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* Conversation entries */}
-          {entries.map(entry => {
-            if (entry.kind === 'user')      return <UserBubble key={entry.id} content={entry.content} attachments={entry.attachments} />;
-            if (entry.kind === 'assistant') return <AssistantBubble key={entry.id} content={entry.content} />;
-            return <ErrorBubble key={entry.id} content={entry.content} />;
-          })}
+            {/* Conversation entries */}
+            {entries.map(entry => {
+              if (entry.kind === 'user')      return <UserBubble key={entry.id} content={entry.content} attachments={entry.attachments} />;
+              if (entry.kind === 'assistant') return <AssistantBubble key={entry.id} content={entry.content} />;
+              return <ErrorBubble key={entry.id} content={entry.content} />;
+            })}
 
-          {/* Live agent run */}
-          {live && (
-            <RunCard
-              run={live}
-              planOpen={planOpen}
-              onTogglePlan={() => setPlanOpen(v => !v)}
-            />
-          )}
+            {/* Live agent run */}
+            {live && (
+              <RunCard
+                run={live}
+                planOpen={planOpen}
+                onTogglePlan={() => setPlanOpen(v => !v)}
+              />
+            )}
 
-          {/* Inline tool approval / ask_user card */}
-          {pendingTool && (
-            <ToolApprovalCard
-              tool={pendingTool}
-              onApprove={approveTool}
-              onReject={rejectTool}
-            />
-          )}
+            {/* Tool approval card */}
+            {pendingTool && (
+              <ToolApprovalCard
+                tool={pendingTool}
+                onApprove={approveTool}
+                onReject={rejectTool}
+              />
+            )}
 
-          <div ref={bottomRef} />
+            <div ref={bottomRef} />
+          </div>
         </div>
 
-        {/* Input bar */}
-        <div className="mt-4 space-y-2">
+        {/* Composer */}
+        <div style={{ padding: '8px 24px 16px', flexShrink: 0 }}>
+          <div style={{ maxWidth: 780, margin: '0 auto' }}>
 
-          {/* Attachment chips */}
-          {attachments.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 px-1">
-              {attachments.map(a => (
-                <AttachmentChip key={a.id} a={a} onRemove={() => removeAttachment(a.id)} />
-              ))}
-            </div>
-          )}
+            {/* Attachment chips */}
+            {attachments.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                {attachments.map(a => (
+                  <AttachmentChip key={a.id} a={a} onRemove={() => removeAttachment(a.id)} />
+                ))}
+              </div>
+            )}
 
-          <div className="relative flex items-center gap-2">
-            {/* Attach button */}
-            <div className="relative" ref={attachMenuRef}>
-              <button
-                onClick={() => setShowAttachMenu(v => !v)}
+            <div style={{
+              background: 'var(--surface)', border: '1.5px solid var(--border)',
+              borderRadius: 'var(--r-card)', padding: 12,
+              boxShadow: 'var(--shadow-md)',
+              transition: 'border-color .15s',
+            }}>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
                 disabled={!!live || !chatId}
-                className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 disabled:opacity-40 transition-colors"
-                title="Attach file or virtual drive"
-              >
-                <Paperclip className="w-4 h-4" />
-              </button>
+                placeholder={
+                  !chatId
+                    ? 'Connecting to agent…'
+                    : live
+                    ? 'Agent is working…'
+                    : 'Ask the agent to organize, convert, or analyze files…'
+                }
+                rows={2}
+                style={{
+                  width: '100%', resize: 'none',
+                  border: 0, outline: 0, background: 'transparent',
+                  fontSize: 14, color: 'var(--ink)', lineHeight: 1.5,
+                  fontFamily: 'var(--font-body)',
+                  padding: '4px 4px',
+                  opacity: (!!live || !chatId) ? 0.5 : 1,
+                }}
+              />
 
-              {/* Attach dropdown menu */}
-              {showAttachMenu && (
-                <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden z-50 min-w-45">
+              {/* Bottom action bar */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                paddingTop: 8, borderTop: '1px solid var(--border)',
+              }}>
+                {/* Attach button + dropdown */}
+                <div style={{ position: 'relative' }} ref={attachMenuRef}>
                   <button
-                    onClick={() => { setShowAttachMenu(false); setAttachPicker('file'); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left"
+                    onClick={() => setShowAttachMenu(v => !v)}
+                    disabled={!!live || !chatId}
+                    className="btn btn-ghost"
+                    style={{ padding: '6px 10px', fontSize: 13, opacity: (!!live || !chatId) ? 0.4 : 1 }}
+                    title="Attach file or virtual drive"
                   >
-                    <FileText className="w-4 h-4 text-slate-400 shrink-0" />
-                    File from drive
+                    <Paperclip size={14} /> Attach
                   </button>
-                  <button
-                    onClick={() => { setShowAttachMenu(false); setAttachPicker('drive'); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <HardDrive className="w-4 h-4 text-blue-500 shrink-0" />
-                    Virtual drive
-                  </button>
-                  <button
-                    onClick={() => { setShowAttachMenu(false); fileInputRef.current?.click(); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-left"
-                  >
-                    <Upload className="w-4 h-4 text-emerald-500 shrink-0" />
-                    Browse local files
-                  </button>
+
+                  {showAttachMenu && (
+                    <div style={{
+                      position: 'absolute', bottom: 'calc(100% + 8px)', left: 0,
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--r-card)',
+                      boxShadow: 'var(--shadow-lg)',
+                      overflow: 'hidden', zIndex: 50, minWidth: 180,
+                    }}>
+                      <button
+                        onClick={() => { setShowAttachMenu(false); setAttachPicker('file'); }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', fontSize: 13, color: 'var(--ink-2)', textAlign: 'left', transition: 'background .1s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                      >
+                        <FileText size={14} style={{ color: 'var(--muted)', flexShrink: 0 }} />
+                        File from drive
+                      </button>
+                      <button
+                        onClick={() => { setShowAttachMenu(false); setAttachPicker('drive'); }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', fontSize: 13, color: 'var(--ink-2)', textAlign: 'left', transition: 'background .1s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                      >
+                        <HardDrive size={14} style={{ color: 'var(--c-sky)', flexShrink: 0 }} />
+                        Virtual drive
+                      </button>
+                      <button
+                        onClick={() => { setShowAttachMenu(false); fileInputRef.current?.click(); }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', fontSize: 13, color: 'var(--ink-2)', textAlign: 'left', transition: 'background .1s' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                      >
+                        <Upload size={14} style={{ color: 'var(--c-sage)', flexShrink: 0 }} />
+                        Browse local files
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+
+                <div style={{ flex: 1 }} />
+
+                <span style={{ fontSize: 11, color: 'var(--faint)' }}>
+                  <span className="kbd">⇧</span> + <span className="kbd">↵</span> for newline
+                </span>
+
+                <button
+                  onClick={sendMessage}
+                  disabled={!input.trim() || !!live || !chatId}
+                  className="btn btn-primary"
+                  style={{ padding: '8px 14px', opacity: (!input.trim() || !!live || !chatId) ? 0.4 : 1 }}
+                >
+                  {live
+                    ? <Loader2 size={13} className="spin" />
+                    : <Send size={13} />
+                  }
+                  {live ? 'Working…' : 'Send'}
+                </button>
+              </div>
             </div>
-
-            {/* Text input */}
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={!!live || !chatId}
-              placeholder={
-                !chatId
-                  ? 'Connecting to agent…'
-                  : live
-                  ? 'Agent is working…'
-                  : 'Ask the agent to organize, convert, or analyze files…'
-              }
-              className="flex-1 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl py-4 pl-4 pr-14 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 disabled:opacity-50 transition-all"
-            />
-
-            {/* Send button */}
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || !!live || !chatId}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-xl transition-colors"
-            >
-              {live
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Send className="w-4 h-4" />
-              }
-            </button>
           </div>
         </div>
 
@@ -1029,11 +1194,11 @@ export const Chat: React.FC = () => {
           ref={fileInputRef}
           type="file"
           multiple
-          className="hidden"
+          style={{ display: 'none' }}
           onChange={handleNativeFileSelect}
         />
 
-        {/* Attachment file/drive picker */}
+        {/* Folder / drive picker modals */}
         {attachPicker === 'file' && (
           <FolderPickerModal
             isOpen

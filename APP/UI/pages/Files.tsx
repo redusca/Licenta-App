@@ -31,6 +31,7 @@ import {
     List,
     Filter,
     BarChart2,
+    RefreshCw,
 } from 'lucide-react';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 
@@ -192,7 +193,9 @@ export const Files: React.FC = () => {
     const DRIVES_PER_PAGE = 6;
     const [drivePage, setDrivePage] = useState(0);
 
-    // Tool-drive filter
+    // Tool-drive filter & pagination
+    const TOOL_DRIVES_PER_PAGE = 6;
+    const [toolDrivePage, setToolDrivePage] = useState(0);
     const [driveFilter, setDriveFilter] = useState<'all' | 'tool'>('all');
     const [driveTypeFilter, setDriveTypeFilter] = useState<'all' | 'shortcut' | 'move'>('all');
     const [toolDrives, setToolDrives] = useState<{ path: string; name: string; tool: string }[]>([]);
@@ -1057,139 +1060,220 @@ export const Files: React.FC = () => {
 
         return (
             <>
-            <div className="flex flex-col h-full">
-                {/* Drive list */}
-                <div className="space-y-3 py-4 px-1">
-                    {/* Header row: title + filter pills */}
-                    <div className="flex items-center justify-between pl-1 mb-4">
-                        <div className="text-sm font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                            {driveFilter === 'tool' ? 'Tool Drives' : 'Your Drives'}
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', background: 'var(--page)' }}>
+                {/* Hero */}
+                <div style={{ padding: '40px 44px 28px', background: 'linear-gradient(180deg, var(--surface-2) 0%, transparent 100%)' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, maxWidth: 1100 }}>
+                        <div>
+                            <h1 className="heading-display" style={{ margin: 0, fontSize: 38, lineHeight: 1.02 }}>
+                                Your drives,<br/>all in one place.
+                            </h1>
+                            <p style={{ marginTop: 12, fontSize: 15, color: 'var(--muted)', maxWidth: 520, lineHeight: 1.5 }}>
+                                Group folders from anywhere on your computer into virtual drives.
+                                Open one to browse, drop files, and run tools on its contents.
+                            </p>
                         </div>
-                        {toolDrives.length > 0 && (
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={() => setDriveFilter('all')}
-                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveFilter === 'all' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}
-                                >All</button>
-                                <button
-                                    onClick={() => setDriveFilter('tool')}
-                                    className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveFilter === 'tool' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}
-                                >
-                                    <Filter className="w-3 h-3" />
-                                    Tool Drives
-                                </button>
-                            </div>
-                        )}
-                        {/* Type Filter */}
-                        {driveFilter === 'all' && (
-                            <div className="flex gap-1 ml-2 border-l border-slate-200 dark:border-slate-800 pl-2">
-                                <button onClick={() => setDriveTypeFilter('all')}
-                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveTypeFilter === 'all' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}>All Types</button>
-                                <button onClick={() => setDriveTypeFilter('shortcut')}
-                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveTypeFilter === 'shortcut' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}>Shortcut</button>
-                                <button onClick={() => setDriveTypeFilter('move')}
-                                    className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${driveTypeFilter === 'move' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-300'}`}>Move</button>
-                            </div>
-                        )}
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexShrink: 0 }}>
+                            {toolDrives.length > 0 && (
+                                <>
+                                    <button
+                                        onClick={() => setDriveFilter(driveFilter === 'tool' ? 'all' : 'tool')}
+                                        className="btn btn-secondary"
+                                        style={{ background: driveFilter === 'tool' ? 'var(--accent-soft)' : undefined, color: driveFilter === 'tool' ? 'var(--accent-ink)' : undefined }}
+                                    >
+                                        <Filter className="w-3.5 h-3.5" />
+                                        {driveFilter === 'tool' ? 'All Drives' : 'Tool Drives'}
+                                    </button>
+                                </>
+                            )}
+                            <button onClick={() => { loadKnownDrives(); loadToolDrives(); }} className="btn btn-secondary">
+                                <RefreshCw className="w-3.5 h-3.5" /> Refresh
+                            </button>
+                            <button onClick={() => setIsCreating(true)} className="btn btn-primary">
+                                <Plus className="w-3.5 h-3.5" /> New drive
+                            </button>
+                        </div>
                     </div>
-
-                    {/* Tool drives view */}
-                    {driveFilter === 'tool' && toolDrives.map((td, i) => {
-                        const asDrive: DriveConfig = { path: td.path, name: td.name, type: 'move' };
-                        const available = isDriveAvailable(asDrive);
-                        return (
-                            <div key={i} className="flex items-center gap-2">
-                                <button onClick={() => available && selectDrive(asDrive)} disabled={!available}
-                                    className={`flex-1 text-left p-4 bg-white dark:bg-slate-900 border rounded-xl transition-all group flex items-center gap-4
-                                        ${available
-                                            ? 'border-blue-200 dark:border-blue-900/40 hover:border-blue-500 hover:shadow-md cursor-pointer'
-                                            : 'border-slate-100 dark:border-slate-800/50 opacity-40 cursor-not-allowed'}`}>
-                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-transform ${available ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
-                                        <HardDrive className="w-5 h-5" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <h3 className="font-semibold">{td.name}</h3>
-                                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 shrink-0">Tool</span>
-                                        </div>
-                                        <p className="text-xs text-slate-500 truncate">{td.path}</p>
-                                        {!available && <p className="text-xs text-red-400 mt-0.5">Drive not connected</p>}
-                                    </div>
-                                    {available && <div className="ml-auto opacity-0 group-hover:opacity-100 text-blue-500"><ExternalLink className="w-4 h-4" /></div>}
-                                </button>
-                            </div>
-                        );
-                    })}
-
-                    {driveFilter === 'tool' && toolDrives.length === 0 && (
-                        <p className="text-sm text-slate-500 text-center py-8">No tool-created drives yet.</p>
-                    )}
-
-                    {/* Regular drives view */}
-                    {driveFilter === 'all' && pageDrives.map((d, i) => {
-                        const available = isDriveAvailable(d);
-                        return (
-                        <div key={i} className="flex items-center gap-2">
-                            <button onClick={() => available && selectDrive(d)} disabled={!available}
-                                className={`flex-1 text-left p-4 bg-white dark:bg-slate-900 border rounded-xl transition-all group flex items-center gap-4
-                                    ${ available
-                                        ? 'border-slate-200 dark:border-slate-800 hover:border-blue-500 hover:shadow-md cursor-pointer'
-                                        : 'border-slate-100 dark:border-slate-800/50 opacity-40 cursor-not-allowed' }`}>
-                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-transform ${ available ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 group-hover:scale-110' : 'bg-slate-100 dark:bg-slate-800 text-slate-400' }`}>
-                                    <HardDrive className="w-5 h-5" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold">{d.name}</h3>
-                                    <p className="text-xs text-slate-500 truncate">{d.path}</p>
-                                    {!available && <p className="text-xs text-red-400 mt-0.5">Drive not connected</p>}
-                                </div>
-                                {available && <div className="ml-auto opacity-0 group-hover:opacity-100 text-blue-500"><ExternalLink className="w-4 h-4" /></div>}
-                            </button>
-                            <button
-                                onClick={() => startRenameDrive(d)}
-                                className="p-2.5 flex-shrink-0 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors"
-                                title="Rename drive"
-                            >
-                                <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => startDeleteDrive(d)}
-                                className="p-2.5 flex-shrink-0 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl border border-slate-200 dark:border-slate-800 transition-colors"
-                                title="Delete drive"
-                            >
-                                <Trash className="w-4 h-4" />
-                            </button>
+                    {/* Stats strip */}
+                    <div style={{ display: 'flex', gap: 28, marginTop: 28, color: 'var(--muted)', fontSize: 12.5 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)', fontSize: 14, fontWeight: 500 }}>{knownDrives.length}</span>
+                            <span>Drives</span>
                         </div>
-                        );
-                    })}
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)', fontSize: 14, fontWeight: 500 }}>{toolDrives.length}</span>
+                            <span>Tool drives</span>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Bottom bar: pagination + create (only in All Drives view) */}
+                {/* Drive type filter */}
                 {driveFilter === 'all' && (
-                <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800">
-                    <button
-                        onClick={() => setDrivePage(p => Math.max(0, p - 1))}
-                        disabled={safePage === 0}
-                        className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                        <ChevronLeft className="w-5 h-5" />
-                    </button>
-
-                    <div className="flex items-center gap-4">
-                        <span className="text-sm text-slate-400">{safePage + 1} / {totalPages}</span>
-                        <button onClick={() => setIsCreating(true)} className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-slate-500 hover:border-blue-500 hover:text-blue-500 transition-colors flex items-center gap-2 px-4 py-2 text-sm font-medium">
-                            <Plus className="w-4 h-4" /> Create New Drive
-                        </button>
+                    <div style={{ padding: '0 44px 16px', display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600, color: 'var(--faint)' }}>Filter</span>
+                        {(['all', 'shortcut', 'move'] as const).map(t => (
+                            <button key={t} onClick={() => setDriveTypeFilter(t)} style={{
+                                padding: '5px 12px', borderRadius: 'var(--r-pill)', fontSize: 12.5, fontWeight: 500,
+                                background: driveTypeFilter === t ? 'var(--ink)' : 'var(--surface)',
+                                color: driveTypeFilter === t ? 'var(--page)' : 'var(--ink-2)',
+                                border: '1px solid ' + (driveTypeFilter === t ? 'transparent' : 'var(--border)'),
+                                transition: 'all .15s var(--ease)',
+                            }}>
+                                {t === 'all' ? 'All Types' : t.charAt(0).toUpperCase() + t.slice(1)}
+                            </button>
+                        ))}
                     </div>
+                )}
 
-                    <button
-                        onClick={() => setDrivePage(p => Math.min(totalPages - 1, p + 1))}
-                        disabled={safePage >= totalPages - 1}
-                        className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                    >
-                        <ChevronRight className="w-5 h-5" />
-                    </button>
-                </div>
+                {/* Tool drives */}
+                {driveFilter === 'tool' && (
+                    <div style={{ padding: '0 44px 32px' }}>
+                        {(() => {
+                            const toolTotalPages = Math.ceil(toolDrives.length / TOOL_DRIVES_PER_PAGE);
+                            const safeTdPage = Math.min(toolDrivePage, toolTotalPages - 1 >= 0 ? toolTotalPages - 1 : 0);
+                            const pageToolDrives = toolDrives.slice(safeTdPage * TOOL_DRIVES_PER_PAGE, (safeTdPage + 1) * TOOL_DRIVES_PER_PAGE);
+                            return (<>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600, color: 'var(--faint)' }}>
+                                Tool Drives <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10 }}>{toolDrives.length}</span>
+                            </div>
+                            {toolTotalPages > 1 && (
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    <button onClick={() => setToolDrivePage(p => Math.max(0, p - 1))} disabled={safeTdPage === 0} className="btn btn-ghost" style={{ padding: '6px 10px', opacity: safeTdPage === 0 ? 0.3 : 1 }}>
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{safeTdPage + 1}/{toolTotalPages}</span>
+                                    <button onClick={() => setToolDrivePage(p => Math.min(toolTotalPages - 1, p + 1))} disabled={safeTdPage >= toolTotalPages - 1} className="btn btn-ghost" style={{ padding: '6px 10px', opacity: safeTdPage >= toolTotalPages - 1 ? 0.3 : 1 }}>
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        {toolDrives.length === 0 ? (
+                            <p style={{ fontSize: 13, color: 'var(--muted)' }}>No tool-created drives yet. Run a tool to see drives created automatically here.</p>
+                        ) : (
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                                {pageToolDrives.map((td, i) => {
+                                    const asDrive: DriveConfig = { path: td.path, name: td.name, type: 'move' };
+                                    const available = isDriveAvailable(asDrive);
+                                    return (
+                                        <button key={i} onClick={() => available && selectDrive(asDrive)} disabled={!available}
+                                            className="hover-card"
+                                            style={{
+                                                textAlign: 'left', padding: 16, borderRadius: 'var(--r-card)',
+                                                background: 'var(--surface)', border: '1px solid var(--border)',
+                                                display: 'flex', alignItems: 'center', gap: 14,
+                                                opacity: available ? 1 : 0.5, cursor: available ? 'pointer' : 'not-allowed',
+                                            }}>
+                                            <div style={{ width: 42, height: 42, borderRadius: 11, background: 'var(--c-sky-bg)', color: 'var(--c-sky)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <HardDrive className="w-5 h-5" />
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{td.name}</div>
+                                                <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{td.path}</div>
+                                                {!available && <div style={{ fontSize: 11, color: 'var(--c-clay)', marginTop: 2 }}>Drive not connected</div>}
+                                            </div>
+                                            <ChevronRight className="w-4 h-4" style={{ color: 'var(--faint)', flexShrink: 0 }} />
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        </>);
+                        })()}
+                    </div>
+                )}
+
+                {/* Regular drives grid */}
+                {driveFilter === 'all' && (
+                    <div style={{ padding: '0 44px 40px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                            <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600, color: 'var(--faint)' }}>
+                                All drives <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10 }}>{filteredDrives.length}</span>
+                            </div>
+                            {totalPages > 1 && (
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                    <button onClick={() => setDrivePage(p => Math.max(0, p - 1))} disabled={safePage === 0} className="btn btn-ghost" style={{ padding: '6px 10px', opacity: safePage === 0 ? 0.3 : 1 }}>
+                                        <ChevronLeft className="w-4 h-4" />
+                                    </button>
+                                    <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{safePage + 1}/{totalPages}</span>
+                                    <button onClick={() => setDrivePage(p => Math.min(totalPages - 1, p + 1))} disabled={safePage >= totalPages - 1} className="btn btn-ghost" style={{ padding: '6px 10px', opacity: safePage >= totalPages - 1 ? 0.3 : 1 }}>
+                                        <ChevronRight className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                            {/* New drive card */}
+                            <button onClick={() => setIsCreating(true)} className="hover-card"
+                                style={{
+                                    padding: 16, borderRadius: 'var(--r-card)',
+                                    background: 'transparent',
+                                    border: '1.5px dashed var(--border-2)',
+                                    display: 'flex', alignItems: 'center', gap: 14,
+                                    color: 'var(--muted)', textAlign: 'left',
+                                }}
+                                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--accent)'; (e.currentTarget as HTMLElement).style.color = 'var(--accent-ink)'; }}
+                                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = 'var(--border-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; }}
+                            >
+                                <div style={{ width: 42, height: 42, borderRadius: 11, background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Plus className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>New drive</div>
+                                    <div style={{ fontSize: 11.5, marginTop: 2 }}>From a folder, or build from scratch</div>
+                                </div>
+                            </button>
+
+                            {pageDrives.map((d, i) => {
+                                const available = isDriveAvailable(d);
+                                const accentColor = d.type === 'move' ? 'clay' : 'sky';
+                                return (
+                                    <div key={i} style={{ display: 'flex', alignItems: 'stretch', gap: 0, position: 'relative' }}>
+                                        <button onClick={() => available && selectDrive(d)} disabled={!available}
+                                            className="hover-card"
+                                            style={{
+                                                flex: 1, textAlign: 'left', padding: '14px 44px 14px 14px',
+                                                borderRadius: 'var(--r-card)',
+                                                background: 'var(--surface)', border: '1px solid var(--border)',
+                                                display: 'flex', alignItems: 'center', gap: 14,
+                                                opacity: available ? 1 : 0.5,
+                                                cursor: available ? 'pointer' : 'not-allowed',
+                                            }}>
+                                            <div style={{ width: 42, height: 42, borderRadius: 11, background: `var(--c-${accentColor}-bg)`, color: `var(--c-${accentColor})`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                <HardDrive className="w-5 h-5" />
+                                            </div>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{d.name}</span>
+                                                    <span className="pill" style={{ background: d.type === 'move' ? 'var(--c-sage-bg)' : 'var(--c-sky-bg)', color: d.type === 'move' ? 'var(--c-sage)' : 'var(--c-sky)', border: '1px solid transparent', padding: '2px 8px', fontSize: 11 }}>
+                                                        {d.type === 'move' ? 'Move' : 'Shortcut'}
+                                                    </span>
+                                                    {!available && <span className="pill" style={{ background: 'var(--c-clay-bg)', color: 'var(--c-clay)', border: '1px solid transparent', padding: '2px 8px', fontSize: 11 }}>offline</span>}
+                                                </div>
+                                                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'var(--font-mono)' }}>
+                                                    {d.path.split(/[/\\]/).slice(-2).join('\\')}
+                                                </div>
+                                            </div>
+                                        </button>
+                                        {/* Action buttons overlay */}
+                                        <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 4 }}>
+                                            <button onClick={() => startRenameDrive(d)} title="Rename"
+                                                style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', transition: 'all .15s var(--ease)' }}
+                                                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; }}
+                                                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; }}
+                                            ><Edit2 className="w-3.5 h-3.5" /></button>
+                                            <button onClick={() => startDeleteDrive(d)} title="Delete"
+                                                style={{ width: 28, height: 28, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', transition: 'all .15s var(--ease)' }}
+                                                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--c-clay-bg)'; (e.currentTarget as HTMLElement).style.color = 'var(--c-clay)'; }}
+                                                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; }}
+                                            ><Trash className="w-3.5 h-3.5" /></button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                 )}
             </div>
             <DriveModals />
@@ -1274,91 +1358,125 @@ export const Files: React.FC = () => {
     }
 
     return (
-        <div className="h-full flex flex-col space-y-4" onClick={() => { setContextMenu(null); setShowAddMenu(false); }}>
-            {/* Header */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-xl shadow-sm flex flex-col gap-3">
-                {/* Breadcrumbs row */}
-                <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
-                    <div className="flex items-center gap-1 overflow-hidden flex-1 text-sm pl-2">
-                        <Home className="w-4 h-4 text-slate-400 shrink-0 cursor-pointer hover:text-blue-500" onClick={() => { setCurrentDrive(null); setCurrentPath(null); setFiles([]); }} />
-                        <span className="text-slate-300 mx-1">|</span>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--page)' }}
+            onClick={() => { setContextMenu(null); setShowAddMenu(false); }}>
+
+            {/* Drive header strip */}
+            <div style={{ padding: '16px 24px 12px', borderBottom: '1px solid var(--border)', background: 'var(--page)', flexShrink: 0 }}>
+                {/* Breadcrumbs + close */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                    <button
+                        onClick={() => { setCurrentDrive(null); setCurrentPath(null); setFiles([]); }}
+                        className="btn btn-ghost" style={{ padding: 8 }} title="Back to drives"
+                    >
+                        <Home className="w-4 h-4" />
+                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                         {getBreadcrumbs().map((crumb, i, arr) => (
-                            <div key={crumb.path} className="flex items-center gap-1 whitespace-nowrap">
-                                {i > 0 && <ChevronRight className="w-3 h-3 text-slate-300" />}
-                                <button onClick={() => navigateTo(crumb.path)}
-                                    className={`hover:bg-white dark:hover:bg-slate-700 px-2 py-0.5 rounded transition-all ${i === arr.length - 1 ? 'font-bold text-slate-900 dark:text-slate-100 shadow-sm bg-white dark:bg-slate-700' : 'text-slate-500'}`}>
-                                    {crumb.name}
-                                </button>
-                            </div>
+                            <React.Fragment key={crumb.path}>
+                                {i > 0 && <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--faint)' }} />}
+                                <button
+                                    onClick={() => navigateTo(crumb.path)}
+                                    style={{
+                                        padding: '4px 8px', borderRadius: 6, fontSize: 14,
+                                        color: i === arr.length - 1 ? 'var(--ink)' : 'var(--muted)',
+                                        fontWeight: i === arr.length - 1 ? 600 : 500,
+                                    }}
+                                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                                >{crumb.name}</button>
+                            </React.Fragment>
                         ))}
                     </div>
-                    <div className="flex items-center gap-1">
-                        <span className="text-xs text-slate-400 px-2">{currentDrive?.type === 'shortcut' ? '🔗 Shortcut' : '📁 Move'}</span>
-                        <button onClick={() => { setCurrentDrive(null); setCurrentPath(null); setFiles([]); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors" title="Close Drive"><LogOut className="w-4 h-4" /></button>
-                    </div>
+                    <div style={{ flex: 1 }} />
+                    <span className="pill" style={{ background: currentDrive?.type === 'move' ? 'var(--c-sage-bg)' : 'var(--c-sky-bg)', color: currentDrive?.type === 'move' ? 'var(--c-sage)' : 'var(--c-sky)', border: '1px solid transparent', padding: '3px 10px' }}>
+                        {currentDrive?.type === 'move' ? 'Move drive' : 'Shortcut drive'}
+                    </span>
+                    <button onClick={() => { setCurrentDrive(null); setCurrentPath(null); setFiles([]); }}
+                        className="btn btn-ghost" style={{ padding: 8 }} title="Close drive">
+                        <LogOut className="w-4 h-4" />
+                    </button>
                 </div>
 
-                {/* Search + controls row */}
-                <div className="flex gap-3 items-center">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                {/* Toolbar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {/* Search */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, height: 34, padding: '0 12px', background: 'var(--surface)', border: `1px solid ${deepSearch ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--r-control)', width: 280, transition: 'border-color .15s' }}>
+                        <Search className="w-3.5 h-3.5" style={{ color: 'var(--muted)', flexShrink: 0 }} />
                         {deepSearch ? (
-                            <input
-                                autoFocus
-                                value={deepQuery}
+                            <input autoFocus value={deepQuery}
                                 onChange={(e) => { setDeepQuery(e.target.value); runDeepSearch(e.target.value); }}
-                                placeholder="Search all folders in this drive…"
-                                className="pl-9 pr-10 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-400 dark:border-indigo-600 rounded-lg text-sm w-full focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                                placeholder="Search all folders…"
+                                style={{ border: 0, outline: 0, background: 'transparent', flex: 1, fontSize: 12.5, color: 'var(--ink)' }}
                             />
                         ) : (
-                            <input
-                                value={searchQuery}
+                            <input value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search current folder…"
-                                className="pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                style={{ border: 0, outline: 0, background: 'transparent', flex: 1, fontSize: 12.5, color: 'var(--ink)' }}
                             />
                         )}
                         {deepSearch && deepQuery && (
-                            <button onClick={() => { setDeepQuery(''); setDeepResults([]); }}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                                <X className="w-4 h-4" />
+                            <button onClick={() => { setDeepQuery(''); setDeepResults([]); }} style={{ color: 'var(--muted)' }}>
+                                <X className="w-3.5 h-3.5" />
                             </button>
                         )}
                     </div>
-                    {/* Deep search toggle */}
-                    <button
-                        onClick={toggleDeepSearch}
-                        title={deepSearch ? 'Back to current folder' : 'Search all folders in drive'}
-                        className={`p-2.5 border rounded-lg transition-colors whitespace-nowrap text-xs font-medium px-3 flex items-center gap-1.5 ${deepSearch ? 'border-indigo-500 text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:text-indigo-600 hover:border-indigo-400'}`}>
-                        <Search className="w-3.5 h-3.5" />
-                        {deepSearch ? 'All Folders' : 'All Folders'}
+
+                    <button onClick={toggleDeepSearch} className="btn btn-ghost"
+                        style={{ background: deepSearch ? 'var(--accent-soft)' : undefined, color: deepSearch ? 'var(--accent-ink)' : undefined }}>
+                        <Search className="w-3.5 h-3.5" /> All Folders
                     </button>
+
+                    {/* Type filters */}
+                    <div style={{ display: 'flex', gap: 4, flex: 1, flexWrap: 'wrap' }}>
+                        {filterChips.map(chip => (
+                            <button key={chip.value} onClick={() => setFileTypeFilter(chip.value)}
+                                style={{
+                                    padding: '4px 10px', borderRadius: 'var(--r-pill)', fontSize: 12, fontWeight: 500,
+                                    background: fileTypeFilter === chip.value ? 'var(--accent)' : 'var(--surface)',
+                                    color: fileTypeFilter === chip.value ? 'var(--on-accent)' : 'var(--ink-2)',
+                                    border: '1px solid ' + (fileTypeFilter === chip.value ? 'transparent' : 'var(--border)'),
+                                    transition: 'all .15s var(--ease)',
+                                }}>
+                                {chip.label} <span style={{ opacity: 0.65, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{chip.count}</span>
+                            </button>
+                        ))}
+                    </div>
+
                     {/* Stats toggle */}
-                    <button onClick={() => setShowStats(s => !s)} title="Drive statistics"
-                        className={`p-2.5 border rounded-lg transition-colors ${showStats ? 'border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-200 dark:border-slate-700 text-slate-400 hover:text-blue-600 hover:border-blue-400'}`}>
+                    <button onClick={() => setShowStats(s => !s)} className="btn btn-ghost"
+                        style={{ padding: 8, background: showStats ? 'var(--accent-soft)' : undefined, color: showStats ? 'var(--accent-ink)' : undefined }}>
                         <BarChart2 className="w-4 h-4" />
                     </button>
-                    {/* View mode toggle */}
-                    <div className="flex border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                        <button onClick={() => setViewMode('list')} title="List view"
-                            className={`p-2.5 transition-colors ${viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-                            <List className="w-4 h-4" />
+
+                    {/* View toggle */}
+                    <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-control)', padding: 3, gap: 2 }}>
+                        <button onClick={() => setViewMode('list')} style={{ padding: '5px 9px', borderRadius: 7, display: 'flex', alignItems: 'center', background: viewMode === 'list' ? 'var(--accent-soft)' : 'transparent', color: viewMode === 'list' ? 'var(--accent-ink)' : 'var(--muted)' }}>
+                            <List className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => setViewMode('grid')} title="Grid view"
-                            className={`p-2.5 transition-colors ${viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-                            <LayoutGrid className="w-4 h-4" />
+                        <button onClick={() => setViewMode('grid')} style={{ padding: '5px 9px', borderRadius: 7, display: 'flex', alignItems: 'center', background: viewMode === 'grid' ? 'var(--accent-soft)' : 'transparent', color: viewMode === 'grid' ? 'var(--accent-ink)' : 'var(--muted)' }}>
+                            <LayoutGrid className="w-3.5 h-3.5" />
                         </button>
                     </div>
-                    {/* Add button */}
-                    <div className="relative">
-                        <button onClick={(e) => { e.stopPropagation(); setShowAddMenu(!showAddMenu); }}
-                            className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-all">
-                            <Plus className="w-4 h-4" /> Add <ChevronDown className="w-3 h-3 opacity-80" />
+
+                    {/* Add */}
+                    <div style={{ position: 'relative' }}>
+                        <button onClick={(e) => { e.stopPropagation(); setShowAddMenu(!showAddMenu); }} className="btn btn-primary">
+                            <Plus className="w-3.5 h-3.5" /> Add
                         </button>
                         {showAddMenu && (
-                            <div className="absolute top-full right-0 mt-2 w-48 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl z-10 overflow-hidden">
-                                <button onClick={pickFileToAdd} className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-3 text-sm"><File className="w-4 h-4 text-slate-500" /> Upload File</button>
-                                <button onClick={pickFolderToAdd} className="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-3 text-sm"><Folder className="w-4 h-4 text-slate-500" /> Upload Folder</button>
+                            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, width: 180, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-card)', boxShadow: 'var(--shadow-md)', overflow: 'hidden', zIndex: 20 }}>
+                                <button onClick={pickFileToAdd} style={{ width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 10 }}
+                                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                                    <File className="w-4 h-4" style={{ color: 'var(--muted)' }} /> Upload File
+                                </button>
+                                <button onClick={pickFolderToAdd} style={{ width: '100%', textAlign: 'left', padding: '10px 14px', fontSize: 13, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 10 }}
+                                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                                    <Folder className="w-4 h-4" style={{ color: 'var(--muted)' }} /> Upload Folder
+                                </button>
                             </div>
                         )}
                     </div>
@@ -1366,44 +1484,33 @@ export const Files: React.FC = () => {
 
                 {/* Stats panel */}
                 {showStats && (
-                    <div className="grid grid-cols-4 gap-3 pt-1">
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 12 }}>
                         {[
                             { label: 'Total Items', value: String(files.length) },
-                            { label: 'Files',       value: String(fileCount) },
-                            { label: 'Folders',     value: String(folderCount) },
-                            { label: 'Total Size',  value: fmtBytes(totalSize) },
+                            { label: 'Files', value: String(fileCount) },
+                            { label: 'Folders', value: String(folderCount) },
+                            { label: 'Total Size', value: fmtBytes(totalSize) },
                         ].map(s => (
-                            <div key={s.label} className="bg-slate-50 dark:bg-slate-800 rounded-lg p-3 text-center">
-                                <p className="text-lg font-bold text-slate-800 dark:text-slate-100">{s.value}</p>
-                                <p className="text-xs text-slate-400 mt-0.5">{s.label}</p>
+                            <div key={s.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-control)', padding: '10px 14px', textAlign: 'center' }}>
+                                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 17, fontWeight: 500, color: 'var(--ink)' }}>{s.value}</div>
+                                <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{s.label}</div>
                             </div>
                         ))}
                     </div>
                 )}
-
-                {/* Type filter chips */}
-                <div className="flex items-center gap-1.5 flex-wrap">
-                    <Filter className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                    {filterChips.map(chip => (
-                        <button key={chip.value} onClick={() => setFileTypeFilter(chip.value)}
-                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-all ${fileTypeFilter === chip.value ? 'bg-blue-600 text-white shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}`}>
-                            {chip.label} <span className="opacity-70 ml-0.5">{chip.count}</span>
-                        </button>
-                    ))}
-                </div>
             </div>
 
             {/* File content area */}
             {deepSearch ? (
                 /* ── Deep search results ── */
-                <div className="bg-white dark:bg-slate-900 border border-indigo-300 dark:border-indigo-700 rounded-xl flex-1 overflow-hidden flex flex-col shadow-sm">
+                <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderTop: '1px solid var(--border)' }}>
                     {/* Header bar */}
-                    <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        <Search className="w-3.5 h-3.5 text-indigo-500" />
-                        <span className="text-indigo-500">Search across all folders</span>
-                        {deepLoading && <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400 ml-1" />}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                        <Search className="w-3.5 h-3.5" style={{ color: 'var(--accent)' }} />
+                        <span style={{ color: 'var(--accent-ink)' }}>Search across all folders</span>
+                        {deepLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--accent)', marginLeft: 4 }} />}
                         {!deepLoading && deepQuery && (
-                            <span className="ml-auto normal-case font-normal text-slate-400">
+                            <span style={{ marginLeft: 'auto', fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--muted)' }}>
                                 {deepResults.length} result{deepResults.length !== 1 ? 's' : ''}
                                 {deepTruncated ? ' (showing first 500)' : ''}
                             </span>
@@ -1476,10 +1583,12 @@ export const Files: React.FC = () => {
                     </div>
                 </div>
             ) : loading ? (
-                <div className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
+                </div>
             ) : (
                 <div
-                    className={`bg-white dark:bg-slate-900 border rounded-xl flex-1 overflow-hidden flex flex-col shadow-sm select-none relative transition-all ${isDragOver ? 'border-blue-500 ring-2 ring-blue-400/50 bg-blue-50/30 dark:bg-blue-900/10' : 'border-slate-200 dark:border-slate-800'}`}
+                    style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', userSelect: 'none', position: 'relative', background: isDragOver ? 'var(--accent-soft)' : 'var(--surface)', border: isDragOver ? '2px dashed var(--accent)' : '1px solid transparent', transition: 'all .15s var(--ease)' }}
                     onContextMenu={(e) => e.preventDefault()}
                     onDragOver={handleDragOver}
                     onDragLeave={handleDragLeave}
@@ -1487,73 +1596,76 @@ export const Files: React.FC = () => {
                 >
                     {/* Drag overlay */}
                     {isDragOver && (
-                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-blue-50/80 dark:bg-blue-900/30 pointer-events-none rounded-xl border-2 border-dashed border-blue-400">
-                            <Plus className="w-12 h-12 text-blue-500 mb-2" />
-                            <p className="text-blue-600 font-semibold text-lg">Drop to add to drive</p>
-                            <p className="text-blue-400 text-sm mt-1">
+                        <div style={{ position: 'absolute', inset: 0, zIndex: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                            <Plus className="w-12 h-12" style={{ color: 'var(--accent)', marginBottom: 8 }} />
+                            <p style={{ color: 'var(--accent-ink)', fontWeight: 600, fontSize: 16 }}>Drop to add to drive</p>
+                            <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>
                                 {currentDrive?.type === 'shortcut' ? 'Shortcuts will be created' : 'Files will be moved into drive'}
                             </p>
                         </div>
                     )}
 
                     {viewMode === 'list' ? (<>
-                    {/* Column headers / sort bar */}
-                    <div className="flex items-center px-4 py-2 border-b border-slate-100 dark:border-slate-800 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        <button className="flex-1 text-left hover:text-slate-600 dark:hover:text-slate-200 transition-colors" onClick={() => toggleSort('name')}>
+                    {/* Column headers */}
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '8px 16px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--faint)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+                        <button style={{ flex: 1, textAlign: 'left', color: 'var(--faint)' }} onClick={() => toggleSort('name')}>
                             Name <SortArrow col="name" />
                         </button>
-                        <button className="w-32 text-right hover:text-slate-600 dark:hover:text-slate-200 transition-colors" onClick={() => toggleSort('modified')}>
+                        <button style={{ width: 128, textAlign: 'right', color: 'var(--faint)' }} onClick={() => toggleSort('modified')}>
                             Modified <SortArrow col="modified" />
                         </button>
-                        <button className="w-24 text-right hover:text-slate-600 dark:hover:text-slate-200 transition-colors mr-10" onClick={() => toggleSort('size')}>
+                        <button style={{ width: 96, textAlign: 'right', color: 'var(--faint)', marginRight: 40 }} onClick={() => toggleSort('size')}>
                             Size <SortArrow col="size" />
                         </button>
                     </div>
 
-                    <div className="overflow-y-auto flex-1 p-2">
+                    <div style={{ overflowY: 'auto', flex: 1, padding: '8px' }}>
                         {sortedFiles.map((file, idx) => {
                              const isCut = clipboard.mode === 'cut' && clipboard.items.some(i => i.path === file.path);
+                             const isSelected = selectedItems.has(file.path);
                              return (
-                                 <div
-                                    key={file.path}
-                                    className={`flex items-center px-4 py-3 rounded-lg group cursor-pointer transition-all border border-transparent ${selectedItems.has(file.path) ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'hover:bg-slate-50 dark:hover:bg-slate-800'} ${isCut ? 'opacity-50' : ''}`}
+                                 <div key={file.path}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', padding: '10px 12px', borderRadius: 8,
+                                        background: isSelected ? 'var(--accent-soft)' : 'transparent',
+                                        border: '1px solid ' + (isSelected ? 'transparent' : 'transparent'),
+                                        cursor: 'pointer', opacity: isCut ? 0.5 : 1,
+                                        transition: 'background .1s',
+                                    }}
                                     onClick={(e) => handleItemClick(e, file, idx)}
                                     onDoubleClick={() => {
                                         if (file.is_dir) { navigateTo(file.path); }
                                         else {
                                             const ext = getExt(file.name);
-                                            const isImage = IMAGE_EXTS.has(ext);
-                                            const isVideo = ['mp4','mov','avi','mkv','webm'].includes(ext);
-                                            if (isImage || isVideo) { setPreviewFile(file); }
+                                            if (IMAGE_EXTS.has(ext) || ['mp4','mov','avi','mkv','webm'].includes(ext)) { setPreviewFile(file); }
                                             else { openItem(file.path); }
                                         }
                                     }}
-                                    onContextMenu={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setSelectedItems(new Set([file.path]));
-                                        setContextMenu({ x: e.clientX, y: e.clientY, item: file });
-                                    }}
+                                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setSelectedItems(new Set([file.path])); setContextMenu({ x: e.clientX, y: e.clientY, item: file }); }}
+                                    onMouseEnter={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                                    onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                                  >
-                                    <div className="flex-1 flex items-center gap-3">
-                                        {file.is_dir ? <Folder className="w-5 h-5 text-yellow-500 fill-current" /> : getFileIcon(file.name)}
-                                        <span className={`text-sm ${selectedItems.has(file.path) ? 'font-semibold text-blue-700 dark:text-blue-300' : 'font-medium text-slate-700 dark:text-slate-300'}`}>
+                                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                                        <div style={{ width: 28, height: 28, borderRadius: 7, background: file.is_dir ? 'var(--c-ochre-bg)' : 'var(--surface-2)', color: file.is_dir ? 'var(--c-ochre)' : 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                            {file.is_dir ? <Folder className="w-4 h-4" /> : getFileIcon(file.name)}
+                                        </div>
+                                        <span style={{ fontSize: 13.5, fontWeight: 500, color: isSelected ? 'var(--accent-ink)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                             {getDisplayName(file.name)}
                                         </span>
                                     </div>
-                                    <div className="text-xs text-slate-400 group-hover:text-slate-500 w-32 text-right hidden sm:block">{fmtDate(file.modified)}</div>
-                                    <div className="text-xs text-slate-400 group-hover:text-slate-500 w-24 text-right">{file.is_dir ? '—' : fmtBytes(file.size)}</div>
-                                    <button className="p-1.5 opacity-0 group-hover:opacity-100 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-all ml-4"
+                                    <div style={{ fontSize: 12, color: 'var(--muted)', width: 128, textAlign: 'right' }}>{fmtDate(file.modified)}</div>
+                                    <div style={{ fontSize: 12, color: 'var(--muted)', width: 96, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{file.is_dir ? '—' : fmtBytes(file.size)}</div>
+                                    <button style={{ padding: 6, color: 'var(--faint)', marginLeft: 8 }}
                                         onClick={(e) => { e.stopPropagation(); setContextMenu({ x: e.clientX, y: e.clientY + 10, item: file }); }}>
-                                        <MoreVertical className="w-4 h-4 text-slate-500" />
+                                        <MoreVertical className="w-3.5 h-3.5" />
                                     </button>
                                  </div>
                             );
                         })}
                         {sortedFiles.length === 0 && (
-                            <div className="flex flex-col items-center justify-center p-12 text-slate-400 opacity-60">
-                                <Folder className="w-12 h-12 mb-2" />
-                                <p className="text-sm">No items match</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 48, color: 'var(--faint)' }}>
+                                <Folder className="w-10 h-10" style={{ marginBottom: 8 }} />
+                                <p style={{ fontSize: 13 }}>No items match</p>
                             </div>
                         )}
                     </div>
@@ -1621,46 +1733,32 @@ export const Files: React.FC = () => {
 
             {/* Context Menu */}
             {contextMenu && (
-                <div 
-                    className="fixed z-50 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-xl rounded-lg w-52 py-1.5 text-sm animate-in fade-in zoom-in-95 duration-100"
-                    style={{ top: contextMenu.y, left: contextMenu.x }}
-                    onClick={(e) => e.stopPropagation()} 
+                <div
+                    style={{ position: 'fixed', zIndex: 50, top: contextMenu.y, left: contextMenu.x, width: 200, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-card)', boxShadow: 'var(--shadow-lg)', overflow: 'hidden', fontSize: 13 }}
+                    onClick={(e) => e.stopPropagation()}
                 >
-                    <div className="px-3 py-2 text-[10px] uppercase font-bold text-slate-400 border-b border-slate-100 dark:border-slate-800 mb-1 truncate tracking-wider">
+                    <div style={{ padding: '8px 12px 6px', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.08em', fontWeight: 600, color: 'var(--faint)', borderBottom: '1px solid var(--border)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {getDisplayName(contextMenu.item.name)}
                     </div>
-                    {!contextMenu.item.is_dir && (
-                        <button className="w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 flex items-center gap-3 transition-colors"
-                            onClick={() => { openItem(contextMenu.item.path); setContextMenu(null); }}>
-                            <ExternalLink className="w-4 h-4" /> Open
+                    {[
+                        { label: contextMenu.item.is_dir ? 'Open' : 'Open', icon: contextMenu.item.is_dir ? Folder : ExternalLink, action: () => { contextMenu.item.is_dir ? navigateTo(contextMenu.item.path) : openItem(contextMenu.item.path); setContextMenu(null); } },
+                        { label: 'Rename', icon: Edit2, action: () => { setRenamingItem(contextMenu.item); setNewName(contextMenu.item.name); setContextMenu(null); } },
+                        { label: 'Copy', icon: Copy, action: () => { copySelection(); setContextMenu(null); } },
+                        { label: 'Cut', icon: Scissors, action: () => { cutSelection(); setContextMenu(null); } },
+                        { label: 'Move to…', icon: MoveRight, action: () => { startMoveItems(files.filter(f => selectedItems.has(f.path))); setContextMenu(null); } },
+                    ].map(({ label, icon: Icon, action }) => (
+                        <button key={label} onClick={action} style={{ width: '100%', textAlign: 'left', padding: '9px 14px', color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 10 }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                            <Icon className="w-3.5 h-3.5" style={{ color: 'var(--muted)' }} /> {label}
                         </button>
-                    )}
-                    {contextMenu.item.is_dir && (
-                        <button className="w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 flex items-center gap-3 transition-colors"
-                            onClick={() => { navigateTo(contextMenu.item.path); setContextMenu(null); }}>
-                            <Folder className="w-4 h-4" /> Open
-                        </button>
-                    )}
-                    <button className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"
-                        onClick={() => { setRenamingItem(contextMenu.item); setNewName(contextMenu.item.name); setContextMenu(null); }}>
-                        <Edit2 className="w-4 h-4" /> Rename
-                    </button>
-                    <button className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"
-                        onClick={() => { copySelection(); setContextMenu(null); }}>
-                        <Copy className="w-4 h-4" /> Copy
-                    </button>
-                    <button className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center gap-3 transition-colors"
-                        onClick={() => { cutSelection(); setContextMenu(null); }}>
-                        <Scissors className="w-4 h-4" /> Cut
-                    </button>
-                    <button className="w-full text-left px-4 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 flex items-center gap-3 transition-colors"
-                        onClick={() => { startMoveItems(files.filter(f => selectedItems.has(f.path))); setContextMenu(null); }}>
-                        <MoveRight className="w-4 h-4" /> Move to...
-                    </button>
-                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-1"/>
-                    <button className="w-full text-left px-4 py-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 flex items-center gap-3 transition-colors"
-                        onClick={() => { deleteItem(contextMenu.item.path); setContextMenu(null); }}>
-                        <Trash className="w-4 h-4" /> Delete
+                    ))}
+                    <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+                    <button onClick={() => { deleteItem(contextMenu.item.path); setContextMenu(null); }}
+                        style={{ width: '100%', textAlign: 'left', padding: '9px 14px', color: 'var(--c-clay)', display: 'flex', alignItems: 'center', gap: 10 }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--c-clay-bg)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                        <Trash className="w-3.5 h-3.5" /> Delete
                     </button>
                 </div>
             )}

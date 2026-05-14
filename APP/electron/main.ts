@@ -49,6 +49,7 @@ function createWindow() {
     width: 1200,
     height: 800,
     show: false,
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: true,
@@ -74,7 +75,14 @@ function createWindow() {
   });
 }
 
-// IPC Handlers
+// IPC Handlers — window controls
+ipcMain.on('window:close',    () => mainWindow?.close());
+ipcMain.on('window:minimize', () => mainWindow?.minimize());
+ipcMain.on('window:maximize', () => {
+  if (mainWindow?.isMaximized()) mainWindow.unmaximize();
+  else mainWindow?.maximize();
+});
+
 ipcMain.handle('dialog:selectDirectory', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow!, {
     properties: ['openDirectory']

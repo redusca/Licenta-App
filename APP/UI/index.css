@@ -1,51 +1,243 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-@theme {
-  --color-slate-900: #0f172a;
-  --color-slate-950: #020617;
-  --color-slate-800: #1e293b;
-  --color-slate-700: #334155;
-  --color-slate-600: #475569;
-  --color-slate-500: #64748b;
-  --color-slate-400: #94a3b8;
-  --color-slate-300: #cbd5e1;
-  --color-slate-200: #e2e8f0;
-  --color-slate-100: #f1f5f9;
-  --color-slate-50: #f8fafc;
+/* ─── Font stack ─────────────────────────────────────────────────────────── */
+:root {
+  --font-body:    'Geist', system-ui, -apple-system, sans-serif;
+  --font-display: 'Geist', system-ui, -apple-system, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, monospace;
+
+  /* ─── Radius scale ─────────────────────────────────────────────────────── */
+  --r-xs:   6px;
+  --r-sm:   10px;
+  --r-md:   14px;
+  --r-lg:   18px;
+  --r-xl:   24px;
+  --r-full: 999px;
+  --r-card:    14px;
+  --r-control: 10px;
+  --r-pill:    999px;
+
+  /* ─── Type scale ───────────────────────────────────────────────────────── */
+  --t-xs:  11px;
+  --t-sm:  12.5px;
+  --t-base: 14px;
+  --t-md:  15px;
+  --t-lg:  17px;
+  --t-xl:  20px;
+  --t-2xl: 24px;
+  --t-3xl: 32px;
+  --t-4xl: 42px;
+
+  /* ─── Display personality ──────────────────────────────────────────────── */
+  --display-tracking: -0.02em;
+  --display-weight:   600;
+
+  /* ─── Easing ───────────────────────────────────────────────────────────── */
+  --ease: cubic-bezier(.22,.61,.36,1);
+
+  /* ─── Light mode tokens (Cocoon warm minimal) ──────────────────────────── */
+  --page:          oklch(0.971 0.008 25);
+  --surface:       oklch(0.987 0.005 25);
+  --surface-2:     oklch(0.95  0.009 25);
+  --surface-3:     oklch(0.925 0.011 25);
+  --ink:           oklch(0.22  0.012 25);
+  --ink-2:         oklch(0.36  0.011 25);
+  --muted:         oklch(0.58  0.011 25);
+  --faint:         oklch(0.72  0.009 25);
+  --border:        oklch(0.905 0.012 25);
+  --border-2:      oklch(0.86  0.013 25);
+
+  --accent:        oklch(0.52  0.22  255);
+  --accent-ink:    oklch(0.38  0.19  255);
+  --accent-soft:   oklch(0.94  0.04  255);
+  --accent-soft-2: oklch(0.87  0.07  255);
+  --on-accent:     oklch(0.99  0.004 255);
+
+  --c-sage:        oklch(0.66  0.08  145);
+  --c-sage-bg:     oklch(0.93  0.03  145);
+  --c-sky:         oklch(0.66  0.08  232);
+  --c-sky-bg:      oklch(0.93  0.025 232);
+  --c-plum:        oklch(0.6   0.1   320);
+  --c-plum-bg:     oklch(0.93  0.03  320);
+  --c-ochre:       oklch(0.72  0.11  95);
+  --c-ochre-bg:    oklch(0.93  0.04  95);
+  --c-clay:        oklch(0.6   0.18  22);
+  --c-clay-bg:     oklch(0.93  0.045 22);
+
+  --shadow-color:  oklch(0.4   0.04  25 / 0.07);
+  --shadow-sm:     0 1px 2px var(--shadow-color);
+  --shadow-md:     0 4px 14px var(--shadow-color);
+  --shadow-lg:     0 12px 40px var(--shadow-color);
 }
 
-/* Configure dark mode strategy */
+/* ─── Dark mode overrides ────────────────────────────────────────────────── */
+:is(.dark) {
+  --page:          oklch(0.175 0.011 25);
+  --surface:       oklch(0.22  0.012 25);
+  --surface-2:     oklch(0.26  0.013 25);
+  --surface-3:     oklch(0.30  0.013 25);
+  --ink:           oklch(0.95  0.006 25);
+  --ink-2:         oklch(0.82  0.008 25);
+  --muted:         oklch(0.65  0.011 25);
+  --faint:         oklch(0.5   0.01  25);
+  --border:        oklch(0.30  0.013 25);
+  --border-2:      oklch(0.36  0.014 25);
+
+  --accent:        oklch(0.68  0.19  255);
+  --accent-ink:    oklch(0.80  0.16  255);
+  --accent-soft:   oklch(0.25  0.07  255);
+  --accent-soft-2: oklch(0.31  0.10  255);
+  --on-accent:     oklch(0.99  0.004 255);
+
+  --c-sage:        oklch(0.78  0.09  145);
+  --c-sage-bg:     oklch(0.30  0.04  145);
+  --c-sky:         oklch(0.78  0.09  232);
+  --c-sky-bg:      oklch(0.28  0.04  232);
+  --c-plum:        oklch(0.76  0.1   320);
+  --c-plum-bg:     oklch(0.28  0.04  320);
+  --c-ochre:       oklch(0.85  0.11  95);
+  --c-ochre-bg:    oklch(0.30  0.05  95);
+  --c-clay:        oklch(0.74  0.16  22);
+  --c-clay-bg:     oklch(0.30  0.06  22);
+
+  --shadow-color:  oklch(0 0 25 / 0.35);
+}
+
+/* ─── Base resets ────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+
+body {
+  font-family: var(--font-body);
+  font-feature-settings: "cv11", "ss01", "ss03";
+  -webkit-font-smoothing: antialiased;
+  background: var(--page);
+  color: var(--ink);
+  letter-spacing: -0.005em;
+}
+
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+input, textarea { font: inherit; color: inherit; }
+
+/* ─── Custom scrollbar ───────────────────────────────────────────────────── */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn .25s var(--ease); }
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin .9s linear infinite; }
+
+/* ─── Design-system shared classes ──────────────────────────────────────── */
+.heading-display {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  color: var(--ink);
+  line-height: 1.05;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border-radius: var(--r-control);
+  font: 500 13px/1 var(--font-body);
+  transition: all .15s var(--ease);
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.btn-primary:hover { filter: brightness(1.07); }
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--border);
+}
+.btn-secondary:hover { background: var(--surface-2); border-color: var(--border-2); }
+.btn-ghost { color: var(--muted); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font: 500 11.5px/1 var(--font-body);
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+}
+.chip-mono { font-family: var(--font-mono); font-weight: 400; padding: 3px 7px; font-size: 11px; }
+
+.kbd {
+  font: 500 10.5px/1 var(--font-mono);
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  font: 500 11.5px/1 var(--font-body);
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+.pill-neutral { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+.pill-accent  { background: var(--accent-soft); color: var(--accent-ink); border: 1px solid transparent; }
+.pill-success { background: var(--c-sage-bg);  color: var(--c-sage);    border: 1px solid transparent; }
+.pill-info    { background: var(--c-sky-bg);   color: var(--c-sky);     border: 1px solid transparent; }
+.pill-warn    { background: var(--c-ochre-bg); color: var(--c-ochre);   border: 1px solid transparent; }
+.pill-ai      { background: var(--c-plum-bg);  color: var(--c-plum);    border: 1px solid transparent; }
+
+.divider-v { width: 1px; align-self: stretch; background: var(--border); }
+.divider-h { height: 1px; width: 100%; background: var(--border); }
+
+/* ─── Electron drag regions ──────────────────────────────────────────── */
+.drag-region { -webkit-app-region: drag; }
+.no-drag     { -webkit-app-region: no-drag; }
+
+.hover-card { transition: all .18s var(--ease); }
+.hover-card:hover { border-color: var(--border-2) !important; }
+
+/* Tile (colored icon square) color map */
+.tile-clay  { background: var(--c-clay-bg);  color: var(--c-clay);  }
+.tile-sky   { background: var(--c-sky-bg);   color: var(--c-sky);   }
+.tile-sage  { background: var(--c-sage-bg);  color: var(--c-sage);  }
+.tile-plum  { background: var(--c-plum-bg);  color: var(--c-plum);  }
+.tile-ochre { background: var(--c-ochre-bg); color: var(--c-ochre); }
+
+/* ─── Configure dark mode strategy ────────────────────────────────────────── */
 @variant dark (&:where(.dark, .dark *));
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: var(--color-slate-300);
-  border-radius: 9999px;
-}
-
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb {
-    background-color: var(--color-slate-700);
-  }
-}
-
-:is(.dark) ::-webkit-scrollbar-thumb {
-  background-color: var(--color-slate-700);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-slate-400);
-}
-
-:is(.dark) ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--color-slate-600);
-}

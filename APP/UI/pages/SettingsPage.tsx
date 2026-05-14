@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Server, Key, CheckCircle, AlertCircle, FolderOpen, FolderCog } from 'lucide-react';
+import { Server, Key, CheckCircle, AlertCircle, FolderOpen, FolderCog, Save } from 'lucide-react';
 
 const FLASK = 'http://127.0.0.1:5000/api/agent';
 
@@ -7,6 +7,74 @@ interface AgentConfig {
     server_url: string;
     api_key_set: boolean;
     output_path: string;
+}
+
+// ── Section card ─────────────────────────────────────────────────────────────
+
+function Card({ children }: { children: React.ReactNode }) {
+    return (
+        <div style={{
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            borderRadius: 'var(--r-card)', overflow: 'hidden',
+        }}>
+            {children}
+        </div>
+    );
+}
+
+function CardHeader({ icon, title, badge }: { icon: React.ReactNode; title: string; badge?: React.ReactNode }) {
+    return (
+        <div style={{
+            padding: '14px 20px', borderBottom: '1px solid var(--border)',
+            display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+            <span style={{ color: 'var(--muted)', display: 'flex', flexShrink: 0 }}>{icon}</span>
+            <h2 style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', flex: 1 }}>{title}</h2>
+            {badge}
+        </div>
+    );
+}
+
+function CardBody({ children }: { children: React.ReactNode }) {
+    return (
+        <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {children}
+        </div>
+    );
+}
+
+function Field({ label, hint, children }: { label: React.ReactNode; hint?: React.ReactNode; children: React.ReactNode }) {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--muted)' }}>{label}</label>
+            {children}
+            {hint && <p style={{ margin: 0, fontSize: 11.5, color: 'var(--faint)', lineHeight: 1.5 }}>{hint}</p>}
+        </div>
+    );
+}
+
+function TextInput({ value, onChange, placeholder, type = 'text', mono }: {
+    value: string; onChange: (v: string) => void;
+    placeholder?: string; type?: string; mono?: boolean;
+}) {
+    return (
+        <input
+            type={type}
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            style={{
+                width: '100%', padding: '9px 12px',
+                background: 'var(--page)', border: '1px solid var(--border)',
+                borderRadius: 'var(--r-control)', fontSize: 13.5, color: 'var(--ink)',
+                fontFamily: mono ? 'var(--font-mono)' : 'var(--font-body)',
+                outline: 'none', boxSizing: 'border-box',
+                transition: 'border-color .15s',
+            }}
+            onFocus={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+            onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; }}
+        />
+    );
 }
 
 export const Settings: React.FC = () => {
@@ -35,9 +103,7 @@ export const Settings: React.FC = () => {
         try {
             const dir = await (window as any).electronAPI?.selectDirectory?.();
             if (dir) setOutputPath(dir);
-        } catch {
-            // Electron API not available (dev browser mode)
-        }
+        } catch { /* Electron API not available */ }
     };
 
     const save = async () => {
@@ -58,6 +124,7 @@ export const Settings: React.FC = () => {
             if (apiKey) setApiKeySet(true);
             setApiKey('');
             setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
         } catch {
             setError('Save failed. Is the local backend running?');
         } finally {
@@ -68,121 +135,145 @@ export const Settings: React.FC = () => {
     const isConfigured = serverUrl && apiKeySet;
 
     return (
-        <div className="space-y-6 max-w-2xl">
-            <h1 className="text-2xl font-bold">Settings</h1>
+        <div style={{ maxWidth: 640, display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-            {/* Agent Connection card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
-                    <Server className="w-4 h-4 text-slate-400" />
-                    <h2 className="font-semibold text-sm">Agent Connection</h2>
-                    <span className={`ml-auto flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full border ${isConfigured
-                        ? 'bg-green-500/10 text-green-400 border-green-500/20'
-                        : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'}`}>
-                        {isConfigured
-                            ? <><CheckCircle className="w-3 h-3" /> Configured</>
-                            : <><AlertCircle className="w-3 h-3" /> Not configured</>}
-                    </span>
+            <div>
+                <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--ink)', letterSpacing: 'var(--display-tracking)' }}>
+                    Settings
+                </h1>
+                <p style={{ margin: '4px 0 0', fontSize: 13.5, color: 'var(--muted)' }}>
+                    Configure how the app connects to the AI agent.
+                </p>
+            </div>
+
+            {error && (
+                <div style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 8,
+                    padding: '12px 14px', borderRadius: 'var(--r-control)',
+                    background: 'var(--c-clay-bg)', color: 'var(--c-clay)', fontSize: 13,
+                }}>
+                    <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                    <span>{error}</span>
                 </div>
+            )}
 
-                <div className="px-6 py-5 space-y-5">
-                    {error && (
-                        <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</p>
-                    )}
-
-                    {/* Server URL */}
-                    <div>
-                        <label className="block text-xs text-slate-500 mb-1.5">Server URL</label>
-                        <input
-                            type="text"
+            {/* Agent connection */}
+            <Card>
+                <CardHeader
+                    icon={<Server size={15} />}
+                    title="Agent Connection"
+                    badge={
+                        <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                            fontSize: 11.5, fontWeight: 500, padding: '3px 9px',
+                            borderRadius: 'var(--r-pill)',
+                            background: isConfigured ? 'var(--c-sage-bg)' : 'var(--c-ochre-bg)',
+                            color: isConfigured ? 'var(--c-sage)' : 'var(--c-ochre)',
+                        }}>
+                            {isConfigured
+                                ? <><CheckCircle size={11} /> Configured</>
+                                : <><AlertCircle size={11} /> Not configured</>
+                            }
+                        </span>
+                    }
+                />
+                <CardBody>
+                    <Field label="Server URL">
+                        <TextInput
                             value={serverUrl}
-                            onChange={e => { setServerUrl(e.target.value); setSaved(false); }}
-                            className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                            onChange={v => { setServerUrl(v); setSaved(false); }}
                             placeholder="https://your-server.example.com"
                         />
-                    </div>
+                    </Field>
 
-                    {/* API Key */}
-                    <div>
-                        <label className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
-                            <Key className="w-3 h-3" />
-                            API Key
-                            {apiKeySet && <span className="text-green-400">(saved)</span>}
-                        </label>
-                        <input
+                    <Field
+                        label={
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <Key size={11} /> API Key
+                                {apiKeySet && (
+                                    <span style={{ fontSize: 11, color: 'var(--c-sage)', fontWeight: 500 }}>(saved)</span>
+                                )}
+                            </span>
+                        }
+                        hint="The API key is generated when you deploy a container on the server. Open the server web UI → Containers → copy the key."
+                    >
+                        <TextInput
                             type="password"
                             value={apiKey}
-                            onChange={e => { setApiKey(e.target.value); setSaved(false); }}
-                            className="w-full text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-                            placeholder={apiKeySet ? '••••••••  (leave blank to keep existing)' : 'Paste the API key from the server\'s Containers page'}
+                            onChange={v => { setApiKey(v); setSaved(false); }}
+                            placeholder={apiKeySet ? '••••••  (leave blank to keep existing)' : 'Paste the API key from the server'}
                         />
-                        <p className="text-xs text-slate-500 mt-1">
-                            The API key is generated when you deploy a container on the server. Open the server web UI → Containers → copy the key.
-                        </p>
-                    </div>
+                    </Field>
 
-                    {/* Save */}
-                    <div className="flex items-center gap-3 pt-1">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 4, borderTop: '1px solid var(--border)' }}>
                         <button
                             onClick={save}
                             disabled={saving || loading}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                            className="btn btn-primary"
+                            style={{ opacity: (saving || loading) ? 0.5 : 1 }}
                         >
-                            {saving ? 'Saving…' : 'Save'}
+                            {saving ? <><span className="spin" style={{ display: 'inline-block', width: 12, height: 12, border: '1.5px solid currentColor', borderRightColor: 'transparent', borderRadius: '50%' }} /> Saving…</> : <><Save size={13} /> Save</>}
                         </button>
-                        {saved && <span className="text-xs text-green-400">Saved!</span>}
+                        {saved && (
+                            <span style={{ fontSize: 12.5, color: 'var(--c-sage)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <CheckCircle size={13} /> Saved
+                            </span>
+                        )}
                     </div>
-                </div>
-            </div>
+                </CardBody>
+            </Card>
 
-            {/* Tool Output Settings card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center gap-3">
-                    <FolderCog className="w-4 h-4 text-slate-400" />
-                    <h2 className="font-semibold text-sm">Tool Output Settings</h2>
-                </div>
-
-                <div className="px-6 py-5 space-y-4">
-                    <div>
-                        <label className="flex items-center gap-1.5 text-xs text-slate-500 mb-1.5">
-                            <FolderOpen className="w-3 h-3" />
-                            Output Path
-                        </label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                value={outputPath}
-                                onChange={e => { setOutputPath(e.target.value); setSaved(false); }}
-                                className="flex-1 text-sm px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40 font-mono"
-                                placeholder="C:\Users\You\Documents"
-                            />
+            {/* Tool output */}
+            <Card>
+                <CardHeader icon={<FolderCog size={15} />} title="Tool Output Settings" />
+                <CardBody>
+                    <Field
+                        label={<span style={{ display: 'flex', alignItems: 'center', gap: 5 }}><FolderOpen size={11} /> Output Path</span>}
+                        hint={
+                            <>
+                                When a tool runs in <strong style={{ color: 'var(--ink-2)' }}>Virtual Drive</strong> mode, it creates a drive folder
+                                (e.g. <code style={{ fontSize: 11, fontFamily: 'var(--font-mono)', background: 'var(--surface-2)', padding: '1px 5px', borderRadius: 4 }}>ImageConversionResults</code>)
+                                inside this path. Leave blank to disable virtual drive output.
+                            </>
+                        }
+                    >
+                        <div style={{ display: 'flex', gap: 8 }}>
+                            <div style={{ flex: 1 }}>
+                                <TextInput
+                                    value={outputPath}
+                                    onChange={v => { setOutputPath(v); setSaved(false); }}
+                                    placeholder="C:\Users\You\Documents"
+                                    mono
+                                />
+                            </div>
                             <button
                                 onClick={browseOutputPath}
-                                className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors text-sm"
+                                className="btn btn-secondary"
+                                style={{ padding: '9px 12px', flexShrink: 0 }}
                                 title="Browse for folder"
                             >
-                                <FolderOpen className="w-4 h-4" />
+                                <FolderOpen size={15} />
                             </button>
                         </div>
-                        <p className="text-xs text-slate-500 mt-1.5">
-                            When a tool runs in <strong>Virtual Drive</strong> mode, it creates a drive folder
-                            (e.g. <code className="text-xs bg-slate-100 dark:bg-slate-800 px-1 rounded">ImageConversionResults</code>)
-                            inside this path. Leave blank to disable virtual drive output.
-                        </p>
-                    </div>
+                    </Field>
 
-                    <div className="flex items-center gap-3 pt-1">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 4, borderTop: '1px solid var(--border)' }}>
                         <button
                             onClick={save}
                             disabled={saving || loading}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                            className="btn btn-primary"
+                            style={{ opacity: (saving || loading) ? 0.5 : 1 }}
                         >
-                            {saving ? 'Saving…' : 'Save'}
+                            {saving ? 'Saving…' : <><Save size={13} /> Save</>}
                         </button>
-                        {saved && <span className="text-xs text-green-400">Saved!</span>}
+                        {saved && (
+                            <span style={{ fontSize: 12.5, color: 'var(--c-sage)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                                <CheckCircle size={13} /> Saved
+                            </span>
+                        )}
                     </div>
-                </div>
-            </div>
+                </CardBody>
+            </Card>
         </div>
     );
 };

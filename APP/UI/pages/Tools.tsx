@@ -1,182 +1,156 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-    Zap, Cpu, X,
-    Image, Music, Video, FileText, Archive, Box, Database,
-    Code, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
-    AudioWaveform, Clapperboard, LayoutGrid, List, ChevronRight,
-    Search, AlertCircle, RefreshCw, ExternalLink, PenTool, ImageOff,
+    Cpu, X, Search, RefreshCw, AlertCircle,
+    Zap, Image, Music, Video, FileText, Archive, Box, Code,
+    Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
+    AudioWaveform, Clapperboard, PenTool, ImageOff, ChevronRight,
+    LayoutGrid, List,
 } from 'lucide-react';
 import type { CategoryKey, CategoryMeta, ToolDefinition } from '../data/tools';
 import { useToolsCatalog } from '../hooks/useToolsCatalog';
 
-// ── Icon resolver ───────────────────────────────────────────────────────────
-
-const ICON_MAP: Record<string, any> = {
-    Image, Music, Video, FileText, Archive, Box, Database, Code,
+// ── Icon resolver ─────────────────────────────────────────────────────────────
+const ICON_MAP: Record<string, React.ElementType> = {
+    Image, Music, Video, FileText, Archive, Box, Code,
     Zap, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
     AudioWaveform, Clapperboard, PenTool, ImageOff,
 };
 
-function ToolIcon({ name, className }: { name: string; className?: string }) {
+function ToolIcon({ name, size = 20 }: { name: string; size?: number }) {
     const Icon = ICON_MAP[name] ?? Zap;
-    return <Icon className={className} />;
+    return <Icon style={{ width: size, height: size }} />;
 }
 
-// ── Colour maps ─────────────────────────────────────────────────────────────
+// ── Colour mapping: tailwind names → design tokens ────────────────────────────
+const COLOR_TO_TOKEN: Record<string, string> = {
+    blue:    'sky',
+    cyan:    'sky',
+    indigo:  'sky',
+    sky:     'sky',
+    purple:  'plum',
+    violet:  'plum',
+    rose:    'ochre',
+    red:     'clay',
+    pink:    'clay',
+    amber:   'ochre',
+    yellow:  'ochre',
+    green:   'sage',
+    emerald: 'sage',
+    teal:    'sage',
+    lime:    'sage',
+    slate:   'sky',
+    gray:    'sky',
+    zinc:    'sky',
+    stone:   'sage',
+    neutral: 'sage',
+};
+function token(color: string): string {
+    return COLOR_TO_TOKEN[color] ?? 'sky';
+}
 
-const COLOR_ICON: Record<string, string> = {
-    blue: 'bg-blue-500/10 border-blue-500/20 text-blue-400',
-    purple: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
-    rose: 'bg-rose-500/10 border-rose-500/20 text-rose-400',
-    amber: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
-    cyan: 'bg-cyan-500/10 border-cyan-500/20 text-cyan-400',
-    indigo: 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400',
-    green: 'bg-green-500/10 border-green-500/20 text-green-400',
-    emerald: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
-    violet: 'bg-violet-500/10 border-violet-500/20 text-violet-400',
+// ── Tool runner routes ────────────────────────────────────────────────────────
+const TOOL_RUNNER_ROUTES: Record<string, string> = {
+    'image-converter':    '/tools/image-converter/run',
+    'remove-background':  '/tools/remove-background/run',
+    'image-to-svg':       '/tools/image-to-svg/run',
+    'video-converter':    '/tools/video-converter/run',
+    'video-compressor':   '/tools/video-compressor/run',
+    'audio-converter':    '/tools/audio-converter/run',
+    '3d-visualizer':      '/tools/3d-visualizer/run',
+    'drive-creator':      '/tools/drive-creator/run',
+    'space-analyzer':     '/tools/space-analyzer/run',
+    'pdf-merger':         '/tools/pdf-merger/run',
+    'model-converter':    '/tools/model-converter/run',
+    'document-converter': '/tools/document-converter/run',
 };
 
-const COLOR_SECTION: Record<string, string> = {
-    blue: 'border-l-blue-500',
-    purple: 'border-l-purple-500',
-    rose: 'border-l-rose-500',
-    amber: 'border-l-amber-500',
-    cyan: 'border-l-cyan-500',
-    indigo: 'border-l-indigo-500',
-    green: 'border-l-green-500',
-    emerald: 'border-l-emerald-500',
-    violet: 'border-l-violet-500',
-};
-
-const COLOR_CAT_ICON: Record<string, string> = {
-    blue: 'text-blue-400 bg-blue-500/10',
-    purple: 'text-purple-400 bg-purple-500/10',
-    rose: 'text-rose-400 bg-rose-500/10',
-    amber: 'text-amber-400 bg-amber-500/10',
-    cyan: 'text-cyan-400 bg-cyan-500/10',
-    indigo: 'text-indigo-400 bg-indigo-500/10',
-    green: 'text-green-400 bg-green-500/10',
-    emerald: 'text-emerald-400 bg-emerald-500/10',
-    violet: 'text-violet-400 bg-violet-500/10',
-};
-
-const COLOR_FILTER_ACTIVE: Record<string, string> = {
-    blue: 'bg-blue-600 text-white border-blue-600',
-    purple: 'bg-purple-600 text-white border-purple-600',
-    rose: 'bg-rose-600 text-white border-rose-600',
-    amber: 'bg-amber-600 text-white border-amber-600',
-    cyan: 'bg-cyan-600 text-white border-cyan-600',
-    indigo: 'bg-indigo-600 text-white border-indigo-600',
-    green: 'bg-green-600 text-white border-green-600',
-    emerald: 'bg-emerald-600 text-white border-emerald-600',
-    violet: 'bg-violet-600 text-white border-violet-600',
-};
-
-// ── Skeleton loader ─────────────────────────────────────────────────────────
-
+// ── Skeleton ──────────────────────────────────────────────────────────────────
 function SkeletonCard() {
     return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col gap-4 animate-pulse">
-            <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-800 shrink-0" />
-                <div className="flex-1 space-y-2">
-                    <div className="h-3.5 bg-slate-200 dark:bg-slate-800 rounded w-2/3" />
-                    <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-full" />
-                    <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-4/5" />
+        <div style={{
+            padding: 16, borderRadius: 'var(--r-card)',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--surface-2)', flexShrink: 0 }} />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    <div style={{ height: 12, background: 'var(--surface-2)', borderRadius: 4, width: '55%' }} />
+                    <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 4, width: '90%' }} />
+                    <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 4, width: '70%' }} />
                 </div>
             </div>
-            <div className="flex gap-1.5">
-                <div className="h-5 w-10 bg-slate-200 dark:bg-slate-800 rounded-full" />
-                <div className="h-5 w-14 bg-slate-200 dark:bg-slate-800 rounded" />
-                <div className="h-5 w-14 bg-slate-200 dark:bg-slate-800 rounded" />
+            <div style={{ display: 'flex', gap: 5 }}>
+                <div style={{ height: 20, width: 34, background: 'var(--surface-2)', borderRadius: 'var(--r-pill)' }} />
+                <div style={{ height: 20, width: 48, background: 'var(--surface-2)', borderRadius: 'var(--r-pill)' }} />
             </div>
-            <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded-lg mt-auto" />
+            <div style={{ height: 32, background: 'var(--surface-2)', borderRadius: 'var(--r-control)' }} />
         </div>
     );
 }
 
-const TOOL_RUNNER_ROUTES: Record<string, string> = {
-    'image-converter': '/tools/image-converter/run',
-    'remove-background': '/tools/remove-background/run',
-    'image-to-svg': '/tools/image-to-svg/run',
-    'video-converter': '/tools/video-converter/run',
-    'video-compressor': '/tools/video-compressor/run',
-    'audio-converter': '/tools/audio-converter/run',
-    '3d-visualizer': '/tools/3d-visualizer/run',
-    'drive-creator': '/tools/drive-creator/run',
-    'space-analyzer': '/tools/space-analyzer/run',
-    'pdf-merger': '/tools/pdf-merger/run',
-    'model-converter': '/tools/model-converter/run',
-    'document-converter': '/tools/document-converter/run',
-};
-
-// Maps tool accent color → Open button tailwind classes
-const COLOR_OPEN_BTN: Record<string, string> = {
-    blue: 'bg-blue-600 hover:bg-blue-500',
-    violet: 'bg-violet-600 hover:bg-violet-500',
-    rose: 'bg-rose-600 hover:bg-rose-500',
-    amber: 'bg-amber-600 hover:bg-amber-500',
-    cyan: 'bg-cyan-600 hover:bg-cyan-500',
-    indigo: 'bg-indigo-600 hover:bg-indigo-500',
-    green: 'bg-green-600 hover:bg-green-500',
-    emerald: 'bg-emerald-600 hover:bg-emerald-500',
-    purple: 'bg-purple-600 hover:bg-purple-500',
-};
-
-// ── Tool Card ───────────────────────────────────────────────────────────────
-
+// ── Tool Card ─────────────────────────────────────────────────────────────────
 function ToolCard({ tool }: { tool: ToolDefinition }) {
-    const iconCls = COLOR_ICON[tool.accentColor] ?? COLOR_ICON.blue;
+    const t = token(tool.accentColor);
+    const runRoute = TOOL_RUNNER_ROUTES[tool.id];
 
     return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col gap-4">
-
+        <div className="hover-card" style={{
+            padding: 16, borderRadius: 'var(--r-card)',
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            display: 'flex', flexDirection: 'column', gap: 12,
+        }}>
             {/* Header */}
-            <div className="flex items-start gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center border shrink-0 ${iconCls}`}>
-                    <ToolIcon name={tool.icon} className="w-5 h-5" />
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{
+                    width: 40, height: 40, borderRadius: 10,
+                    background: `var(--c-${t}-bg)`, color: `var(--c-${t})`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                    <ToolIcon name={tool.icon} size={20} />
                 </div>
-                <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-sm leading-snug">{tool.name}</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {tool.name}
+                        </h3>
+                        {tool.usesAI && (
+                            <span className="pill pill-ai" style={{ fontSize: 10, padding: '2px 6px', flexShrink: 0 }}>
+                                <Cpu style={{ width: 9, height: 9 }} /> AI
+                            </span>
+                        )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
                         {tool.description}
                     </p>
                 </div>
             </div>
 
-            {/* Badges */}
-            <div className="flex flex-wrap gap-1.5">
-                {tool.usesAI && (
-                    <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-500/25 font-medium">
-                        <Cpu className="w-2.5 h-2.5" /> AI
-                    </span>
-                )}
-                {tool.fileExtensions.slice(0, 3).map(ext => (
-                    <span key={ext}
-                        className="text-xs font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
-                        {ext}
-                    </span>
-                ))}
-                {tool.fileExtensions.length > 3 && (
-                    <span className="text-xs text-slate-500">+{tool.fileExtensions.length - 3}</span>
-                )}
-            </div>
+            {/* Extension chips */}
+            {tool.fileExtensions.length > 0 && (
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                    {tool.fileExtensions.slice(0, 4).map(ext => (
+                        <span key={ext} className="chip chip-mono">{ext}</span>
+                    ))}
+                    {tool.fileExtensions.length > 4 && (
+                        <span className="chip chip-mono">+{tool.fileExtensions.length - 4}</span>
+                    )}
+                </div>
+            )}
 
-            {/* Footer */}
-            <div className="mt-auto flex gap-2">
-                <Link to={`/tools/${tool.id}`}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
-                    Details
-                    <ChevronRight className="w-3.5 h-3.5" />
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 7, marginTop: 'auto' }}>
+                <Link to={`/tools/${tool.id}`} style={{ textDecoration: 'none', flex: runRoute ? 0 : 1 }}>
+                    <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 12.5, padding: '7px 12px' }}>
+                        Details
+                    </button>
                 </Link>
-                {TOOL_RUNNER_ROUTES[tool.id] && (
-                    <Link to={TOOL_RUNNER_ROUTES[tool.id]}
-                        className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-white text-sm font-semibold transition-colors ${
-                            COLOR_OPEN_BTN[tool.accentColor] ?? COLOR_OPEN_BTN.blue
-                        }`}>
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        Open
+                {runRoute && (
+                    <Link to={runRoute} style={{ textDecoration: 'none', flex: 1 }}>
+                        <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: 12.5, padding: '7px 12px' }}>
+                            Open <ChevronRight style={{ width: 12, height: 12 }} />
+                        </button>
                     </Link>
                 )}
             </div>
@@ -184,44 +158,59 @@ function ToolCard({ tool }: { tool: ToolDefinition }) {
     );
 }
 
-// ── Category Section ────────────────────────────────────────────────────────
-
-function CategorySection({
-    meta,
-    tools,
-}: {
-    meta: CategoryMeta;
-    tools: ToolDefinition[];
-}) {
-    const borderCls = COLOR_SECTION[meta.color] ?? 'border-l-slate-500';
-    const catIconCls = COLOR_CAT_ICON[meta.color] ?? 'text-slate-400 bg-slate-500/10';
-    const CatIcon = ICON_MAP[meta.icon] ?? Zap;
-
+// ── Category Section ──────────────────────────────────────────────────────────
+function CategorySection({ meta, tools }: { meta: CategoryMeta; tools: ToolDefinition[] }) {
+    const t = token(meta.color);
     if (tools.length === 0) return null;
-
     return (
-        <section className="space-y-4">
-            <div className={`flex items-center gap-3 pl-4 border-l-4 ${borderCls}`}>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${catIconCls}`}>
-                    <CatIcon className="w-4 h-4" />
+        <section>
+            <header style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    background: `var(--c-${t}-bg)`, color: `var(--c-${t})`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                }}>
+                    <ToolIcon name={meta.icon} size={16} />
                 </div>
-                <div>
-                    <h2 className="font-bold text-base">{meta.label}</h2>
-                    <p className="text-xs text-slate-500">{meta.description}</p>
+                <div style={{ flex: 1 }}>
+                    <h2 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>{meta.label}</h2>
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>{meta.description}</div>
                 </div>
-                <span className="ml-auto text-xs text-slate-500 tabular-nums">
-                    {tools.length} {tools.length === 1 ? 'tool' : 'tools'}
+                <span style={{ fontSize: 11, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
+                    {tools.length}
                 </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            </header>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                 {tools.map(t => <ToolCard key={t.id} tool={t} />)}
             </div>
         </section>
     );
 }
 
-// ── Main Page ───────────────────────────────────────────────────────────────
+// ── Category filter pill ──────────────────────────────────────────────────────
+function CatPill({ active, onClick, label, icon, accent, count }: {
+    active: boolean; onClick: () => void; label: string;
+    icon?: string; accent?: string; count: number;
+}) {
+    const t = accent ? token(accent) : null;
+    return (
+        <button onClick={onClick} style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '5px 11px', borderRadius: 'var(--r-pill)',
+            background: active ? (t ? `var(--c-${t})` : 'var(--ink)') : 'var(--surface)',
+            color: active ? 'var(--page)' : 'var(--ink-2)',
+            border: '1px solid ' + (active ? 'transparent' : 'var(--border)'),
+            fontSize: 12.5, fontWeight: 500, whiteSpace: 'nowrap',
+            transition: 'all .15s var(--ease)',
+        }}>
+            {icon && <ToolIcon name={icon} size={12} />}
+            {label}
+            <span style={{ fontSize: 10.5, opacity: 0.6, fontFamily: 'var(--font-mono)' }}>{count}</span>
+        </button>
+    );
+}
 
+// ── Main Page ─────────────────────────────────────────────────────────────────
 type ViewMode = 'categories' | 'list';
 
 export const Tools: React.FC = () => {
@@ -230,10 +219,6 @@ export const Tools: React.FC = () => {
 
     const urlCategory = searchParams.get('category') as CategoryKey | null;
 
-    const [showHero, setShowHero] = useState<boolean>(() => {
-        const v = localStorage.getItem('tools_showHero');
-        return v === null ? true : v === 'true';
-    });
     const [viewMode, setViewMode] = useState<ViewMode>(() =>
         localStorage.getItem('tools_viewMode') === 'list' ? 'list' : 'categories'
     );
@@ -245,13 +230,10 @@ export const Tools: React.FC = () => {
     );
     const [query, setQuery] = useState('');
 
-    // Persist filter state
-    useEffect(() => { localStorage.setItem('tools_showHero', String(showHero)); }, [showHero]);
     useEffect(() => { localStorage.setItem('tools_viewMode', viewMode); }, [viewMode]);
     useEffect(() => { localStorage.setItem('tools_category', selectedCategory); }, [selectedCategory]);
     useEffect(() => { localStorage.setItem('tools_aiOnly', String(aiOnly)); }, [aiOnly]);
 
-    // URL ?category= param overrides stored category (comes from detail page breadcrumb)
     useEffect(() => {
         if (urlCategory) {
             setSelectedCategory(urlCategory);
@@ -269,185 +251,165 @@ export const Tools: React.FC = () => {
         });
     }, [tools, selectedCategory, aiOnly, query]);
 
-    const visibleCategories = useMemo(() => {
-        return categories.filter(cat =>
-            filteredTools.some(t => t.categories.includes(cat.key))
-        );
-    }, [categories, filteredTools]);
+    const visibleCategories = useMemo(() =>
+        categories.filter(cat => filteredTools.some(t => t.categories.includes(cat.key))),
+        [categories, filteredTools]
+    );
 
     return (
-        <div className="space-y-8">
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--page)' }}>
 
-            {/* ── Hero ── */}
-            {showHero && (
-                <div className="relative rounded-2xl overflow-hidden bg-slate-900 text-white p-10 min-h-[160px] flex items-center">
-                    <div className="absolute inset-0 opacity-20">
-                        <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
-                        <div className="absolute bottom-0 left-0 w-72 h-72 bg-violet-500 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3" />
-                    </div>
-                    <div className="relative z-10 max-w-2xl">
-                        <h1 className="text-3xl font-bold mb-2">Utility Tools</h1>
-                        <p className="text-slate-300 leading-relaxed">
-                            Browse and run tools organised by file type. AI-powered tools connect to your agent container; local tools run on-device.
-                        </p>
-                    </div>
-                    <button
-                        onClick={() => setShowHero(false)}
-                        className="absolute top-4 right-4 z-10 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-                        aria-label="Dismiss"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-            )}
-
-            {/* ── Error banner ── */}
-            {error && (
-                <div className="flex items-center justify-between px-5 py-3.5 rounded-xl border bg-red-500/10 border-red-500/20">
-                    <div className="flex items-center gap-2.5 text-sm text-red-300">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        Could not load tool catalog from backend: {error}
-                    </div>
-                    <button onClick={reload}
-                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-red-500/30 text-red-400 hover:border-red-400 transition-colors">
-                        <RefreshCw className="w-3 h-3" /> Retry
-                    </button>
-                </div>
-            )}
-
-            {/* ── Toolbar ── */}
-            <div className="flex flex-col gap-4">
-
-                {/* Top row: search + view toggle */}
-                <div className="flex items-center gap-3">
-                    <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        <input
-                            type="text"
-                            value={query}
-                            onChange={e => setQuery(e.target.value)}
-                            placeholder="Search tools…"
-                            className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/50 transition-colors"
-                        />
-                    </div>
-
-                    <button
-                        onClick={() => setAiOnly(v => !v)}
-                        className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                            aiOnly
-                                ? 'bg-violet-600 border-violet-600 text-white'
-                                : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600'
-                        }`}
-                    >
-                        <Cpu className="w-3.5 h-3.5" />
-                        AI Only
-                    </button>
-
-                    <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden ml-auto">
-                        <button
-                            onClick={() => setViewMode('categories')}
-                            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
-                                viewMode === 'categories'
-                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
-                                    : 'text-slate-500 hover:text-slate-300'
-                            }`}
-                        >
-                            <LayoutGrid className="w-4 h-4" />
-                            Categories
+            {/* ── Filter bar ── */}
+            <div style={{
+                padding: '10px 20px', flexShrink: 0,
+                borderBottom: '1px solid var(--border)',
+                background: 'var(--surface)',
+                display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+                {/* Search */}
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: 7,
+                    height: 34, padding: '0 10px',
+                    background: 'var(--page)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--r-control)', width: 220, flexShrink: 0,
+                }}>
+                    <Search style={{ width: 13, height: 13, color: 'var(--muted)', flexShrink: 0 }} />
+                    <input
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        placeholder="Search tools…"
+                        style={{ border: 0, outline: 0, background: 'transparent', flex: 1, fontSize: 12.5, color: 'var(--ink)' }}
+                    />
+                    {query && (
+                        <button onClick={() => setQuery('')} style={{ color: 'var(--muted)', display: 'flex' }}>
+                            <X style={{ width: 11, height: 11 }} />
                         </button>
-                        <div className="w-px h-6 bg-slate-200 dark:bg-slate-700" />
-                        <button
-                            onClick={() => setViewMode('list')}
-                            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors ${
-                                viewMode === 'list'
-                                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white'
-                                    : 'text-slate-500 hover:text-slate-300'
-                            }`}
-                        >
-                            <List className="w-4 h-4" />
-                            All Tools
-                        </button>
-                    </div>
+                    )}
                 </div>
 
-                {/* Category filter pills */}
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        onClick={() => setSelectedCategory('all')}
-                        className={`px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors ${
-                            selectedCategory === 'all'
-                                ? 'bg-slate-800 text-white border-slate-700'
-                                : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600'
-                        }`}
-                    >
-                        All
-                    </button>
-                    {categories.map(cat => {
-                        const CatIcon = ICON_MAP[cat.icon] ?? Zap;
-                        const isActive = selectedCategory === cat.key;
-                        const activeCls = COLOR_FILTER_ACTIVE[cat.color] ?? 'bg-blue-600 text-white border-blue-600';
-                        return (
-                            <button
-                                key={cat.key}
-                                onClick={() => setSelectedCategory(cat.key)}
-                                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border text-sm font-medium transition-colors ${
-                                    isActive
-                                        ? activeCls
-                                        : 'border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-600'
-                                }`}
-                            >
-                                <CatIcon className="w-3.5 h-3.5" />
-                                {cat.label}
-                            </button>
-                        );
-                    })}
-                </div>
+                <div className="divider-v" style={{ height: 22, flexShrink: 0 }} />
 
-                {/* Result count */}
-                {!loading && (
-                    <p className="text-xs text-slate-500">
-                        {filteredTools.length} {filteredTools.length === 1 ? 'tool' : 'tools'} found
-                        {selectedCategory !== 'all' && ` in ${categories.find(c => c.key === selectedCategory)?.label}`}
-                        {aiOnly && ' • AI only'}
-                        {query && ` • matching "${query}"`}
-                    </p>
-                )}
-            </div>
-
-            {/* ── Content ── */}
-            {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)}
-                </div>
-            ) : filteredTools.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-500 gap-3">
-                    <Search className="w-10 h-10 opacity-30" />
-                    <p className="text-base">No tools match your filters.</p>
-                    <button
-                        onClick={() => { setSelectedCategory('all'); setAiOnly(false); setQuery(''); }}
-                        className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
-                    >
-                        Clear all filters
-                    </button>
-                </div>
-            ) : viewMode === 'categories' ? (
-                <div className="space-y-10">
-                    {visibleCategories.map(cat => (
-                        <CategorySection
-                            key={cat.key}
-                            meta={cat}
-                            tools={filteredTools.filter(t => t.categories.includes(cat.key))}
+                {/* Category pills — horizontally scrollable */}
+                <div style={{
+                    flex: 1, display: 'flex', gap: 6, overflowX: 'auto',
+                    scrollbarWidth: 'none', msOverflowStyle: 'none',
+                    paddingBottom: 1,
+                }}>
+                    <CatPill active={selectedCategory === 'all'} onClick={() => setSelectedCategory('all')} label="All" count={tools.length} />
+                    {categories.map(cat => (
+                        <CatPill key={cat.key}
+                            active={selectedCategory === cat.key}
+                            onClick={() => setSelectedCategory(cat.key)}
+                            label={cat.label}
+                            icon={cat.icon}
+                            accent={cat.color}
+                            count={tools.filter(t => t.categories.includes(cat.key)).length}
                         />
                     ))}
                 </div>
-            ) : (
-                <div className="space-y-4">
-                    <h2 className="font-bold text-lg">All Tools</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {filteredTools.map(tool => <ToolCard key={tool.id} tool={tool} />)}
-                    </div>
+
+                <div className="divider-v" style={{ height: 22, flexShrink: 0 }} />
+
+                {/* AI only toggle */}
+                <button
+                    onClick={() => setAiOnly(v => !v)}
+                    className="btn"
+                    style={{
+                        flexShrink: 0, fontSize: 12.5, padding: '5px 11px',
+                        background: aiOnly ? 'var(--c-plum)' : 'var(--surface-2)',
+                        color: aiOnly ? 'var(--page)' : 'var(--ink-2)',
+                        border: '1px solid ' + (aiOnly ? 'transparent' : 'var(--border)'),
+                    }}
+                >
+                    <Cpu style={{ width: 12, height: 12 }} /> AI only
+                </button>
+
+                {/* View toggle */}
+                <div style={{
+                    display: 'flex', background: 'var(--surface-2)',
+                    border: '1px solid var(--border)', borderRadius: 'var(--r-control)',
+                    padding: 2, gap: 1, flexShrink: 0,
+                }}>
+                    {([['categories', LayoutGrid], ['list', List]] as const).map(([mode, Icon]) => (
+                        <button key={mode} onClick={() => setViewMode(mode)} style={{
+                            padding: '5px 8px', borderRadius: 7, display: 'flex', alignItems: 'center',
+                            background: viewMode === mode ? 'var(--accent-soft)' : 'transparent',
+                            color: viewMode === mode ? 'var(--accent-ink)' : 'var(--muted)',
+                            transition: 'all .15s var(--ease)',
+                        }}>
+                            <Icon style={{ width: 14, height: 14 }} />
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* ── Error banner ── */}
+            {error && (
+                <div style={{
+                    margin: '10px 20px 0', padding: '10px 14px',
+                    background: 'var(--c-clay-bg)', color: 'var(--c-clay)',
+                    borderRadius: 'var(--r-control)',
+                    display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, flexShrink: 0,
+                }}>
+                    <AlertCircle style={{ width: 14, height: 14, flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>Could not load tool catalog: {error}</span>
+                    <button onClick={reload} className="btn btn-secondary" style={{ padding: '4px 9px', fontSize: 11.5 }}>
+                        <RefreshCw style={{ width: 11, height: 11 }} /> Retry
+                    </button>
                 </div>
             )}
+
+            {/* ── Tool count strip ── */}
+            {!loading && !error && (
+                <div style={{
+                    padding: '8px 20px 0', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                }}>
+                    <span style={{ fontSize: 12, color: 'var(--faint)', fontFamily: 'var(--font-mono)' }}>
+                        {filteredTools.length} {filteredTools.length === 1 ? 'tool' : 'tools'}
+                        {selectedCategory !== 'all' && ` in ${categories.find(c => c.key === selectedCategory)?.label ?? selectedCategory}`}
+                        {query && ` matching "${query}"`}
+                    </span>
+                </div>
+            )}
+
+            {/* ── Content ── */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 20px 32px' }}>
+                {loading ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                        {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
+                    </div>
+                ) : filteredTools.length === 0 ? (
+                    <div style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        justifyContent: 'center', padding: '60px 20px',
+                        color: 'var(--faint)', gap: 10,
+                    }}>
+                        <Search style={{ width: 32, height: 32, opacity: 0.3 }} />
+                        <p style={{ fontSize: 13.5, color: 'var(--muted)', margin: 0 }}>No tools match your filters.</p>
+                        <button
+                            onClick={() => { setSelectedCategory('all'); setAiOnly(false); setQuery(''); }}
+                            style={{ fontSize: 12.5, color: 'var(--accent-ink)', fontWeight: 500 }}
+                        >
+                            Clear all filters
+                        </button>
+                    </div>
+                ) : viewMode === 'categories' ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                        {visibleCategories.map(cat => (
+                            <CategorySection
+                                key={cat.key}
+                                meta={cat}
+                                tools={filteredTools.filter(t => t.categories.includes(cat.key))}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                        {filteredTools.map(t => <ToolCard key={t.id} tool={t} />)}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
