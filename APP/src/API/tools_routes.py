@@ -24,6 +24,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import threading
 import uuid
 from pathlib import Path
@@ -43,9 +44,54 @@ from tools import space_analyzer as space_analyzer_tool
 from tools import pdf_merger as pdf_merger_tool
 from tools import model_converter as model_converter_tool
 from tools import document_converter as document_converter_tool
+from tools import subtitle_generator as subtitle_generator_tool
+from tools.subtitle_generator import build_srt as _build_srt, srt_time as _srt_time
+from tools import document_analytics as document_analytics_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
+
+# ── Sound-effect normaliser ───────────────────────────────────────────────────
+# Whisper sometimes produces bracket-notation for non-speech sounds.
+# Map them to friendly SRT markers; drop noise-only annotations entirely.
+
+_SFX_MAP: list[tuple[re.Pattern, str]] = [
+    (re.compile(r'\[(?:laughing|laughter|laugh|laughs?|giggling|giggles?)\]', re.I), '*laughs*'),
+    (re.compile(r'\[(?:applause|clapping|claps?)\]', re.I), '*applause*'),
+    (re.compile(r'\[(?:cheering|cheers?|crowd cheering)\]', re.I), '*cheering*'),
+    (re.compile(r'\[(?:music|musical?|background music)\]', re.I), '*music*'),
+    (re.compile(r'\[(?:sighs?|sighing)\]', re.I), '*sighs*'),
+    (re.compile(r'\[(?:gasps?|gasping)\]', re.I), '*gasps*'),
+    (re.compile(r'\[(?:crying|cries|sobs?|sobbing|weeping)\]', re.I), '*cries*'),
+    (re.compile(r'\[(?:whistling?|whistle)\]', re.I), '*whistles*'),
+    (re.compile(r'\[(?:coughing?|coughs?)\]', re.I), '*coughs*'),
+    # Drop pure noise/silence/inaudible annotations
+    (re.compile(r'\[(?:noise|background noise|ambient|silence|inaudible|unintelligible|(?:speaking )?foreign (?:language|speech))\]', re.I), ''),
+]
+
+# Matches segments that are almost entirely laugh vocalisations ("ha ha ha", "heh heh", etc.)
+_LAUGH_NOISE_RE = re.compile(
+    r'^[\s,!\.\-]*((?:ha|hah|haha|heh|hee|ah|aha|lol)[\s,!\.\-]*){3,}[\s,!\.\-]*$',
+    re.I,
+)
+
+
+def _normalize_sfx(chunks: list[dict]) -> list[dict]:
+    """Replace/remove Whisper sound-effect tokens; tag laugh-noise segments."""
+    out: list[dict] = []
+    for seg in chunks:
+        text = seg.get("text", "").strip()
+        if not text:
+            continue
+        for pattern, replacement in _SFX_MAP:
+            text = pattern.sub(replacement, text).strip()
+        if not text:
+            continue
+        if _LAUGH_NOISE_RE.match(text):
+            text = "*laughs*"
+        out.append({**seg, "text": text})
+    return out
+
 
 tools_bp = Blueprint("tools", __name__)
 
@@ -83,6 +129,8 @@ _TOOLS: dict[str, object] = {
     "pdf_merger": pdf_merger_tool,
     "model_converter": model_converter_tool,
     "document_converter": document_converter_tool,
+    "subtitle_generator": subtitle_generator_tool,
+    "document_analytics": document_analytics_tool,
 }
 
 
@@ -1050,6 +1098,262 @@ def audio_transcriber_stream():
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@tools_bp.post("/subtitle-generator/stream")
+def subtitle_generator_stream():
+    """
+    SSE endpoint: extract audio from a video, transcribe with Whisper (timestamps),
+    optionally translate each segment, then produce and save an SRT subtitle file.
+
+    Body: {
+        "videoPath": "C:/...",
+        "sourceLanguage": "auto" | "en" | "ro" | ...,
+        "translateTo": "" | "en" | "fr" | ...,
+        "outputMode": "copy" | "virtual_drive",
+        "outputPath": "C:/..."
+    }
+    Stream: SSE events:
+        {stage, message, progress}
+        done → {stage:"done", srtPath, srtContent, numSegments, metrics}
+    """
+    import subprocess
+    import tempfile
+    import requests as _req
+
+    try:
+        import imageio_ffmpeg
+        _ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        _ffmpeg_exe = "ffmpeg"
+
+    data = request.get_json(force=True) or {}
+    video_path: str = data.get("videoPath", "")
+    source_language: str | None = data.get("sourceLanguage") or None
+    if source_language == "auto":
+        source_language = None
+    translate_to: str = data.get("translateTo", "").strip()
+    output_mode: str = data.get("outputMode", "copy")
+    output_path: str = data.get("outputPath", "")
+
+    def _err_event(msg: str) -> str:
+        return f'data: {json.dumps({"stage": "error", "message": msg})}\n\n'
+
+    def _evt(payload: dict) -> str:
+        return f"data: {json.dumps(payload)}\n\n"
+
+    if not video_path or not os.path.isfile(video_path):
+        def _e():
+            yield _err_event("Video file not found or invalid path")
+        return Response(stream_with_context(_e()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    video_extensions = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v", ".mpeg", ".mpg"}
+    ext = os.path.splitext(video_path)[1].lower()
+    if ext not in video_extensions:
+        def _e():
+            yield _err_event(f"Unsupported video format: {ext}")
+        return Response(stream_with_context(_e()), mimetype="text/event-stream",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    filename = os.path.basename(video_path)
+    dir_path = os.path.dirname(video_path)
+    base_name = os.path.splitext(filename)[0]
+
+    def _generate():
+        tmp_audio = None
+        try:
+            # ── Extract audio ─────────────────────────────────────────────
+            yield _evt({"stage": "extracting_audio", "message": "Extracting audio from video...", "progress": 0.05})
+            tmp_audio = tempfile.mktemp(suffix=".wav")
+            try:
+                result = subprocess.run(
+                    [_ffmpeg_exe, "-y", "-i", video_path,
+                     "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+                     tmp_audio],
+                    capture_output=True, text=True, timeout=300,
+                )
+                if result.returncode != 0 or not os.path.isfile(tmp_audio):
+                    yield _err_event(f"FFmpeg audio extraction failed: {result.stderr[-400:]}")
+                    return
+            except subprocess.TimeoutExpired:
+                yield _err_event("Audio extraction timed out (5 min limit).")
+                return
+            except FileNotFoundError:
+                yield _err_event("FFmpeg not found. Install FFmpeg and make sure it is in PATH.")
+                return
+
+            try:
+                with open(tmp_audio, "rb") as fh:
+                    audio_bytes = fh.read()
+            except Exception as exc:
+                yield _err_event(f"Cannot read extracted audio: {exc}")
+                return
+
+            # ── Send to AI Gateway ─────────────────────────────────────────
+            yield _evt({"stage": "loading_model", "message": "Connecting to AI Gateway...", "progress": 0.1})
+
+            form_data: dict = {}
+            if source_language:
+                form_data["language"] = source_language
+
+            try:
+                resp = _req.post(
+                    f"{_AI_GATEWAY_BASE}/api/ai/subtitle/whisper/stream",
+                    files={"file": ("audio.wav", audio_bytes, "audio/wav")},
+                    data=form_data,
+                    stream=True,
+                    timeout=(10, 1800),
+                )
+            except _req.exceptions.ConnectionError:
+                yield _err_event("AI Gateway is not running. Start the Server (port 8000) first.")
+                return
+            except Exception as exc:
+                yield _err_event(str(exc))
+                return
+
+            # ── Proxy SSE from AI Gateway until "done" ─────────────────────
+            chunks_result: list[dict] | None = None
+            gw_metrics: dict = {}
+
+            buf = b""
+            for chunk in resp.iter_content(chunk_size=None):
+                if not chunk:
+                    continue
+                buf += chunk
+                while b"\n\n" in buf:
+                    evt_raw, buf = buf.split(b"\n\n", 1)
+                    evt_text = evt_raw.decode("utf-8", errors="replace")
+                    for line in evt_text.split("\n"):
+                        if not line.startswith("data: "):
+                            continue
+                        json_str = line[6:]
+                        try:
+                            evt = json.loads(json_str)
+                        except Exception:
+                            continue
+
+                        if evt.get("stage") == "done":
+                            chunks_result = evt.get("chunks", [])
+                            gw_metrics = evt.get("metrics", {})
+                        elif evt.get("stage") == "error":
+                            yield _err_event(evt.get("message", "AI Gateway error"))
+                            return
+                        else:
+                            # re-scale progress to leave room for translate + save steps
+                            raw_pct = evt.get("progress", 0)
+                            scaled_pct = 0.1 + raw_pct * 0.7  # 0.1 → 0.8
+                            yield _evt({**evt, "progress": round(scaled_pct, 3)})
+
+            if chunks_result is None:
+                yield _err_event("No response from AI Gateway.")
+                return
+
+            # ── Normalise sound effects ────────────────────────────────────
+            chunks_result = _normalize_sfx(chunks_result)
+
+            # ── Translation (optional) ─────────────────────────────────────
+            final_chunks = chunks_result
+            if translate_to and chunks_result:
+                yield _evt({
+                    "stage": "translating",
+                    "message": f"Translating {len(chunks_result)} segments to {translate_to}...",
+                    "progress": 0.82,
+                })
+                try:
+                    from deep_translator import GoogleTranslator
+                    translator = GoogleTranslator(source="auto", target=translate_to)
+                    translated: list[dict] = []
+                    for seg in chunks_result:
+                        text = seg.get("text", "").strip()
+                        # Keep sound-effect markers as-is — don't translate *laughs* etc.
+                        if re.match(r'^\*[^*]+\*$', text):
+                            translated.append({**seg, "text": text})
+                            continue
+                        try:
+                            t = translator.translate(text) if text else text
+                        except Exception:
+                            t = text
+                        translated.append({**seg, "text": t or text})
+                    final_chunks = translated
+                except ImportError:
+                    yield _evt({
+                        "stage": "translating",
+                        "message": "deep-translator not installed — skipping translation.",
+                        "progress": 0.83,
+                    })
+                except Exception as exc:
+                    yield _evt({
+                        "stage": "translating",
+                        "message": f"Translation failed ({exc}) — keeping original language.",
+                        "progress": 0.83,
+                    })
+
+            # ── Generate SRT ───────────────────────────────────────────────
+            yield _evt({"stage": "generating_srt", "message": "Building SRT file...", "progress": 0.92})
+
+            srt_content = _build_srt(final_chunks)
+
+            # ── Save SRT ───────────────────────────────────────────────────
+            if output_mode == "virtual_drive" and output_path:
+                out_dir = os.path.join(output_path, "SubtitleResults")
+                os.makedirs(out_dir, exist_ok=True)
+            else:
+                out_dir = dir_path
+
+            srt_filename = f"{base_name}.srt"
+            srt_path = os.path.join(out_dir, srt_filename)
+            with open(srt_path, "w", encoding="utf-8") as fh:
+                fh.write(srt_content)
+
+            yield _evt({
+                "stage": "done",
+                "progress": 1.0,
+                "srtPath": srt_path,
+                "srtContent": srt_content,
+                "numSegments": len(final_chunks),
+                "metrics": gw_metrics,
+            })
+
+        except Exception as exc:
+            logger.exception("Subtitle generator stream error")
+            yield _err_event(str(exc))
+        finally:
+            if tmp_audio and os.path.isfile(tmp_audio):
+                try:
+                    os.remove(tmp_audio)
+                except Exception:
+                    pass
+
+    return Response(
+        stream_with_context(_generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@tools_bp.post("/document-analytics/run")
+def document_analytics_run():
+    """
+    Analyze a document file and return statistics + LLM insights.
+
+    Body: {
+        "filePath": "C:/path/to/document.pdf",
+        "includeLLM": true
+    }
+    Response: { success, stats, llm_insights, text_preview, file_name, file_size, file_ext }
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    try:
+        raw = document_analytics_tool.execute(data)
+        result = json.loads(raw)
+        return jsonify(result)
+    except Exception as exc:
+        logger.exception("Document analytics failed")
+        return jsonify({"error": str(exc)}), 500
 
 
 @tools_bp.get("/created-drives")

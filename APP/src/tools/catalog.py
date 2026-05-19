@@ -444,6 +444,63 @@ TOOLS: list[dict] = [
     # ── VIDEO ─────────────────────────────────────────────────────────────
 
     {
+        "id": "subtitle-generator",
+        "name": "Subtitle Generator",
+        "version": "1.0.0",
+        "description": "Generate SRT subtitle files from video using Whisper AI, with optional translation.",
+        "longDescription": (
+            "Subtitle Generator extracts audio from any video file, transcribes it with "
+            "Whisper Large V3 (with word-level timestamps), and produces a ready-to-use SRT file "
+            "that VLC, MPC-HC, and other media players can load. "
+            "You can optionally translate the subtitles into another language using Google Translate. "
+            "All transcription runs locally on the AI Gateway; translation uses the free Google Translate API."
+        ),
+        "categories": ["video", "audio"],
+        "fileExtensions": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v"],
+        "usesAI": True,
+        "icon": "Subtitles",
+        "accentColor": "rose",
+        "author": "AI Labs",
+        "fields": [
+            {
+                "key": "videoFile",
+                "label": "Video File",
+                "type": "file",
+                "description": "The video file to generate subtitles for.",
+                "required": True,
+                "acceptedExtensions": [".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v"],
+            },
+            {
+                "key": "sourceLanguage",
+                "label": "Video Language",
+                "type": "select",
+                "description": "Spoken language in the video. Use 'auto' to let Whisper detect it.",
+                "required": False,
+                "options": ["auto", "en", "ro", "fr", "de", "es", "it", "pt", "nl", "ru", "ja", "zh", "ko", "ar", "tr", "pl"],
+                "default": "auto",
+            },
+            {
+                "key": "translateTo",
+                "label": "Translate To",
+                "type": "select",
+                "description": "Target language for translation. Leave empty to keep the original language.",
+                "required": False,
+                "options": ["", "en", "ro", "fr", "de", "es", "it", "pt", "nl", "ru", "ja", "zh-CN", "ko", "ar", "tr", "pl"],
+                "default": "",
+            },
+        ],
+        "usageSteps": [
+            "Click \"Run Tool\" to open the Subtitle Generator.",
+            "Select the video file you want to subtitle.",
+            "Choose the spoken language or leave on auto-detect.",
+            "Optionally pick a translation language to get translated subtitles.",
+            "Click Generate — Whisper will transcribe with timestamps.",
+            "Download the .srt file and load it in VLC or any video player.",
+        ],
+        "tags": ["subtitle", "srt", "whisper", "AI", "transcribe", "translate", "video", "captions"],
+    },
+
+    {
         "id": "video-compressor",
         "name": "Video Compressor",
         "version": "1.3.0",
@@ -697,6 +754,55 @@ TOOLS: list[dict] = [
             "Choose an output mode and review the results.",
         ],
         "tags": ["pdf", "merge", "combine", "split", "cut", "extract", "convert", "word", "docx", "reorder", "pages", "documents"],
+    },
+
+    {
+        "id": "document-analytics",
+        "name": "Document Analytics",
+        "version": "1.0.0",
+        "description": "Analyze any document for word count, readability, keywords, and AI-powered insights.",
+        "longDescription": (
+            "Document Analytics extracts text from PDF, DOCX, TXT, Markdown, and HTML files and "
+            "computes a comprehensive set of statistics: word count, sentence and paragraph count, "
+            "unique words, reading time, estimated page count, average sentence length, top keywords, "
+            "and Flesch-Kincaid readability score. "
+            "It also sends an excerpt to the Groq LLM (the same model used by the planning agent) "
+            "to generate a concise summary, identify main topics, classify writing tone, and extract "
+            "key named entities. Works on single pages or full books."
+        ),
+        "categories": ["documents"],
+        "fileExtensions": [".pdf", ".docx", ".txt", ".md", ".html", ".htm"],
+        "usesAI": True,
+        "icon": "BarChart2",
+        "accentColor": "amber",
+        "author": "AI Labs",
+        "fields": [
+            {
+                "key": "filePath",
+                "label": "Document File",
+                "type": "file",
+                "description": "The document to analyze.",
+                "required": True,
+                "acceptedExtensions": [".pdf", ".docx", ".txt", ".md", ".html", ".htm"],
+            },
+            {
+                "key": "includeLLM",
+                "label": "AI Insights",
+                "type": "boolean",
+                "description": "Use the Groq LLM to generate a summary, topics, tone, and key entities.",
+                "required": False,
+                "default": True,
+            },
+        ],
+        "usageSteps": [
+            "Click 'Run Tool' to open the Document Analytics page.",
+            "Browse and select a PDF, DOCX, TXT, Markdown, or HTML file.",
+            "Toggle 'AI Insights' to include an LLM-generated summary (requires AI Gateway on port 8000).",
+            "Click 'Analyze' — local stats appear instantly; AI insights take a few seconds.",
+            "Review word count, readability score, top keywords, and the AI summary.",
+            "Copy the report or use individual metric values as needed.",
+        ],
+        "tags": ["analytics", "document", "readability", "word count", "keywords", "summary", "AI", "pdf", "docx"],
     },
 
     {

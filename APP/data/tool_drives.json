@@ -43,5 +43,10 @@
     "path": "D:\\DProjects\\licentaFiles\\DocConvertResults",
     "name": "DocConvertResults",
     "tool": "document_converter"
+  },
+  {
+    "path": "D:\\DProjects\\Drives\\RemovedBackgrounds\\RemovedBackgrounds",
+    "name": "RemovedBackgrounds",
+    "tool": "remove_background"
   }
 ]

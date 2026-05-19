@@ -4,8 +4,8 @@ import {
     Cpu, X, Search, RefreshCw, AlertCircle,
     Zap, Image, Music, Video, FileText, Archive, Box, Code,
     Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
-    AudioWaveform, Clapperboard, PenTool, ImageOff, ChevronRight,
-    LayoutGrid, List,
+    AudioWaveform, Clapperboard, PenTool, ImageOff, BarChart2,
+    LayoutGrid, List, Play, FolderTree, PieChart,
 } from 'lucide-react';
 import type { CategoryKey, CategoryMeta, ToolDefinition } from '../data/tools';
 import { useToolsCatalog } from '../hooks/useToolsCatalog';
@@ -14,7 +14,8 @@ import { useToolsCatalog } from '../hooks/useToolsCatalog';
 const ICON_MAP: Record<string, React.ElementType> = {
     Image, Music, Video, FileText, Archive, Box, Code,
     Zap, Sparkles, Mic, Film, BrainCircuit, Table, ScanSearch,
-    AudioWaveform, Clapperboard, PenTool, ImageOff,
+    AudioWaveform, Clapperboard, PenTool, ImageOff, BarChart2,
+    FolderTree, PieChart,
 };
 
 function ToolIcon({ name, size = 20 }: { name: string; size?: number }) {
@@ -51,18 +52,22 @@ function token(color: string): string {
 
 // ── Tool runner routes ────────────────────────────────────────────────────────
 const TOOL_RUNNER_ROUTES: Record<string, string> = {
-    'image-converter':    '/tools/image-converter/run',
-    'remove-background':  '/tools/remove-background/run',
-    'image-to-svg':       '/tools/image-to-svg/run',
-    'video-converter':    '/tools/video-converter/run',
-    'video-compressor':   '/tools/video-compressor/run',
-    'audio-converter':    '/tools/audio-converter/run',
-    '3d-visualizer':      '/tools/3d-visualizer/run',
-    'drive-creator':      '/tools/drive-creator/run',
-    'space-analyzer':     '/tools/space-analyzer/run',
-    'pdf-merger':         '/tools/pdf-merger/run',
-    'model-converter':    '/tools/model-converter/run',
-    'document-converter': '/tools/document-converter/run',
+    'image-converter':      '/tools/image-converter/run',
+    'remove-background':    '/tools/remove-background/run',
+    'image-to-svg':         '/tools/image-to-svg/run',
+    'video-converter':      '/tools/video-converter/run',
+    'video-compressor':     '/tools/video-compressor/run',
+    'audio-converter':      '/tools/audio-converter/run',
+    '3d-visualizer':        '/tools/3d-visualizer/run',
+    'drive-creator':        '/tools/drive-creator/run',
+    'space-analyzer':       '/tools/space-analyzer/run',
+    'pdf-merger':           '/tools/pdf-merger/run',
+    'model-converter':      '/tools/model-converter/run',
+    'document-converter':   '/tools/document-converter/run',
+    'image-enhancer':       '/tools/image-enhancer/run',
+    'audio-transcriber':    '/tools/audio-transcriber/run',
+    'subtitle-generator':   '/tools/subtitle-generator/run',
+    'document-analytics':   '/tools/document-analytics/run',
 };
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -71,11 +76,11 @@ function SkeletonCard() {
         <div style={{
             padding: 16, borderRadius: 'var(--r-card)',
             background: 'var(--surface)', border: '1px solid var(--border)',
-            display: 'flex', flexDirection: 'column', gap: 12,
+            display: 'flex', flexDirection: 'column', gap: 10,
         }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--surface-2)', flexShrink: 0 }} />
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ height: 12, background: 'var(--surface-2)', borderRadius: 4, width: '55%' }} />
                     <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 4, width: '90%' }} />
                     <div style={{ height: 10, background: 'var(--surface-2)', borderRadius: 4, width: '70%' }} />
@@ -85,7 +90,7 @@ function SkeletonCard() {
                 <div style={{ height: 20, width: 34, background: 'var(--surface-2)', borderRadius: 'var(--r-pill)' }} />
                 <div style={{ height: 20, width: 48, background: 'var(--surface-2)', borderRadius: 'var(--r-pill)' }} />
             </div>
-            <div style={{ height: 32, background: 'var(--surface-2)', borderRadius: 'var(--r-control)' }} />
+            <div style={{ height: 34, background: 'var(--surface-2)', borderRadius: 'var(--r-control)' }} />
         </div>
     );
 }
@@ -94,12 +99,14 @@ function SkeletonCard() {
 function ToolCard({ tool }: { tool: ToolDefinition }) {
     const t = token(tool.accentColor);
     const runRoute = TOOL_RUNNER_ROUTES[tool.id];
+    const docsRoute = `/tools/${tool.id}`;
+    const useRoute = runRoute ?? docsRoute;
 
     return (
         <div className="hover-card" style={{
             padding: 16, borderRadius: 'var(--r-card)',
             background: 'var(--surface)', border: '1px solid var(--border)',
-            display: 'flex', flexDirection: 'column', gap: 12,
+            display: 'flex', flexDirection: 'column', gap: 10,
         }}>
             {/* Header */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -111,17 +118,17 @@ function ToolCard({ tool }: { tool: ToolDefinition }) {
                     <ToolIcon name={tool.icon} size={20} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                        <h3 style={{ margin: 0, fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <Link to={docsRoute} className="tool-title-link" style={{ flex: 1, minWidth: 0 }}>
                             {tool.name}
-                        </h3>
+                        </Link>
                         {tool.usesAI && (
                             <span className="pill pill-ai" style={{ fontSize: 10, padding: '2px 6px', flexShrink: 0 }}>
                                 <Cpu style={{ width: 9, height: 9 }} /> AI
                             </span>
                         )}
                     </div>
-                    <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
+                    <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.45, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' } as React.CSSProperties}>
                         {tool.description}
                     </p>
                 </div>
@@ -139,21 +146,13 @@ function ToolCard({ tool }: { tool: ToolDefinition }) {
                 </div>
             )}
 
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: 7, marginTop: 'auto' }}>
-                <Link to={`/tools/${tool.id}`} style={{ textDecoration: 'none', flex: runRoute ? 0 : 1 }}>
-                    <button className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center', fontSize: 12.5, padding: '7px 12px' }}>
-                        Details
-                    </button>
-                </Link>
-                {runRoute && (
-                    <Link to={runRoute} style={{ textDecoration: 'none', flex: 1 }}>
-                        <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: 12.5, padding: '7px 12px' }}>
-                            Open <ChevronRight style={{ width: 12, height: 12 }} />
-                        </button>
-                    </Link>
-                )}
-            </div>
+            {/* Use Tool — always visible */}
+            <Link to={useRoute} style={{ textDecoration: 'none', marginTop: 'auto' }}>
+                <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', fontSize: 12.5, padding: '8px 12px', gap: 6 }}>
+                    <Play style={{ width: 11, height: 11, fill: 'currentColor' }} />
+                    Use Tool
+                </button>
+            </Link>
         </div>
     );
 }

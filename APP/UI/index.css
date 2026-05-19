@@ -230,7 +230,25 @@ input, textarea { font: inherit; color: inherit; }
 .no-drag     { -webkit-app-region: no-drag; }
 
 .hover-card { transition: all .18s var(--ease); }
-.hover-card:hover { border-color: var(--border-2) !important; }
+.hover-card:hover { border-color: var(--border-2) !important; box-shadow: var(--shadow-sm); }
+
+.tool-title-link {
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  transition: color .15s var(--ease);
+}
+.tool-title-link:hover {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
 
 /* Tile (colored icon square) color map */
 .tile-clay  { background: var(--c-clay-bg);  color: var(--c-clay);  }

@@ -114,12 +114,25 @@ Produce ONLY valid JSON (no markdown, no prose):
 
 FOLLOW-UP RECOGNITION — read the conversation history carefully:
 - If a previous tool call SUCCEEDED and the user is asking about that data
-  ("how many?", "what was the first one?", "summarize it"), answer with a
-  single "llm" step — do NOT re-call the tool.
+  ("how many?", "what was the first one?", "summarize it", "mulțumesc", "câte"),
+  answer with a single "llm" step — do NOT re-call the tool again.
+  Example: user asked to list files → assistant returned the list → user asks
+  "how many files?" → use a single "llm" step counting from the existing list.
 - If a previous tool call FAILED and the user is asking about that data,
   answer with a single "llm" step explaining the failure — do NOT retry
   the tool unless the user explicitly asks you to try again.
 - "Thank you", "ok", "got it", greetings → single "llm" step, always.
+
+PROACTIVE TOOL USE — take action, do not ask for clarification when:
+- The user's request explicitly mentions an operation AND the drive tools can
+  fulfill it (list, read, move, create, delete).
+  Example: "listează fișierele și citește raportul Q1" →
+    step 1: list_files (folder="") to find files,
+    step 2: read_file using the filename that matches "raport Q1" (e.g. "raport_Q1.pdf"),
+    step 3: llm to summarize extracted data.
+  Do NOT ask the user for a path you can discover by listing files first.
+- When a filename is mentioned but the path is unknown, list files first to
+  locate it, then read it — never ask the user to specify paths you can find.
 
 RULES:
 - Default to a single "llm" step for conversational or knowledge requests.
@@ -144,6 +157,8 @@ Your assignment for this step: {prompt}
 Be focused and concise — only address this step, not the whole task.
 Use markdown formatting: **bold** for emphasis, bullet lists for multiple items, \
 `code` for file paths or technical values.
+IMPORTANT: Do NOT call any tools — this is a text-reasoning step only. \
+Answer in plain text or markdown.
 """
 
 _SYNTHESIZER_SYSTEM = """\
@@ -159,6 +174,7 @@ Write a clear, direct final answer for the user. Incorporate the results natural
 Do not list step numbers or raw JSON — just answer the question.
 Use markdown formatting: **bold** for emphasis, bullet lists for multiple items, \
 `code` for file paths or technical values, headers (##) only for long structured answers.
+IMPORTANT: Do NOT call any tools — write the final answer directly in plain text or markdown.
 """
 
 # ---------------------------------------------------------------------------
@@ -259,20 +275,50 @@ async def _stream_llm_step(
         task=task, past_steps=past_str, prompt=full_prompt
     )
 
-    stream = await client.chat.completions.create(
+    llm_kwargs: dict[str, Any] = dict(
         model=settings.GROQ_MODEL,
         messages=[{"role": "system", "content": system}, *history[-6:]],
         temperature=1,
         max_completion_tokens=1024,
         top_p=1,
         reasoning_effort="medium",
-        stream=True,
         stop=None,
     )
-    async for chunk in stream:
-        delta = chunk.choices[0].delta.content
-        if delta:
-            yield delta
+    stream = await client.chat.completions.create(**llm_kwargs, stream=True)
+    try:
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+        return
+    except Exception as exc:
+        if "tool" not in str(exc).lower():
+            raise
+        logger.warning("LLM step: model attempted tool call during streaming — retrying without stream")
+
+    try:
+        resp = await client.chat.completions.create(**llm_kwargs, stream=False)
+        content = resp.choices[0].message.content or ""
+        if content:
+            yield content
+            return
+    except Exception as exc2:
+        if "tool" not in str(exc2).lower():
+            raise
+        logger.warning("LLM step: non-stream also triggered tool call — retrying with anti-tool instruction")
+
+    # Last resort: inject an explicit user message forbidding tool calls
+    anti_tool_msgs = list(llm_kwargs["messages"]) + [
+        {"role": "user", "content": "CRITICAL: Do NOT call any tool. Answer in plain text only."}
+    ]
+    resp2 = await client.chat.completions.create(
+        **{k: v for k, v in llm_kwargs.items() if k != "messages"},
+        messages=anti_tool_msgs,
+        stream=False,
+    )
+    content = resp2.choices[0].message.content or ""
+    if content:
+        yield content
 
 
 async def _stream_synthesize(
@@ -287,24 +333,58 @@ async def _stream_synthesize(
     )
     system = _SYNTHESIZER_SYSTEM.format(task=task, step_results=results_str)
 
-    stream = await client.chat.completions.create(
+    messages = [
+        {"role": "system", "content": system},
+        *history[-6:],
+        {"role": "user", "content": task},
+    ]
+    base_kwargs: dict[str, Any] = dict(
         model=settings.GROQ_MODEL,
-        messages=[
-            {"role": "system", "content": system},
-            *history[-6:],
-            {"role": "user", "content": task},
-        ],
+        messages=messages,
         temperature=1,
         max_completion_tokens=2048,
         top_p=1,
         reasoning_effort="medium",
-        stream=True,
         stop=None,
     )
-    async for chunk in stream:
-        delta = chunk.choices[0].delta.content
-        if delta:
-            yield delta
+
+    # Try streaming; fall back to non-streaming if the model emits a tool call
+    # (Groq raises "Tool choice is none, but model called a tool" in that case).
+    stream = await client.chat.completions.create(**base_kwargs, stream=True)
+    try:
+        async for chunk in stream:
+            delta = chunk.choices[0].delta.content
+            if delta:
+                yield delta
+        return
+    except Exception as exc:
+        if "tool" not in str(exc).lower():
+            raise
+        logger.warning("Synthesizer: model attempted tool call during streaming — retrying without stream")
+
+    # Fallback: non-streaming call avoids the tool-call streaming error
+    try:
+        resp = await client.chat.completions.create(**base_kwargs, stream=False)
+        content = resp.choices[0].message.content or ""
+        if content:
+            yield content
+            return
+    except Exception as exc2:
+        if "tool" not in str(exc2).lower():
+            raise
+        logger.warning("Synthesizer: non-stream also triggered tool call — retrying with anti-tool instruction")
+
+    anti_tool_msgs = list(base_kwargs["messages"]) + [
+        {"role": "user", "content": "CRITICAL: Do NOT call any tool. Write the final answer in plain text only."}
+    ]
+    resp2 = await client.chat.completions.create(
+        **{k: v for k, v in base_kwargs.items() if k != "messages"},
+        messages=anti_tool_msgs,
+        stream=False,
+    )
+    content = resp2.choices[0].message.content or ""
+    if content:
+        yield content
 
 
 async def _call_tool(tool: dict, input_data: dict) -> str:

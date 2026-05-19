@@ -18,6 +18,7 @@ import base64
 import io
 import json as _json
 import logging
+import os
 from typing import Any
 
 import numpy as np
@@ -27,6 +28,7 @@ from pydantic import BaseModel
 from PIL import Image
 
 from .models import Swin2SRModel, WhisperModel
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +345,215 @@ async def transcribe_whisper_stream(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ---------- Whisper — subtitle SSE (with timestamps) ----------
+
+
+@router.post("/subtitle/whisper/stream")
+async def subtitle_whisper_stream(
+    file: UploadFile = File(..., description="Audio file extracted from video (WAV, MP3, etc.)"),
+    language: str = Form(None, description="ISO-639 source language code. None = auto"),
+    max_new_tokens: int = Form(444, ge=16, le=444),
+):
+    """Transcribe audio with timestamps for SRT subtitle generation, streaming SSE progress.
+
+    Events::
+
+        data: {"stage":"loading_model","message":"...","progress":0.05}
+        data: {"stage":"inference",    "message":"...","progress":0.4}
+        data: {"stage":"done","progress":1.0,"chunks":[{"text":"...","start":0.0,"end":2.5},...], "metrics":{...}}
+        data: {"stage":"error","message":"..."}
+    """
+    audio_array, sample_rate = await _read_upload_as_audio(file)
+
+    async def _gen():
+        def _evt(data: dict) -> str:
+            return f"data: {_json.dumps(data)}\n\n"
+
+        already_loaded = _whisper.model_info.is_loaded
+        if already_loaded:
+            yield _evt({"stage": "loading_model", "message": "Whisper already loaded — preprocessing audio...", "progress": 0.25})
+        else:
+            yield _evt({"stage": "loading_model", "message": "Loading Whisper Large V3 (~3 GB, first run ~3 min)...", "progress": 0.05})
+
+        try:
+            await _whisper.ensure_loaded()
+        except Exception as exc:
+            yield _evt({"stage": "error", "message": f"Failed to load model: {exc}"})
+            return
+
+        duration_s = len(audio_array) / sample_rate
+        if not already_loaded:
+            yield _evt({"stage": "loading_model", "message": f"Whisper ready — audio: {duration_s:.1f} s", "progress": 0.3})
+
+        _wdev = _whisper.model_info.device
+        _note = " (CPU — may take several minutes)" if _wdev == "cpu" else f" on {_wdev}"
+        yield _evt({"stage": "inference", "message": f"Transcribing {duration_s:.1f} s of audio with timestamps{_note}...", "progress": 0.4})
+
+        try:
+            result = await _whisper.process_with_timestamps(
+                audio=audio_array,
+                sample_rate=sample_rate,
+                language=language or None,
+                max_new_tokens=max_new_tokens,
+            )
+        except Exception as exc:
+            yield _evt({"stage": "error", "message": f"Transcription failed: {exc}"})
+            return
+
+        yield _evt({
+            "stage": "done",
+            "progress": 1.0,
+            "chunks": result["chunks"],
+            "metrics": result["metrics"],
+        })
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ── LLM Gateway (Groq — same model as planning agent) ────────────────────────
+
+
+class LLMRequest(BaseModel):
+    prompt: str
+    system: str | None = None
+    temperature: float = 0.7
+    max_output_tokens: int = 2048
+
+
+class LLMResponse(BaseModel):
+    text: str
+    model: str
+    latency_s: float
+
+
+def _groq_api_key() -> str:
+    """Resolve the Groq API key — settings first, then KEY env var (same as planning agent)."""
+    return settings.GROQ_API_KEY or os.environ.get("KEY", "")
+
+
+def _get_groq_client():
+    from groq import AsyncGroq
+    api_key = _groq_api_key()
+    if not api_key:
+        raise RuntimeError("No Groq API key found. Set GROQ_API_KEY (or KEY) in .env")
+    return AsyncGroq(api_key=api_key)
+
+
+@router.get("/llm/status")
+async def llm_status():
+    """Return whether the Groq LLM is reachable (API key configured)."""
+    api_key = _groq_api_key()
+    configured = bool(api_key)
+    return {
+        "configured": configured,
+        "model": settings.GROQ_MODEL,
+        "detail": "Groq API key is set" if configured else "No API key found (set GROQ_API_KEY or KEY in .env)",
+    }
+
+
+@router.post("/llm/generate", response_model=LLMResponse)
+async def llm_generate(body: LLMRequest):
+    """Send a prompt to the Groq LLM and return the full text response.
+
+    Uses the same model (``settings.GROQ_MODEL``) and API key the planning
+    agent uses, so no extra credentials are needed.
+
+    Body
+    ----
+    prompt : str
+        The user prompt.
+    system : str | None
+        Optional system / instruction prefix.
+    temperature : float
+        Sampling temperature (default 0.7).
+    max_output_tokens : int
+        Maximum tokens in the reply (default 2048).
+    """
+    import time
+
+    try:
+        client = _get_groq_client()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    messages: list[dict] = []
+    if body.system:
+        messages.append({"role": "system", "content": body.system})
+    messages.append({"role": "user", "content": body.prompt})
+
+    t0 = time.perf_counter()
+    try:
+        resp = await client.chat.completions.create(
+            model=settings.GROQ_MODEL,
+            messages=messages,
+            temperature=body.temperature,
+            max_completion_tokens=body.max_output_tokens,
+            stream=False,
+        )
+    except Exception as exc:
+        logger.exception("LLM generate failed")
+        raise HTTPException(status_code=500, detail=f"LLM error: {exc}")
+    latency = round(time.perf_counter() - t0, 3)
+
+    text = resp.choices[0].message.content or ""
+    return LLMResponse(text=text, model=settings.GROQ_MODEL, latency_s=latency)
+
+
+@router.post("/llm/stream")
+async def llm_stream(body: LLMRequest):
+    """Stream a Groq LLM response token-by-token via Server-Sent Events.
+
+    Events emitted::
+
+        data: {"stage":"token",  "text":"<new token>", "accumulated":"<full so far>"}
+        data: {"stage":"done",   "text":"<full reply>", "model":"...", "latency_s":0.5}
+        data: {"stage":"error",  "message":"..."}
+    """
+    import time
+
+    try:
+        client = _get_groq_client()
+    except RuntimeError as exc:
+        async def _err():
+            yield f'data: {_json.dumps({"stage": "error", "message": str(exc)})}\n\n'
+        return StreamingResponse(_err(), media_type="text/event-stream",
+                                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    messages: list[dict] = []
+    if body.system:
+        messages.append({"role": "system", "content": body.system})
+    messages.append({"role": "user", "content": body.prompt})
+
+    async def _gen():
+        t0 = time.perf_counter()
+        accumulated = ""
+        try:
+            stream = await client.chat.completions.create(
+                model=settings.GROQ_MODEL,
+                messages=messages,
+                temperature=body.temperature,
+                max_completion_tokens=body.max_output_tokens,
+                stream=True,
+            )
+            async for chunk in stream:
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    accumulated += delta
+                    yield f'data: {_json.dumps({"stage": "token", "text": delta, "accumulated": accumulated})}\n\n'
+            latency = round(time.perf_counter() - t0, 3)
+            yield f'data: {_json.dumps({"stage": "done", "text": accumulated, "model": settings.GROQ_MODEL, "latency_s": latency})}\n\n'
+        except Exception as exc:
+            logger.exception("LLM stream failed")
+            yield f'data: {_json.dumps({"stage": "error", "message": str(exc)})}\n\n'
+
+    return StreamingResponse(_gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ── File-reading helpers ──────────────────────────────────────────────────────

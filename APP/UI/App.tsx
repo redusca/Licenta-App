@@ -18,6 +18,8 @@ import { ModelConverterPage } from './pages/ModelConverterPage';
 import { DocumentConverterPage } from './pages/DocumentConverterPage';
 import { ImageEnhancerPage } from './pages/ImageEnhancerPage';
 import { AudioTranscriberPage } from './pages/AudioTranscriberPage';
+import { SubtitleGeneratorPage } from './pages/SubtitleGeneratorPage';
+import { DocumentAnalyticsPage } from './pages/DocumentAnalyticsPage';
 import { Settings } from './pages/SettingsPage';
 
 function App() {
@@ -44,6 +46,8 @@ function App() {
             <Route path="tools/document-converter/run" element={<DocumentConverterPage />} />
             <Route path="tools/image-enhancer/run" element={<ImageEnhancerPage />} />
             <Route path="tools/audio-transcriber/run" element={<AudioTranscriberPage />} />
+            <Route path="tools/subtitle-generator/run" element={<SubtitleGeneratorPage />} />
+            <Route path="tools/document-analytics/run" element={<DocumentAnalyticsPage />} />
             <Route path="tools/:id" element={<ToolDetail />} />
             <Route path="settings" element={<Settings />} />
           </Route>

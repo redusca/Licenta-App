@@ -140,12 +140,82 @@ class WhisperModel(BaseAIModel):
             "audio_peak": round(float(np.max(np.abs(audio))), 6),
         }
 
-        # If ground-truth is provided, compute error rates
         if expected_text:
             metrics["wer"] = round(_word_error_rate(expected_text, transcription), 4)
             metrics["cer"] = round(_char_error_rate(expected_text, transcription), 4)
 
         return {"transcription": transcription, "metrics": metrics}
+
+    async def process_with_timestamps(
+        self,
+        *,
+        audio: np.ndarray,
+        sample_rate: int = TARGET_SAMPLE_RATE,
+        language: str | None = None,
+        max_new_tokens: int = 444,
+    ) -> dict[str, Any]:
+        """Transcribe audio returning timed chunks suitable for subtitle files.
+
+        Returns
+        -------
+        dict with keys:
+            chunks  — list of {"text": str, "start": float, "end": float}
+            metrics — dict of performance numbers
+        """
+        if not self._is_loaded:
+            await self.ensure_loaded()
+
+        def _infer_ts():
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+
+            generate_kwargs: dict[str, Any] = {"max_new_tokens": max_new_tokens}
+            if language:
+                generate_kwargs["language"] = language
+
+            t0 = time.perf_counter()
+            output = self._pipeline(
+                {"array": audio, "sampling_rate": sample_rate},
+                generate_kwargs=generate_kwargs,
+                return_timestamps=True,
+                chunk_length_s=30,   # sliding-window long-form: process full audio
+                stride_length_s=6,   # 6 s overlap so words at boundaries aren't lost
+            )
+            inference_time = time.perf_counter() - t0
+
+            gpu_peak = 0
+            if torch.cuda.is_available():
+                gpu_peak = torch.cuda.max_memory_allocated() / (1024 ** 2)
+
+            raw_chunks = output.get("chunks") or []
+            chunks = []
+            for chunk in raw_chunks:
+                ts = chunk.get("timestamp") or (0.0, 0.0)
+                start = float(ts[0]) if ts[0] is not None else 0.0
+                end = float(ts[1]) if len(ts) > 1 and ts[1] is not None else start + 2.0
+                text = chunk.get("text", "").strip()
+                if text:
+                    chunks.append({"text": text, "start": round(start, 3), "end": round(end, 3)})
+
+            return chunks, inference_time, gpu_peak
+
+        chunks, inference_time, gpu_peak = await asyncio.to_thread(_infer_ts)
+
+        duration_s = len(audio) / sample_rate
+        rtf = inference_time / duration_s if duration_s > 0 else 0
+
+        metrics: dict[str, Any] = {
+            "inference_time_s": round(inference_time, 4),
+            "audio_duration_s": round(duration_s, 2),
+            "rtf": round(rtf, 4),
+            "num_chunks": len(chunks),
+            "gpu_peak_mb": round(gpu_peak, 1),
+            "device": self._device,
+        }
+
+        return {"chunks": chunks, "metrics": metrics}
 
     async def unload(self) -> None:
         del self._pipeline
