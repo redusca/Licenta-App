@@ -265,3 +265,4 @@ APP/data/agent_config.json
 /test_modele_ai/output_whisper
 /test_modele_ai/dataset
 /design
+*.tex

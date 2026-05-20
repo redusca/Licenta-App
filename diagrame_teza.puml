@@ -1,0 +1,580 @@
+@startuml
+' ============================================================
+'  TOATE DIAGRAMELE TEZEI — Capitol 7
+'  Platformă recomandată: https://plantuml.com/plantuml
+'  VSCode: extensia "PlantUML" (jebbs.plantuml)
+'
+'  Fiecare diagramă e delimitată de @startuml / @enduml
+'  Salvează fiecare bloc separat dacă vrei PNG individual.
+'  Denumire fișiere PNG pt LaTeX (folder figures/):
+'    uc1_autentificare.png
+'    uc2_gateway_ai.png
+'    uc3_agent.png
+'    component_diagram.png
+'    deploy_current.png
+'    deploy_gce.png
+'    class_orm.png
+'    class_ai_gateway.png
+'    class_agent.png
+'    seq_auth.png
+'    seq_react.png
+'    seq_planning.png
+' ============================================================
+@enduml
+
+
+' ============================================================
+' 1. USE CASE — UC-1: Autentificare și gestionare cont
+'    Fișier: figures/uc1_autentificare.png
+'    Referit în teză: \ref{fig:uc1}
+' ============================================================
+@startuml uc1_autentificare
+!theme plain
+skinparam actorStyle awesome
+left to right direction
+
+actor "Utilizator" as U
+
+rectangle "Server — Autentificare și gestionare cont" {
+  usecase "Înregistrare (CF-01)" as UC1
+  usecase "Autentificare (CF-02)" as UC2
+  usecase "Vizualizare cont (CF-03)" as UC3
+  usecase "Generare cheie API (CF-04)" as UC4
+  usecase "Revocare cheie API (CF-05)" as UC5
+  usecase "Emitere token JWT" as JWT
+}
+
+U --> UC1
+U --> UC2
+U --> UC3
+U --> UC4
+U --> UC5
+
+UC1 ..> JWT : <<include>>
+UC2 ..> JWT : <<include>>
+UC3 ..> UC2 : <<include>>
+UC4 ..> UC2 : <<include>>
+UC5 ..> UC2 : <<include>>
+@enduml
+
+
+' ============================================================
+' 2. USE CASE — UC-2: Gateway AI
+'    Fișier: figures/uc2_gateway_ai.png
+'    Referit în teză: \ref{fig:uc2}
+' ============================================================
+@startuml uc2_gateway_ai
+!theme plain
+skinparam actorStyle awesome
+left to right direction
+
+actor "Utilizator" as U
+actor "Aplicație client\n(FileO)" as FileO
+
+rectangle "Server — Gateway AI" {
+  usecase "Upscalare imagine\nSwin2SR (CF-06)" as UC6
+  usecase "Transcriere audio\nWhisper (CF-07)" as UC7
+  usecase "Generare text\nGemini (CF-08)" as UC8
+  usecase "Generare subtitrări\n(CF-09)" as UC9
+  usecase "Pre-încărcare model\n(CF-10)" as UC10
+  usecase "Descărcare model\n(CF-10)" as UC11
+  usecase "Extragere audio\n(FFmpeg)" as FFmpeg
+  usecase "Transcriere Whisper\n(internă)" as WhisperInt
+}
+
+U --> UC6
+U --> UC7
+U --> UC8
+U --> UC9
+U --> UC10
+U --> UC11
+FileO --> UC6
+FileO --> UC7
+FileO --> UC8
+FileO --> UC9
+FileO --> UC10
+FileO --> UC11
+
+UC9 ..> FFmpeg : <<include>>
+UC9 ..> WhisperInt : <<include>>
+@enduml
+
+
+' ============================================================
+' 3. USE CASE — UC-3: Sistemul de agent inteligent
+'    Fișier: figures/uc3_agent.png
+'    Referit în teză: \ref{fig:uc3}
+' ============================================================
+@startuml uc3_agent
+!theme plain
+skinparam actorStyle awesome
+left to right direction
+
+actor "Aplicație client\n(FileO)" as FileO
+actor "Agent\n(sistem intern)" as AgentActor
+
+rectangle "Server — Sistemul de agent inteligent" {
+  usecase "Trimitere mesaj\ncu tool-uri (CF-11)" as UC11
+  usecase "Activare mod\nplanificare (CF-13)" as UC13
+  usecase "Resetare sesiune (CF-15)" as UC15
+  usecase "Apelare tool\nprin callback (CF-12)" as UC12
+  usecase "Utilizare tool\nbuilt-in (CF-14)" as UC14
+  usecase "Creare plan\nde execuție" as UCPlan
+  usecase "Re-planificare\nadaptivă" as UCReplan
+}
+
+FileO --> UC11
+FileO --> UC15
+AgentActor --> UC12
+AgentActor --> UC14
+AgentActor --> UCPlan
+
+UC13 ..> UC11 : <<extend>>
+UCPlan ..> UCReplan : <<include>>
+@enduml
+
+
+' ============================================================
+' 4. COMPONENT — Diagrama de componente a serverului
+'    Fișier: figures/component_diagram.png
+'    Referit în teză: \ref{fig:component}
+' ============================================================
+@startuml component_diagram
+!theme plain
+skinparam componentStyle rectangle
+
+package "API Layer" {
+  [FastAPI Router\n+ Uvicorn ASGI] as Router
+  [Static SPA\n(React + Vite)] as SPA
+}
+
+package "Business Logic Layer" {
+  [Auth Module\n(JWT / bcrypt)] as Auth
+  [AI Gateway\n(BaseAIModel)] as AIGateway
+  [Agent System\n(AgentPool + LangGraph)] as AgentSys
+}
+
+package "Infrastructure Layer" {
+  [Redis\n(coadă + pub/sub)] as Redis
+  [SQLAlchemy ORM\n+ Alembic] as ORM
+}
+
+package "External Services" {
+  [Supabase\n(PostgreSQL managed)] as Supabase
+  [Google Gemini API\n(gemini-2.5-flash)] as Gemini
+  [HuggingFace Hub\n(Swin2SR, Whisper)] as HF
+}
+
+package "Client" {
+  [FileO App\n(Docker container)] as FileO
+  [Browser\n(Admin UI)] as Browser
+}
+
+FileO --> Router : REST / X-API-Key
+Browser --> Router : REST / JWT
+Browser --> SPA : static assets
+Router --> Auth
+Router --> AIGateway
+Router --> AgentSys
+Auth --> ORM
+ORM --> Supabase
+AgentSys --> Redis
+AgentSys --> Gemini : LangChain
+AIGateway --> HF : HuggingFace Transformers
+AIGateway --> Gemini : LangChain
+AgentSys --> FileO : HTTP callback POST
+@enduml
+
+
+' ============================================================
+' 5. DEPLOYMENT — Infrastructura curentă (Mac + Supabase)
+'    Fișier: figures/deploy_current.png
+'    Referit în teză: \ref{fig:deploy-current}
+' ============================================================
+@startuml deploy_current
+!theme plain
+skinparam nodeStyle rectangle
+
+node "Laptop Mac\n(uvicorn :8000)" {
+  component "FastAPI Server\n(Python 3.11)" as FastAPI
+  component "Redis Container\n(Docker)" as Redis
+  FastAPI --> Redis : redis://localhost:6379
+}
+
+node "Supabase Cloud\n(99.9% SLA)" {
+  database "PostgreSQL\n(pool via PgBouncer)" as PG
+}
+
+node "Google AI Cloud" {
+  component "Gemini 2.5 Flash API" as Gemini
+}
+
+node "HuggingFace Hub" {
+  component "Swin2SR weights\nWhisper Large V3 weights" as HF
+  note right: descărcare la primul /wake\ncaching local ~/.cache/huggingface
+}
+
+node "Client Device" {
+  component "FileO App\n(Docker container)" as FileO
+}
+
+FastAPI --> PG : DATABASE_URL (SSL :5432)
+FastAPI --> Gemini : GOOGLE_API_KEY (HTTPS)
+FastAPI -[dashed]-> HF : la pornire (lazy load)
+FileO --> FastAPI : HTTP :8000
+@enduml
+
+
+' ============================================================
+' 6. DEPLOYMENT — Arhitectura GCE (referință istorică)
+'    Fișier: figures/deploy_gce.png
+'    Referit în teză: \ref{fig:deploy-gce}
+' ============================================================
+@startuml deploy_gce
+!theme plain
+skinparam nodeStyle rectangle
+
+node "Google Compute Engine\ne2-standard-4 (4 vCPU, 16 GB RAM)\nUbuntu 22.04" {
+  component "FastAPI Container\n(uvicorn)" as FastAPI
+  database "PostgreSQL Container" as PG
+  component "Redis Container" as Redis
+  component "docker-compose.yml" as DC
+
+  DC .> FastAPI : orchestrează
+  DC .> PG : orchestrează
+  DC .> Redis : orchestrează
+  FastAPI --> PG : SQLAlchemy (internal network)
+  FastAPI --> Redis : redis-py (internal network)
+}
+
+node "Google AI Cloud" {
+  component "Gemini API" as Gemini
+}
+
+node "Internet" {
+  component "Client (FileO / Browser)" as Client
+}
+
+FastAPI --> Gemini : HTTPS
+Client --> FastAPI : HTTP/HTTPS :80/:443
+note bottom of DC : setup_vm.sh + deploy_gce.sh\n(director docker/)
+@enduml
+
+
+' ============================================================
+' 7. CLASS — Modelul de date ORM (User, AgentKey)
+'    Fișier: figures/class_orm.png
+'    Referit în teză: \ref{fig:class-orm}
+' ============================================================
+@startuml class_orm
+!theme plain
+skinparam classAttributeIconSize 0
+
+class User << (E,#AADDFF) Entity >> {
+  + id : UUID <<PK>>
+  + email : String(255) <<unique, index>>
+  + hashed_password : String(255)
+  + is_active : Boolean = True
+  + created_at : DateTime(tz)
+  --
+  + agent_key : AgentKey
+  + __repr__() : str
+}
+
+class AgentKey << (E,#AADDFF) Entity >> {
+  + id : UUID <<PK>>
+  + user_id : UUID <<FK → users.id CASCADE>>
+  + api_key : String(128) <<unique, index>>
+  + created_at : DateTime(tz)
+  --
+  + owner : User
+  + __repr__() : str
+}
+
+User "1" --o "0..1" AgentKey : agent_key\n(uselist=False) >
+note bottom of User : hashed_password stochează\nexclusiv hash bcrypt;\nvaloarea clară nu e persistată.
+note bottom of AgentKey : api_key = UUID generat aleator\nla înregistrare, indexat\npentru lookup rapid.
+@enduml
+
+
+' ============================================================
+' 8. CLASS — Ierarhia modelelor AI (BaseAIModel)
+'    Fișier: figures/class_ai_gateway.png
+'    Referit în teză: \ref{fig:class-ai}
+' ============================================================
+@startuml class_ai_gateway
+!theme plain
+skinparam classAttributeIconSize 0
+
+abstract class BaseAIModel {
+  # _name : str
+  # _model_id : str
+  # _task : str
+  # _is_loaded : bool
+  # _device : str
+  # _lock : asyncio.Lock
+  --
+  + name : str <<property>>
+  + is_loaded : bool <<property>>
+  + model_info : ModelInfo <<property>>
+  + ensure_loaded() : Awaitable[None]
+  + safe_unload() : Awaitable[None]
+  --
+  {abstract} + wake_up() : Awaitable[None]
+  {abstract} + process(**kwargs) : Awaitable[Any]
+  {abstract} + unload() : Awaitable[None]
+}
+
+class Swin2SRModel {
+  - _processor : AutoImageProcessor
+  - _model : Swin2SRForImageSuperResolution
+  --
+  + wake_up()
+  + process(image_b64, scale) : dict
+  + unload()
+  - _no_ref_metrics(original, upscaled) : dict
+}
+
+class WhisperModel {
+  - _model : WhisperForConditionalGeneration
+  - _processor : WhisperProcessor
+  - _dtype : torch.dtype
+  --
+  + wake_up()
+  + process(audio_b64, language, expected_text) : dict
+  + unload()
+}
+
+class LLMModel {
+  - _llm : ChatGoogleGenerativeAI
+  --
+  + wake_up()
+  + process(prompt, temperature, max_tokens) : dict
+  + unload()
+}
+
+class VideoSubtitleModel {
+  - _whisper : WhisperModel
+  --
+  + wake_up()
+  + process(video_b64, language, fmt) : dict
+  + unload()
+}
+
+BaseAIModel <|-- Swin2SRModel
+BaseAIModel <|-- WhisperModel
+BaseAIModel <|-- LLMModel
+BaseAIModel <|-- VideoSubtitleModel
+VideoSubtitleModel --> WhisperModel : delegă\ntranscrierea audio
+@enduml
+
+
+' ============================================================
+' 9. CLASS — Sistemul de agent
+'    Fișier: figures/class_agent.png
+'    Referit în teză: \ref{fig:class-agent}
+' ============================================================
+@startuml class_agent
+!theme plain
+skinparam classAttributeIconSize 0
+
+class AgentPool {
+  - _redis : Redis
+  - _workers : list[Task]
+  + NUM_WORKERS : int = 5
+  --
+  + start() : Awaitable[None]
+  + stop() : Awaitable[None]
+  + enqueue(api_key, message, tool_definitions) : Awaitable[AgentResponse]
+  - _worker(worker_id) : Awaitable[None]
+}
+
+class Session {
+  - agent_executor : CompiledGraph
+  - tools : list[BaseTool]
+  + history : list[BaseMessage]
+  --
+  + reset() : None
+}
+
+class ToolDefinition << (D,#FFDDAA) Pydantic >> {
+  + name : str
+  + description : str
+  + parameters : dict
+  + callback_url : str
+}
+
+abstract class BaseBuiltinTool {
+  + callback_url : str
+  --
+  {abstract} + execute(input: dict) : Awaitable[str]
+}
+
+class TextEditorTool {
+  + execute(input: dict) : Awaitable[str]
+}
+
+class VirtualDriveMoveTool {
+  + execute(input: dict) : Awaitable[str]
+}
+
+class AgentState << (T,#DDFFDD) TypedDict >> {
+  + task : str
+  + plan : list[str]
+  + past_steps : list[tuple[str, str]]
+  + response : str | None
+}
+
+AgentPool "1" --> "*" Session : gestionează\n(indexat după api_key)
+Session "1" --> "*" ToolDefinition : tool-uri active
+BaseBuiltinTool <|-- TextEditorTool
+BaseBuiltinTool <|-- VirtualDriveMoveTool
+AgentPool ..> AgentState : folosit în\nPlanning Agent
+note right of AgentState
+  past_steps folosește
+  Annotated[list, operator.add]
+  pentru acumulare LangGraph
+end note
+@enduml
+
+
+' ============================================================
+' 10. SEQUENCE — Flux autentificare JWT
+'     Fișier: figures/seq_auth.png
+'     Referit în teză: \ref{fig:seq-auth}
+' ============================================================
+@startuml seq_auth
+!theme plain
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceGroupBorderColor #888888
+
+actor "Utilizator / Browser" as U
+participant "FastAPI\n/api/auth" as API
+participant "Auth Utils\n(bcrypt + JWT)" as Auth
+database "Supabase\nPostgreSQL" as DB
+
+== Înregistrare ==
+U -> API : POST /register\n{email, password}
+API -> DB : SELECT WHERE email = ?
+DB --> API : null (email liber)
+API -> Auth : hash_password(password)
+Auth --> API : hashed_password (bcrypt)
+API -> DB : INSERT User(email, hash)
+DB --> API : user.id
+API -> Auth : create_access_token({sub: user.id})
+Auth --> API : JWT (HS256, exp=settings)
+API --> U : 201 {access_token, token_type}
+
+== Autentificare ==
+U -> API : POST /login\n{username=email, password}
+API -> DB : SELECT WHERE email = ?
+DB --> API : user
+API -> Auth : verify_password(plain, hashed)
+Auth --> API : True
+API -> Auth : create_access_token({sub: user.id})
+Auth --> API : JWT
+API --> U : 200 {access_token, token_type}
+
+== Request protejat (GET /me) ==
+U -> API : GET /me\nAuthorization: Bearer <token>
+API -> Auth : decode_token(token)
+Auth --> API : payload {sub: user.id}
+API -> DB : SELECT WHERE id = user.id
+DB --> API : user
+API --> U : 200 {id, email, is_active}
+@enduml
+
+
+' ============================================================
+' 11. SEQUENCE — Agentul conversațional ReAct
+'     Fișier: figures/seq_react.png
+'     Referit în teză: \ref{fig:seq-react}
+' ============================================================
+@startuml seq_react
+!theme plain
+skinparam sequenceArrowThickness 1.5
+
+participant "FileO App" as Client
+participant "FastAPI\n/api/agent/chat" as API
+participant "AgentPool" as Pool
+participant "Worker asyncio\n(x5)" as Worker
+participant "LangGraph\n(ReAct graph)" as LG
+participant "Gemini 2.5\nFlash" as Gemini
+participant "FileO\ncallback_url" as Callback
+
+Client -> API : POST /api/agent/chat\n{message, tools[], X-API-Key}
+API -> API : validare X-API-Key\n(query db → AgentKey)
+API -> Pool : enqueue(api_key, message, tools)
+Pool -> Pool : json.dumps(payload)\nLPUSH "agent:tasks"
+Pool -> Pool : SUBSCRIBE "agent:done:{task_id}"
+
+Worker -> Worker : BRPOP "agent:tasks"
+Worker -> LG : run_session(api_key, message, tools)
+
+loop ReAct: gândire → acțiune → observație
+  LG -> Gemini : invoke(history + tool_schemas)
+  Gemini --> LG : AIMessage
+  alt tool_call în răspuns
+    LG -> Callback : POST callback_url\n{"tool": name, "input": {...}}
+    Callback --> LG : {"result": "..."}
+    LG -> LG : append ToolMessage(result)
+  else răspuns text final
+    LG --> Worker : AgentResponse
+  end
+end
+
+Worker -> Pool : SET "agent:result:{task_id}" TTL=120s
+Worker -> Pool : PUBLISH "agent:done:{task_id}" "1"
+Pool -> Pool : GETDEL "agent:result:{task_id}"
+Pool --> API : AgentResponse
+API --> Client : 200 {message, tool_calls[]}
+@enduml
+
+
+' ============================================================
+' 12. SEQUENCE — Agentul cu planificare (Plan-and-Execute)
+'     Fișier: figures/seq_planning.png
+'     Referit în teză: \ref{fig:seq-planning}
+' ============================================================
+@startuml seq_planning
+!theme plain
+skinparam sequenceArrowThickness 1.5
+
+participant "FileO App" as Client
+participant "FastAPI" as API
+participant "AgentPool" as Pool
+participant "Worker asyncio" as Worker
+participant "LangGraph\nPlan-and-Execute" as LG
+participant "Planner\n(Gemini)" as Planner
+participant "Executor\n(Gemini + tools)" as Executor
+participant "Replanner\n(Gemini)" as Replanner
+participant "FileO\ncallback" as Callback
+
+Client -> API : POST /api/agent/chat\n{message, use_planning=true, tools[]}
+API -> Pool : enqueue(api_key, message, tools, use_planning=true)
+Pool -> Worker : BRPOP
+
+Worker -> LG : run_planning_session(api_key, message, tools)
+
+LG -> Planner : invoke(AgentState{task})
+Planner --> LG : plan = ["pas1", "pas2", "pas3", ...]
+
+loop pentru fiecare pas din plan
+  LG -> Executor : invoke(AgentState{plan[0], past_steps})
+  Executor -> Callback : POST tool callback\n{"tool": name, "input": {...}}
+  Callback --> Executor : {"result": "..."}
+  Executor --> LG : (pas_curent, rezultat)
+
+  LG -> Replanner : invoke(AgentState{task, past_steps})
+  alt mai sunt pași de executat
+    Replanner --> LG : AgentState{plan actualizat}
+  else toate sarcinile îndeplinite
+    Replanner --> LG : AgentState{response: "răspuns final"}
+  end
+end
+
+LG --> Worker : AgentResponse
+Worker -> Pool : SET agent:result + PUBLISH agent:done
+Pool --> API : AgentResponse
+API --> Client : 200 {message}
+@enduml

@@ -618,61 +618,6 @@ TOOLS: list[dict] = [
         "tags": ["convert", "format", "batch", "mp4", "avi", "mkv", "video"],
     },
 
-    {
-        "id": "video-summarizer",
-        "name": "AI Video Summarizer",
-        "version": "0.8.0",
-        "description": "Generate a timestamped text summary of a video using multimodal AI.",
-        "longDescription": (
-            "AI Video Summarizer extracts key frames from a video, sends them along with audio "
-            "transcription to a multimodal AI model, and returns a structured summary with "
-            "chapter timestamps, main topics, and action items. Ideal for long meeting recordings, "
-            "lectures, and tutorials."
-        ),
-        "categories": ["video"],
-        "fileExtensions": [".mp4", ".mkv", ".mov", ".webm"],
-        "usesAI": True,
-        "icon": "Clapperboard",
-        "accentColor": "rose",
-        "author": "AI Labs",
-        "fields": [
-            {
-                "key": "videoFile",
-                "label": "Video File",
-                "type": "file",
-                "description": "The video to summarize.",
-                "required": True,
-                "acceptedExtensions": [".mp4", ".mkv", ".mov", ".webm"],
-            },
-            {
-                "key": "detailLevel",
-                "label": "Summary Detail",
-                "type": "select",
-                "description": "Controls how granular the generated summary is.",
-                "required": False,
-                "options": ["brief", "standard", "detailed"],
-                "default": "standard",
-            },
-            {
-                "key": "includeActionItems",
-                "label": "Include Action Items",
-                "type": "boolean",
-                "description": "Extract and list action items / to-dos mentioned in the video.",
-                "required": False,
-                "default": True,
-            },
-        ],
-        "usageSteps": [
-            "Click \"Run Tool\" to open the AI Video Summarizer.",
-            "Upload or select a video file.",
-            "Choose the summary detail level.",
-            "Click Summarize and wait while the AI processes the video.",
-            "Review the timestamped chapter breakdown and action items.",
-            "Export the summary as Markdown or plain text.",
-        ],
-        "tags": ["summarize", "AI", "transcript", "chapters", "meeting", "video"],
-    },
-
     # ── DOCUMENTS & ARCHIVES ──────────────────────────────────────────────
 
     {

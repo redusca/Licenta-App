@@ -19,9 +19,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Python dependencies
+# Python dependencies — two layers; torch/torchvision use CPU-only wheels (~250 MB).
 COPY Server/src/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN grep -v -E '^\s*(torch|torchvision)\b' requirements.txt \
+    | grep -v '^\s*$' > requirements-base.txt && \
+    pip install --no-cache-dir --timeout 300 --retries 5 -r requirements-base.txt
+RUN pip install --no-cache-dir --timeout 300 --retries 5 \
+      --index-url https://download.pytorch.org/whl/cpu \
+      torch torchvision
 
 # Application source
 COPY Server/src/ ./src/

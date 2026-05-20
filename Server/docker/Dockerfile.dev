@@ -20,9 +20,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install Python dependencies — two layers so Docker cache survives a torch re-run.
+# torch/torchvision use the CPU-only wheel index (no CUDA packages → ~250 MB vs 1.5 GB).
 COPY Server/src/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN grep -v -E '^\s*(torch|torchvision)\b' requirements.txt \
+    | grep -v '^\s*$' > requirements-base.txt && \
+    pip install --no-cache-dir --timeout 300 --retries 5 -r requirements-base.txt
+RUN pip install --no-cache-dir --timeout 300 --retries 5 \
+      --index-url https://download.pytorch.org/whl/cpu \
+      torch torchvision
 
 # Copy application source
 COPY Server/src/       ./src/

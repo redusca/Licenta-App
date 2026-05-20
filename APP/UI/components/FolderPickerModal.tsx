@@ -9,10 +9,10 @@
  * Uses the same /api/drive endpoints as DrivePickerModal, but adds
  * folder-selection support and physical drive fallback.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ArrowLeft, Folder, FileText, HardDrive,
-  ChevronRight, X, Check, Loader2, Monitor, ExternalLink,
+  ChevronRight, X, Check, Loader2, Monitor, ExternalLink, CornerDownLeft,
 } from 'lucide-react';
 
 const FLASK = 'http://127.0.0.1:5000';
@@ -36,12 +36,14 @@ export const FolderPickerModal: React.FC<Props> = ({
   const [history, setHistory] = useState<string[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pathInput, setPathInput] = useState('');
+  const pathInputRef = useRef<HTMLInputElement>(null);
 
   const current = history[history.length - 1] ?? null;
 
   // Load virtual drives + PC drives when the modal opens
   useEffect(() => {
-    if (!isOpen) { setHistory([]); setEntries([]); return; }
+    if (!isOpen) { setHistory([]); setEntries([]); setPathInput(''); return; }
 
     // 1. Read localStorage.knownDrives (source of truth from the Files page)
     let localDrives: Drive[] = [];
@@ -102,8 +104,21 @@ export const FolderPickerModal: React.FC<Props> = ({
     loadPath(current);
   }, [current, isOpen, loadPath]);
 
-  const enterPath = (path: string) => setHistory(prev => [...prev, path]);
-  const goBack    = () => setHistory(prev => prev.slice(0, -1));
+  const enterPath = (path: string) => {
+    setHistory(prev => [...prev, path]);
+    setPathInput(path);
+  };
+  const goBack = () => {
+    const prev = history.slice(0, -1);
+    setHistory(prev);
+    setPathInput(prev[prev.length - 1] ?? '');
+  };
+
+  const navigateTo = () => {
+    const p = pathInput.trim();
+    if (!p) return;
+    setHistory(prev => [...prev, p]);
+  };
 
   const selectEntry = (entry: Entry) => {
     if (entry.is_dir) {
@@ -129,27 +144,46 @@ export const FolderPickerModal: React.FC<Props> = ({
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-700 shrink-0">
-          {current && (
+        <div className="flex flex-col border-b border-slate-200 dark:border-slate-700 shrink-0">
+          <div className="flex items-center gap-2 px-4 py-3">
+            {current && (
+              <button
+                onClick={goBack}
+                className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+            <span className="font-semibold text-sm flex-1">{title || defaultTitle}</span>
             <button
-              onClick={goBack}
+              onClick={onClose}
               className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <X className="w-4 h-4" />
             </button>
-          )}
-          <span className="font-semibold text-sm flex-1">{title || defaultTitle}</span>
-          {current && (
-            <span className="text-xs text-slate-400 font-mono truncate max-w-[45%] hidden sm:block">
-              {current}
-            </span>
-          )}
-          <button
-            onClick={onClose}
-            className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          </div>
+          {/* Path input bar — type any path to navigate directly */}
+          <div className="flex items-center gap-1.5 px-3 pb-2.5">
+            <input
+              ref={pathInputRef}
+              type="text"
+              value={pathInput}
+              onChange={e => setPathInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') navigateTo(); }}
+              placeholder="Paste or type a path (e.g. C:\Users\redis\Desktop)"
+              spellCheck={false}
+              className="flex-1 text-xs font-mono bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors"
+            />
+            <button
+              type="button"
+              onClick={navigateTo}
+              title="Navigate to path"
+              className="shrink-0 flex items-center gap-1 px-2.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs transition-colors"
+            >
+              <CornerDownLeft className="w-3.5 h-3.5" />
+              Go
+            </button>
+          </div>
         </div>
 
         {/* Body */}

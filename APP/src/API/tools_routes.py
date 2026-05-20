@@ -47,6 +47,8 @@ from tools import document_converter as document_converter_tool
 from tools import subtitle_generator as subtitle_generator_tool
 from tools.subtitle_generator import build_srt as _build_srt, srt_time as _srt_time
 from tools import document_analytics as document_analytics_tool
+from tools import smart_drive_scanner as smart_drive_scanner_tool
+from tools import smart_drive_builder as smart_drive_builder_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
@@ -110,6 +112,7 @@ _APPROVAL_REQUIRED = frozenset({
     "image_converter", "remove_background", "image_to_svg",
     "video_converter", "video_compressor", "audio_converter",
     "drive_creator", "pdf_merger", "model_converter", "document_converter",
+    "smart_drive_build",
 })
 
 # ── Tool registry ─────────────────────────────────────────────────────────────
@@ -131,6 +134,8 @@ _TOOLS: dict[str, object] = {
     "document_converter": document_converter_tool,
     "subtitle_generator": subtitle_generator_tool,
     "document_analytics": document_analytics_tool,
+    "smart_drive_scan": smart_drive_scanner_tool,
+    "smart_drive_build": smart_drive_builder_tool,
 }
 
 

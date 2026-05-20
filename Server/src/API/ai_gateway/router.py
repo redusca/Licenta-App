@@ -556,6 +556,100 @@ async def llm_stream(body: LLMRequest):
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+# ── Llama 4 Scout — Vision (Groq API) ────────────────────────────────────────
+
+_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+_VISION_DEFAULT_PROMPT = (
+    "Describe this image in detail. "
+    "List the main subjects, objects, setting, mood, and any notable features. "
+    "Be specific and concise."
+)
+
+
+@router.post("/vision/llama-scout")
+async def vision_llama_scout(
+    file: UploadFile = File(..., description="Image file (JPEG, PNG, WEBP, etc.)"),
+    prompt: str = Form(_VISION_DEFAULT_PROMPT, description="Instruction for the vision model"),
+    max_tokens: int = Form(256, ge=16, le=1024, description="Max tokens in the description"),
+):
+    """Analyze an image using Groq Llama 4 Scout vision model.
+
+    Accepts any common image format; resizes to ≤1024 px on the long edge
+    before encoding to reduce token usage.
+
+    Returns
+    -------
+    description : str   — Detailed description of the image content.
+    tags        : list  — Key words extracted from the description.
+    model       : str   — Model ID used.
+    """
+    import time
+
+    api_key = _groq_api_key()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="Groq API key not configured (set GROQ_API_KEY or KEY in .env)")
+
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    # Resize image to ≤1024 px long edge to save tokens
+    try:
+        img = Image.open(io.BytesIO(raw)).convert("RGB")
+        max_dim = 1024
+        if max(img.size) > max_dim:
+            ratio = max_dim / max(img.size)
+            new_size = (int(img.width * ratio), int(img.height * ratio))
+            img = img.resize(new_size, Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        raw = buf.getvalue()
+        mime = "image/jpeg"
+    except Exception:
+        mime = file.content_type or "image/jpeg"
+
+    b64 = base64.b64encode(raw).decode()
+
+    try:
+        client = _get_groq_client()
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+
+    t0 = time.perf_counter()
+    try:
+        resp = await client.chat.completions.create(
+            model=_VISION_MODEL,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+            max_completion_tokens=max_tokens,
+            temperature=0.3,
+        )
+    except Exception as exc:
+        logger.exception("Llama Scout vision inference failed")
+        raise HTTPException(status_code=500, detail=f"Vision model error: {exc}")
+
+    latency = round(time.perf_counter() - t0, 3)
+    description = resp.choices[0].message.content or ""
+
+    # Simple tag extraction: unique words longer than 3 chars, lowercase, deduped
+    words = [w.strip(".,;:!?\"'()[]").lower() for w in description.split()]
+    seen: set[str] = set()
+    tags: list[str] = []
+    for w in words:
+        if len(w) > 3 and w not in seen:
+            seen.add(w)
+            tags.append(w)
+        if len(tags) >= 15:
+            break
+
+    return {"description": description, "tags": tags, "model": _VISION_MODEL, "latency_s": latency}
+
+
 # ── File-reading helpers ──────────────────────────────────────────────────────
 
 

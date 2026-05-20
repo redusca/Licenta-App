@@ -1,0 +1,3846 @@
+{
+  "_type": "Project",
+  "_id": "130701b6-9531-46bb-bc49-0d1782e04c28",
+  "name": "Teza Capitol 7 — Diagrame UML",
+  "ownedElements": [
+    {
+      "_type": "UMLModel",
+      "_id": "78ba2efd-f355-43c5-b713-d354f23b0459",
+      "name": "Model",
+      "_parent": {
+        "$ref": "130701b6-9531-46bb-bc49-0d1782e04c28"
+      },
+      "ownedElements": [
+        {
+          "_type": "UMLClass",
+          "_id": "72888bf4-0b4e-4f87-b956-d0afa304d8af",
+          "name": "User",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "282d4327-4f0f-479a-8655-a0cd07651e8e",
+              "name": "id",
+              "type": "UUID <<PK>>",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "d799cc49-8602-4713-b1ba-c277d50b05e2",
+              "name": "email",
+              "type": "String(255) <<unique>>",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "d538979b-8965-462e-b9d0-436ae0aa002c",
+              "name": "hashed_password",
+              "type": "String(255)",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "536aa4d3-6651-4fd1-8695-501ca2bc5767",
+              "name": "is_active",
+              "type": "Boolean = True",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "e26635bd-a6ae-48b0-a162-ec5319b8771c",
+              "name": "created_at",
+              "type": "DateTime(tz)",
+              "visibility": "public"
+            }
+          ],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "1a155d28-c9b1-4e2d-a43c-676035490c4c",
+              "name": "__repr__",
+              "returnType": "str",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "501d3e58-39cd-456a-9f2c-0dcae103677e",
+          "name": "AgentKey",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "a6656326-7461-441e-86f8-86d6a619d188",
+              "name": "id",
+              "type": "UUID <<PK>>",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "abd5b3a7-a214-4ccd-9abd-750ce5e3c7a4",
+              "name": "user_id",
+              "type": "UUID <<FK CASCADE>>",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "b664775b-0a02-4a54-8224-81932d7efdf5",
+              "name": "api_key",
+              "type": "String(128) <<unique>>",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "6d314f52-96ee-4804-93cc-9b2344737834",
+              "name": "created_at",
+              "type": "DateTime(tz)",
+              "visibility": "public"
+            }
+          ],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "e6694dc4-fffb-465a-9ebd-cad25f9fc933",
+              "name": "__repr__",
+              "returnType": "str",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "16cc3550-bb68-44e8-a728-34da0bed4c2a",
+          "name": "agent_key",
+          "source": {
+            "$ref": "72888bf4-0b4e-4f87-b956-d0afa304d8af"
+          },
+          "target": {
+            "$ref": "501d3e58-39cd-456a-9f2c-0dcae103677e"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "54a84ad8-d199-4c1c-ba52-66f5ff370b7d",
+            "multiplicity": "1"
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "594c7830-487e-4fbb-b7d2-c60fcc37fae6",
+            "multiplicity": "0..1"
+          }
+        },
+        {
+          "_type": "UMLInterface",
+          "_id": "d771ca47-5d25-42c1-a804-78dff9b33438",
+          "name": "BaseAIModel",
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "881a2209-bb98-441e-9750-9406792b38c4",
+              "name": "wake_up()",
+              "returnType": "Awaitable[None]",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "6c3f52b9-c549-49ec-a9eb-05c4630909e4",
+              "name": "process(**kwargs)",
+              "returnType": "Awaitable[Any]",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "944621fe-4075-473a-a705-5c8605cd4207",
+              "name": "unload()",
+              "returnType": "Awaitable[None]",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "4898c60f-f07a-4815-ad14-96c7e21c1262",
+              "name": "ensure_loaded()",
+              "returnType": "Awaitable[None]",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "338cbeff-9e39-4c04-a806-654d62626469",
+              "name": "safe_unload()",
+              "returnType": "Awaitable[None]",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "b1f69a91-13dd-4f43-8815-e48e4013dce7",
+          "name": "Swin2SRModel",
+          "attributes": [],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "0a62af7a-4b1d-4c88-b89e-3f693577ddeb",
+              "name": "wake_up",
+              "returnType": "",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "f84ee37d-bb67-4d47-940d-d4c4c14331fe",
+              "name": "process",
+              "returnType": "dict",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "d90efa70-4196-4a4e-ab0b-b62e77c1ed7d",
+              "name": "unload",
+              "returnType": "",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "d67c7ddc-c734-4db3-8e7b-876593fddd3c",
+          "name": "WhisperModel",
+          "attributes": [],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "98bb9b49-379a-4677-aa7f-7c2accfa2343",
+              "name": "wake_up",
+              "returnType": "",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "3d2093cd-700c-4943-be6d-164a5c220bf0",
+              "name": "process",
+              "returnType": "dict",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "9420ca2b-1279-499f-9f67-30ef8c386d1b",
+              "name": "unload",
+              "returnType": "",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "6dc7a227-3d5b-4236-8aa4-7047505b43c0",
+          "name": "LLMModel",
+          "attributes": [],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "58f77ebf-c01b-4d56-93bb-036aa6ffa163",
+              "name": "wake_up",
+              "returnType": "",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "0b381dc2-c64e-4672-ac1f-c7f636f4a583",
+              "name": "process",
+              "returnType": "dict",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "b4ae288e-dcce-4860-932a-249bc30e3196",
+              "name": "unload",
+              "returnType": "",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "407b1ada-eded-442c-afc9-96423deff8bf",
+          "name": "VideoSubtitleModel",
+          "attributes": [],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "fce47053-1324-4110-8953-9d126d6aa066",
+              "name": "wake_up",
+              "returnType": "",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "d7f25dee-fe7e-4d6f-98a4-cb5e4b26cf8c",
+              "name": "process",
+              "returnType": "dict",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "04274069-6883-4084-a348-e1778478f120",
+              "name": "unload",
+              "returnType": "",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLGeneralization",
+          "_id": "9c3f815e-bdea-4145-9361-f254935aada1",
+          "source": {
+            "$ref": "b1f69a91-13dd-4f43-8815-e48e4013dce7"
+          },
+          "target": {
+            "$ref": "d771ca47-5d25-42c1-a804-78dff9b33438"
+          }
+        },
+        {
+          "_type": "UMLGeneralization",
+          "_id": "b51b141d-a60e-4869-a99c-f12be7303308",
+          "source": {
+            "$ref": "d67c7ddc-c734-4db3-8e7b-876593fddd3c"
+          },
+          "target": {
+            "$ref": "d771ca47-5d25-42c1-a804-78dff9b33438"
+          }
+        },
+        {
+          "_type": "UMLGeneralization",
+          "_id": "5e43bd2f-3372-4afe-bff6-c99576abdcce",
+          "source": {
+            "$ref": "6dc7a227-3d5b-4236-8aa4-7047505b43c0"
+          },
+          "target": {
+            "$ref": "d771ca47-5d25-42c1-a804-78dff9b33438"
+          }
+        },
+        {
+          "_type": "UMLGeneralization",
+          "_id": "734f0795-8b1a-44de-a2b1-d80970d2afc7",
+          "source": {
+            "$ref": "407b1ada-eded-442c-afc9-96423deff8bf"
+          },
+          "target": {
+            "$ref": "d771ca47-5d25-42c1-a804-78dff9b33438"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "bf0d1350-e334-421d-8812-d7226eaf70ba",
+          "source": {
+            "$ref": "407b1ada-eded-442c-afc9-96423deff8bf"
+          },
+          "target": {
+            "$ref": "d67c7ddc-c734-4db3-8e7b-876593fddd3c"
+          }
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "59525a88-f530-4c02-953f-2faeeed1eb88",
+          "name": "AgentPool",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "be0a45c4-0040-4b73-85cf-128774343572",
+              "name": "NUM_WORKERS",
+              "type": "int = 5",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "9b7e0550-0fae-4271-be72-0ee2a788b5d3",
+              "name": "_redis",
+              "type": "Redis",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "c388b0cc-044d-4b5f-9ec6-2c8e4098829c",
+              "name": "_workers",
+              "type": "list[Task]",
+              "visibility": "public"
+            }
+          ],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "08256842-0958-49a6-bb97-5c57cdb23dc7",
+              "name": "start",
+              "returnType": "",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "e9cc3e4e-f215-4b71-9bae-89a4af306952",
+              "name": "stop",
+              "returnType": "",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLOperation",
+              "_id": "523614ef-a637-430b-9064-34ffba6b7387",
+              "name": "enqueue(api_key,message,tools)",
+              "returnType": "AgentResponse",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "15178075-6e1d-4036-bd3d-9d560b1b7e40",
+          "name": "Session",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "21e8f41f-5f73-4714-99d9-45ae060639d1",
+              "name": "agent_executor",
+              "type": "CompiledGraph",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "16c6ac0d-4f34-4fbc-8e29-c487c76907f2",
+              "name": "tools",
+              "type": "list[BaseTool]",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "cf6825ba-d60a-4d9b-8d01-f4144ee7ad4c",
+              "name": "history",
+              "type": "list[BaseMessage]",
+              "visibility": "public"
+            }
+          ],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "d8d33f0e-fc51-4d56-a7ad-f073331de402",
+              "name": "reset",
+              "returnType": "None",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "99c971b3-6082-4b85-a833-c6d3734cabb4",
+          "name": "ToolDefinition",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "15db03bd-3f4a-4846-b30d-66e15def0729",
+              "name": "name",
+              "type": "str",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "4475903a-ac90-4e94-80d0-8a75b361acfa",
+              "name": "description",
+              "type": "str",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "5db60429-134d-44c3-adf3-e2a0a7b0f433",
+              "name": "parameters",
+              "type": "dict",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "62594861-6fd7-4fb4-9736-ea96e69c6b37",
+              "name": "callback_url",
+              "type": "str",
+              "visibility": "public"
+            }
+          ],
+          "operations": []
+        },
+        {
+          "_type": "UMLInterface",
+          "_id": "c4f3c7ec-78c9-4f3d-aa06-70856abfc7e6",
+          "name": "BaseBuiltinTool",
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "58f8785c-a367-49a9-8810-0abb7c5e15f1",
+              "name": "execute(input)",
+              "returnType": "Awaitable[str]",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "5c0518e7-d6d1-479c-b20e-92d737e53f8e",
+          "name": "TextEditorTool",
+          "attributes": [],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "c6e0cead-f6da-412e-be78-4762044d2d78",
+              "name": "execute",
+              "returnType": "Awaitable[str]",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "5c2261dc-1726-4c99-9d20-cd95c785821a",
+          "name": "VirtualDriveMoveTool",
+          "attributes": [],
+          "operations": [
+            {
+              "_type": "UMLOperation",
+              "_id": "2e6a5d4b-c13e-4079-97af-8d72fdec5b2e",
+              "name": "execute",
+              "returnType": "Awaitable[str]",
+              "visibility": "public"
+            }
+          ]
+        },
+        {
+          "_type": "UMLClass",
+          "_id": "b376dd95-5902-400c-8ffe-f8373875f00e",
+          "name": "AgentState",
+          "attributes": [
+            {
+              "_type": "UMLAttribute",
+              "_id": "e9f9e429-02fd-47d1-add2-100c1f4c7982",
+              "name": "task",
+              "type": "str",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "91b19bb3-8936-4236-adce-1f0834e32d6d",
+              "name": "plan",
+              "type": "list[str]",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "52c20db6-2233-48ef-904f-1e847e9d19d7",
+              "name": "past_steps",
+              "type": "list[tuple]",
+              "visibility": "public"
+            },
+            {
+              "_type": "UMLAttribute",
+              "_id": "ddae5df6-d5c8-47d0-8ca0-486e271b53d1",
+              "name": "response",
+              "type": "str|None",
+              "visibility": "public"
+            }
+          ],
+          "operations": [],
+          "stereotype": "TypedDict"
+        },
+        {
+          "_type": "UMLGeneralization",
+          "_id": "2c367e27-ce12-4a81-83b1-ec84f12dfa76",
+          "source": {
+            "$ref": "5c0518e7-d6d1-479c-b20e-92d737e53f8e"
+          },
+          "target": {
+            "$ref": "c4f3c7ec-78c9-4f3d-aa06-70856abfc7e6"
+          }
+        },
+        {
+          "_type": "UMLGeneralization",
+          "_id": "f629ff85-26b5-4194-a50c-eef8de94fbff",
+          "source": {
+            "$ref": "5c2261dc-1726-4c99-9d20-cd95c785821a"
+          },
+          "target": {
+            "$ref": "c4f3c7ec-78c9-4f3d-aa06-70856abfc7e6"
+          }
+        },
+        {
+          "_type": "UMLAssociation",
+          "_id": "dfddfd38-7206-4d25-9878-f4879cad847e",
+          "source": {
+            "$ref": "59525a88-f530-4c02-953f-2faeeed1eb88"
+          },
+          "target": {
+            "$ref": "15178075-6e1d-4036-bd3d-9d560b1b7e40"
+          },
+          "end1": {
+            "_type": "UMLAssociationEnd",
+            "_id": "075d9670-ee02-4e1c-a8b5-88f6af0ed793",
+            "multiplicity": "1"
+          },
+          "end2": {
+            "_type": "UMLAssociationEnd",
+            "_id": "def3ccf6-4135-4610-aacb-1251ebbe83c4",
+            "multiplicity": "*"
+          }
+        },
+        {
+          "_type": "UMLActor",
+          "_id": "a170b7ca-dd1f-4ce2-ac9f-259d346368a6",
+          "name": "Utilizator"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "b4576019-5c4f-4ef4-ac8a-6c07972bbfbc",
+          "name": "Înregistrare (CF-01)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "5e47b464-23a2-4bc0-a4b9-827c63a483f4",
+          "name": "Autentificare (CF-02)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "8f6d6f64-f8a8-4560-a010-e65218be3c65",
+          "name": "Vizualizare cont (CF-03)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "14c0071f-cbb9-4be6-b6f3-1f6120a5165e",
+          "name": "Generare cheie API (CF-04)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "e2fb0525-e960-42eb-b9b6-9a18c34bed29",
+          "name": "Revocare cheie API (CF-05)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "6aeb22db-11da-427a-9327-da6b3aca0b43",
+          "name": "Emitere token JWT"
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "3434c09f-5f0a-4ad2-9fc1-e6a52875a253",
+          "source": {
+            "$ref": "b4576019-5c4f-4ef4-ac8a-6c07972bbfbc"
+          },
+          "target": {
+            "$ref": "6aeb22db-11da-427a-9327-da6b3aca0b43"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "12ae1210-0e38-4179-be2e-9d6cebefd1e6",
+          "source": {
+            "$ref": "5e47b464-23a2-4bc0-a4b9-827c63a483f4"
+          },
+          "target": {
+            "$ref": "6aeb22db-11da-427a-9327-da6b3aca0b43"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "30220e13-5f76-40d3-a331-e12aed4bfaaa",
+          "source": {
+            "$ref": "8f6d6f64-f8a8-4560-a010-e65218be3c65"
+          },
+          "target": {
+            "$ref": "5e47b464-23a2-4bc0-a4b9-827c63a483f4"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "269e9973-243e-4b13-a2fd-158536483bb4",
+          "source": {
+            "$ref": "14c0071f-cbb9-4be6-b6f3-1f6120a5165e"
+          },
+          "target": {
+            "$ref": "5e47b464-23a2-4bc0-a4b9-827c63a483f4"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "a51b339c-ee1c-4b8c-a137-109f27f4fe4d",
+          "source": {
+            "$ref": "e2fb0525-e960-42eb-b9b6-9a18c34bed29"
+          },
+          "target": {
+            "$ref": "5e47b464-23a2-4bc0-a4b9-827c63a483f4"
+          }
+        },
+        {
+          "_type": "UMLActor",
+          "_id": "be20e9b9-5fa5-461c-908c-a05c67e61f87",
+          "name": "Utilizator"
+        },
+        {
+          "_type": "UMLActor",
+          "_id": "a00c225a-c2ec-4b43-8c6f-ffff1b22dc4d",
+          "name": "Aplicație client (FileO)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "989a0aad-c995-4e2b-86b5-84a4390df829",
+          "name": "Upscalare imagine Swin2SR (CF-06)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "89e79964-08dc-4227-9d7d-fd8d3f6fc477",
+          "name": "Transcriere audio Whisper (CF-07)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "d94275d6-7e9f-432c-a8c3-74cb52f2318c",
+          "name": "Generare text Gemini (CF-08)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "8ab78740-6572-408b-8fb1-f7746686d2d5",
+          "name": "Generare subtitrări (CF-09)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "0ebaab33-7581-40b1-b9f4-309becec06b9",
+          "name": "Pre-încărcare model (CF-10)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "58ad0cd8-f1d1-4c22-821a-00f7c4e451f1",
+          "name": "Descărcare model (CF-10)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "a844aabf-69b3-42dd-9c33-8e83f24e61ad",
+          "name": "Extragere audio FFmpeg"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "87b30bbf-66eb-42f2-a1e4-b4cd6db954ba",
+          "name": "Transcriere Whisper (internă)"
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "0141a082-bdf3-441f-9494-b724ecbdde4c",
+          "source": {
+            "$ref": "8ab78740-6572-408b-8fb1-f7746686d2d5"
+          },
+          "target": {
+            "$ref": "a844aabf-69b3-42dd-9c33-8e83f24e61ad"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "cd8dbf39-4f81-4a96-a41c-75468935b8fe",
+          "source": {
+            "$ref": "8ab78740-6572-408b-8fb1-f7746686d2d5"
+          },
+          "target": {
+            "$ref": "87b30bbf-66eb-42f2-a1e4-b4cd6db954ba"
+          }
+        },
+        {
+          "_type": "UMLActor",
+          "_id": "edff11a5-a3fb-4617-a9d5-01845ff0b5eb",
+          "name": "Aplicație client (FileO)"
+        },
+        {
+          "_type": "UMLActor",
+          "_id": "a8891a5d-a495-4479-bea2-64ee7e23baff",
+          "name": "Agent (sistem intern)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "e29d9fd7-9412-4d73-85ef-1d78bc8a5854",
+          "name": "Trimitere mesaj cu tool-uri (CF-11)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "aef3e940-79b9-4d90-8c0f-cc07445dcf40",
+          "name": "Activare mod planificare (CF-13)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "7d65b501-f301-48ad-9974-b4c4d4756904",
+          "name": "Resetare sesiune (CF-15)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "bdd837db-edb9-48a6-a539-20cffb5a9e79",
+          "name": "Apelare tool prin callback (CF-12)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "b84dd888-26dc-4120-9770-2b8f85d9b05c",
+          "name": "Utilizare tool built-in (CF-14)"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "129fda57-d284-4c3e-9e81-96e0af05962d",
+          "name": "Creare plan de execuție"
+        },
+        {
+          "_type": "UMLUseCase",
+          "_id": "602d6bc1-e42f-46ea-bd5d-2f07efb4282e",
+          "name": "Re-planificare adaptivă"
+        },
+        {
+          "_type": "UMLExtend",
+          "_id": "1d575e71-d504-40cf-bd49-ca9fcc0c4924",
+          "source": {
+            "$ref": "aef3e940-79b9-4d90-8c0f-cc07445dcf40"
+          },
+          "target": {
+            "$ref": "e29d9fd7-9412-4d73-85ef-1d78bc8a5854"
+          }
+        },
+        {
+          "_type": "UMLInclude",
+          "_id": "c9147569-34dd-4cb5-8ff4-4bdc3cfbb726",
+          "source": {
+            "$ref": "129fda57-d284-4c3e-9e81-96e0af05962d"
+          },
+          "target": {
+            "$ref": "602d6bc1-e42f-46ea-bd5d-2f07efb4282e"
+          }
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "b55a8321-c97e-4207-be8c-05af91d61826",
+          "name": "FastAPI Router + Uvicorn"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "771337f8-2bd9-4bd1-948b-098690b16b94",
+          "name": "Auth Module (JWT/bcrypt)"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "6ee75cb3-8949-40c8-8d47-74e581b03cef",
+          "name": "AI Gateway (BaseAIModel)"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "a4ec9ad9-6eeb-4480-afef-463755732fe3",
+          "name": "Agent System (AgentPool)"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "d0daffc8-7875-42e7-8309-473b2769b560",
+          "name": "Redis (coadă + pub/sub)"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "ee5c3236-c40a-4ff1-a06b-c7028975a9f9",
+          "name": "SQLAlchemy ORM + Alembic"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "d301f49f-af44-4b19-a342-a35ec517ea89",
+          "name": "Supabase PostgreSQL"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "c9228903-3a0f-4433-96cb-6d3fc300f27a",
+          "name": "Google Gemini API"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "de966ced-d1a1-49c3-a495-547424e32bbb",
+          "name": "HuggingFace Hub"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "e178dfb9-3c27-42d7-8c37-beb86c5c86b0",
+          "name": "FileO App (Docker)"
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "f9fc893a-8f07-42b3-894e-482558e53e6d",
+          "source": {
+            "$ref": "b55a8321-c97e-4207-be8c-05af91d61826"
+          },
+          "target": {
+            "$ref": "771337f8-2bd9-4bd1-948b-098690b16b94"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "1da5beed-ee09-4303-a058-510e0019e8c6",
+          "source": {
+            "$ref": "b55a8321-c97e-4207-be8c-05af91d61826"
+          },
+          "target": {
+            "$ref": "6ee75cb3-8949-40c8-8d47-74e581b03cef"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "a40b4f2c-0f10-4080-894d-068d5cde70d3",
+          "source": {
+            "$ref": "b55a8321-c97e-4207-be8c-05af91d61826"
+          },
+          "target": {
+            "$ref": "a4ec9ad9-6eeb-4480-afef-463755732fe3"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "8402ac33-e3a1-4bd9-a9a6-696935c22222",
+          "source": {
+            "$ref": "771337f8-2bd9-4bd1-948b-098690b16b94"
+          },
+          "target": {
+            "$ref": "ee5c3236-c40a-4ff1-a06b-c7028975a9f9"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "5451b05f-ffd1-40d3-984d-985c9d91a77d",
+          "source": {
+            "$ref": "ee5c3236-c40a-4ff1-a06b-c7028975a9f9"
+          },
+          "target": {
+            "$ref": "d301f49f-af44-4b19-a342-a35ec517ea89"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "fafb1f01-1c88-4b15-a88d-7ef3449025fe",
+          "source": {
+            "$ref": "a4ec9ad9-6eeb-4480-afef-463755732fe3"
+          },
+          "target": {
+            "$ref": "d0daffc8-7875-42e7-8309-473b2769b560"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "6ac8481e-4bdc-4b6a-a012-e514b4479905",
+          "source": {
+            "$ref": "a4ec9ad9-6eeb-4480-afef-463755732fe3"
+          },
+          "target": {
+            "$ref": "c9228903-3a0f-4433-96cb-6d3fc300f27a"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "803fedd2-272b-4e38-9609-22c3527d91db",
+          "source": {
+            "$ref": "6ee75cb3-8949-40c8-8d47-74e581b03cef"
+          },
+          "target": {
+            "$ref": "de966ced-d1a1-49c3-a495-547424e32bbb"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "24851516-ab1b-4e26-9822-7b67e8d010bd",
+          "source": {
+            "$ref": "6ee75cb3-8949-40c8-8d47-74e581b03cef"
+          },
+          "target": {
+            "$ref": "c9228903-3a0f-4433-96cb-6d3fc300f27a"
+          }
+        },
+        {
+          "_type": "UMLDependency",
+          "_id": "e8381d24-b0d7-4de2-80f7-26b2b4c825db",
+          "source": {
+            "$ref": "a4ec9ad9-6eeb-4480-afef-463755732fe3"
+          },
+          "target": {
+            "$ref": "e178dfb9-3c27-42d7-8c37-beb86c5c86b0"
+          }
+        },
+        {
+          "_type": "UMLNode",
+          "_id": "94c37cc8-5f8e-4bb2-a4ca-437428d61361",
+          "name": "Laptop Mac (uvicorn :8000)"
+        },
+        {
+          "_type": "UMLNode",
+          "_id": "6641db3e-cb5e-4eaf-afbe-1bf544c8a31e",
+          "name": "Supabase Cloud"
+        },
+        {
+          "_type": "UMLNode",
+          "_id": "3e50384f-d36a-41ad-8ea1-ce048e115910",
+          "name": "Google AI Cloud"
+        },
+        {
+          "_type": "UMLNode",
+          "_id": "5733981c-1b0a-4833-b218-1220191fbcc7",
+          "name": "HuggingFace Hub"
+        },
+        {
+          "_type": "UMLNode",
+          "_id": "98d825ff-0553-4ac3-96aa-e945e5906676",
+          "name": "Client Device"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "1ecb6f67-1a26-4d90-b942-22e46f0afbe6",
+          "name": "FastAPI Server"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "2274cab4-8a1a-414a-a593-5450d862554c",
+          "name": "Redis (Docker)"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "803f385c-7a7b-4c42-823e-a0eea7e28626",
+          "name": "PostgreSQL"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "6fee3369-e218-43e7-9f86-59a94ce90add",
+          "name": "Gemini 2.5 Flash API"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "4f5baa10-92f8-4cdf-8ea9-a293b7a7369a",
+          "name": "Swin2SR + Whisper weights"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "f9990eee-20eb-4a1c-a0aa-d028ae9f5eb8",
+          "name": "FileO App (Docker)"
+        },
+        {
+          "_type": "UMLNode",
+          "_id": "b10fdc41-5818-4fd9-8e8f-c4de16741738",
+          "name": "Google Compute Engine\ne2-standard-4 (4vCPU 16GB)\nUbuntu 22.04"
+        },
+        {
+          "_type": "UMLNode",
+          "_id": "7d650237-4ce2-4120-8264-e5399a787ba0",
+          "name": "Google AI Cloud"
+        },
+        {
+          "_type": "UMLNode",
+          "_id": "e8b6d0f9-a34c-44d9-900c-93367ef4b02c",
+          "name": "Internet / Client"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "d866a5c7-cde1-48eb-a290-38faf19f674e",
+          "name": "FastAPI Container"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "e396ac04-5919-4668-b02e-d4ea03fe929c",
+          "name": "PostgreSQL Container"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "c42a46f6-c7c1-4965-a246-1a2ff5abcb6a",
+          "name": "Redis Container"
+        },
+        {
+          "_type": "UMLComponent",
+          "_id": "e1646ac5-18aa-4eb4-91e5-b45a5f5ea722",
+          "name": "docker-compose.yml"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "540581b4-a6de-4971-ad79-afe7e5036c33",
+          "name": "Utilizator"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "16cda078-1a10-4946-86e5-06bfcc7f9533",
+          "name": "FastAPI /api/auth"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2",
+          "name": "Auth Utils (bcrypt+JWT)"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "35c0f1f9-78d7-446f-9386-149d8522bd9a",
+          "name": "Supabase PostgreSQL"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "9721f65c-e514-42d1-9ea0-86283ac2fb5b",
+          "name": "POST /register {email,password}",
+          "source": {
+            "$ref": "540581b4-a6de-4971-ad79-afe7e5036c33"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "1"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "432fd1a4-6fe9-4d34-a0d5-b03ed4886cbd",
+          "name": "SELECT WHERE email=?",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "35c0f1f9-78d7-446f-9386-149d8522bd9a"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "2"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "dd2f0cc9-a3ec-4321-99e5-fd1d4a601647",
+          "name": "null",
+          "source": {
+            "$ref": "35c0f1f9-78d7-446f-9386-149d8522bd9a"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "3"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "ecc22cbb-5a30-49ba-9d93-e6a1f4935113",
+          "name": "hash_password(password)",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "4"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "1355c22c-db9c-4520-aa00-e69913a4a1b3",
+          "name": "hashed_password",
+          "source": {
+            "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "5"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "c20439f8-7276-421c-8e38-1942ffb856c6",
+          "name": "INSERT User(email,hash)",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "35c0f1f9-78d7-446f-9386-149d8522bd9a"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "6"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "d4fe0212-6d3f-4969-9849-e7b2a606ade0",
+          "name": "user.id",
+          "source": {
+            "$ref": "35c0f1f9-78d7-446f-9386-149d8522bd9a"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "7"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "d55df522-8f8c-4065-8bf1-dfaa22d3d550",
+          "name": "create_access_token({sub:user.id})",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "8"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "f185eb18-57b2-459a-a7cc-a338d92f52bd",
+          "name": "JWT token",
+          "source": {
+            "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "9"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "270f44ee-99eb-4c74-b600-a5c04e2e61c7",
+          "name": "201 {access_token}",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "540581b4-a6de-4971-ad79-afe7e5036c33"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "10"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "f2d30ea5-5976-43da-9016-ea53efcdfff4",
+          "name": "POST /login {email,password}",
+          "source": {
+            "$ref": "540581b4-a6de-4971-ad79-afe7e5036c33"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "11"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "a321a4e2-8b0c-48c5-ba98-4e3f85a2dcaa",
+          "name": "SELECT WHERE email=?",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "35c0f1f9-78d7-446f-9386-149d8522bd9a"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "12"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "47e236f4-9528-4187-8a6b-a042b1e72680",
+          "name": "user",
+          "source": {
+            "$ref": "35c0f1f9-78d7-446f-9386-149d8522bd9a"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "13"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "4b809f9e-50a8-4dd8-aa01-c936136619ba",
+          "name": "verify_password(plain,hashed)",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "14"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "70e7a16c-52f4-4221-89ad-410aa3507c05",
+          "name": "True",
+          "source": {
+            "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "15"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "46e6d60e-6f41-4680-aa10-df7335ba6ba7",
+          "name": "create_access_token({sub:user.id})",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "16"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "ea77f12a-1fc0-4c30-9638-12b43c2d5b0d",
+          "name": "JWT token",
+          "source": {
+            "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+          },
+          "target": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "17"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "df526697-4a0c-4f60-9771-c64b39c6db58",
+          "name": "200 {access_token}",
+          "source": {
+            "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+          },
+          "target": {
+            "$ref": "540581b4-a6de-4971-ad79-afe7e5036c33"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "18"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "a9f5e13d-18ed-4819-a047-08d8e1fa9f0c",
+          "name": "FileO App"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "6277887a-fa5e-4049-8644-373c00e6b971",
+          "name": "FastAPI /api/agent"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "118c6f29-28fb-45a8-9ecd-cd78999593ea",
+          "name": "AgentPool"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "e0fb59da-738c-47b0-be8e-6fe5a36982ef",
+          "name": "Worker asyncio"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "0f330550-c38d-49a1-8372-3a1326237ef4",
+          "name": "LangGraph ReAct"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "fa42efeb-b6b3-47ad-a0a9-67328784fc96",
+          "name": "Gemini 2.5 Flash"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "154528eb-91bd-4ae8-a1f5-b31d3b91960f",
+          "name": "FileO callback_url"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "667e3e55-a97d-4b88-b512-f803561200bc",
+          "name": "POST /chat {message,tools[],X-API-Key}",
+          "source": {
+            "$ref": "a9f5e13d-18ed-4819-a047-08d8e1fa9f0c"
+          },
+          "target": {
+            "$ref": "6277887a-fa5e-4049-8644-373c00e6b971"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "1"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "5df45dd6-b067-42b6-a968-2b9d58bc1a0f",
+          "name": "validare X-API-Key",
+          "source": {
+            "$ref": "6277887a-fa5e-4049-8644-373c00e6b971"
+          },
+          "target": {
+            "$ref": "6277887a-fa5e-4049-8644-373c00e6b971"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "2"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "24c380ca-63a5-41e0-80ba-a2d5e0932e41",
+          "name": "enqueue(api_key,message,tools)",
+          "source": {
+            "$ref": "6277887a-fa5e-4049-8644-373c00e6b971"
+          },
+          "target": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "3"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "008d35e9-9f28-4cba-be50-ca3ada65eb3e",
+          "name": "LPUSH agent:tasks",
+          "source": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "target": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "4"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "38228e29-8311-4e26-9468-ed68db19dc0a",
+          "name": "SUBSCRIBE agent:done:{id}",
+          "source": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "target": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "5"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "a18017d8-f8f3-47bd-b49d-ea40df8146cb",
+          "name": "BRPOP agent:tasks",
+          "source": {
+            "$ref": "e0fb59da-738c-47b0-be8e-6fe5a36982ef"
+          },
+          "target": {
+            "$ref": "e0fb59da-738c-47b0-be8e-6fe5a36982ef"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "6"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "6deb2a75-a1e7-4b43-930c-25329360be0c",
+          "name": "run_session(api_key,message,tools)",
+          "source": {
+            "$ref": "e0fb59da-738c-47b0-be8e-6fe5a36982ef"
+          },
+          "target": {
+            "$ref": "0f330550-c38d-49a1-8372-3a1326237ef4"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "7"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "ad6dd1d0-2b97-4920-a955-936d86986b1e",
+          "name": "invoke(history+tools)",
+          "source": {
+            "$ref": "0f330550-c38d-49a1-8372-3a1326237ef4"
+          },
+          "target": {
+            "$ref": "fa42efeb-b6b3-47ad-a0a9-67328784fc96"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "8"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "0f0267b9-0d27-462b-a9f1-236e7fea0a1b",
+          "name": "AIMessage(tool_call)",
+          "source": {
+            "$ref": "fa42efeb-b6b3-47ad-a0a9-67328784fc96"
+          },
+          "target": {
+            "$ref": "0f330550-c38d-49a1-8372-3a1326237ef4"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "9"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "86c575b0-da99-4fc9-b304-afb6c5670f89",
+          "name": "POST callback_url {tool,input}",
+          "source": {
+            "$ref": "0f330550-c38d-49a1-8372-3a1326237ef4"
+          },
+          "target": {
+            "$ref": "154528eb-91bd-4ae8-a1f5-b31d3b91960f"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "10"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "7c0b1242-f62e-4077-a9be-61cf311bbb0a",
+          "name": "{result}",
+          "source": {
+            "$ref": "154528eb-91bd-4ae8-a1f5-b31d3b91960f"
+          },
+          "target": {
+            "$ref": "0f330550-c38d-49a1-8372-3a1326237ef4"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "11"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "a702ace2-9d6f-4eb5-8a2f-08a1348c308f",
+          "name": "AIMessage(final text)",
+          "source": {
+            "$ref": "fa42efeb-b6b3-47ad-a0a9-67328784fc96"
+          },
+          "target": {
+            "$ref": "0f330550-c38d-49a1-8372-3a1326237ef4"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "12"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "90a3ac8c-97c0-4bb6-b029-f139418f4d95",
+          "name": "AgentResponse",
+          "source": {
+            "$ref": "0f330550-c38d-49a1-8372-3a1326237ef4"
+          },
+          "target": {
+            "$ref": "e0fb59da-738c-47b0-be8e-6fe5a36982ef"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "13"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "280ccf27-95f6-4487-b081-3b75444713a0",
+          "name": "SET agent:result TTL=120s",
+          "source": {
+            "$ref": "e0fb59da-738c-47b0-be8e-6fe5a36982ef"
+          },
+          "target": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "14"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "625bbc77-09ef-4c4c-943d-cf44275b2371",
+          "name": "PUBLISH agent:done",
+          "source": {
+            "$ref": "e0fb59da-738c-47b0-be8e-6fe5a36982ef"
+          },
+          "target": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "15"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "514237c7-821d-4903-acc9-f319410e9ffd",
+          "name": "GETDEL agent:result",
+          "source": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "target": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "16"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "7748eb6f-8cd8-4781-9d97-192869b63b37",
+          "name": "AgentResponse",
+          "source": {
+            "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+          },
+          "target": {
+            "$ref": "6277887a-fa5e-4049-8644-373c00e6b971"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "17"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "0b5f542b-9461-4dd2-8379-1a1537b8106b",
+          "name": "200 {message,tool_calls[]}",
+          "source": {
+            "$ref": "6277887a-fa5e-4049-8644-373c00e6b971"
+          },
+          "target": {
+            "$ref": "a9f5e13d-18ed-4819-a047-08d8e1fa9f0c"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "18"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "e7b205c9-f8d6-4a69-aa63-ee95a57ff867",
+          "name": "FileO App"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "f02e50dd-dadc-4ee3-a925-c2727c9d2c03",
+          "name": "FastAPI"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "21cea852-8090-47c6-8149-4580358b6625",
+          "name": "AgentPool"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "950699a7-8105-422b-b3f0-1fa893d5fc1e",
+          "name": "Worker asyncio"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1",
+          "name": "LangGraph P&E"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "b1a90cc2-621b-40ea-ad74-6a32d2f26cf3",
+          "name": "Planner (Gemini)"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "b12cb129-5922-485f-8955-1b54ad3f61f6",
+          "name": "Executor (Gemini)"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "4c0375c6-f05e-4a29-ac49-70ced146183c",
+          "name": "Replanner (Gemini)"
+        },
+        {
+          "_type": "UMLLifeline",
+          "_id": "03f7d7a3-55e0-41a4-a59f-1feb169bf309",
+          "name": "FileO callback"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "84ed42b4-1d30-4203-8d58-417ddf2a34e7",
+          "name": "POST /chat {use_planning=true}",
+          "source": {
+            "$ref": "e7b205c9-f8d6-4a69-aa63-ee95a57ff867"
+          },
+          "target": {
+            "$ref": "f02e50dd-dadc-4ee3-a925-c2727c9d2c03"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "1"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "b3c2b30a-478e-4e07-887a-5850425038d3",
+          "name": "enqueue(..., use_planning=true)",
+          "source": {
+            "$ref": "f02e50dd-dadc-4ee3-a925-c2727c9d2c03"
+          },
+          "target": {
+            "$ref": "21cea852-8090-47c6-8149-4580358b6625"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "2"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "ae85861e-468f-4fec-9996-2f75e13857ca",
+          "name": "BRPOP",
+          "source": {
+            "$ref": "950699a7-8105-422b-b3f0-1fa893d5fc1e"
+          },
+          "target": {
+            "$ref": "950699a7-8105-422b-b3f0-1fa893d5fc1e"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "3"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "234cf89f-271b-471c-a73c-6b303deb5a50",
+          "name": "run_planning_session(...)",
+          "source": {
+            "$ref": "950699a7-8105-422b-b3f0-1fa893d5fc1e"
+          },
+          "target": {
+            "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "4"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "ffe09a66-ce94-4620-94b4-c7c6329c7598",
+          "name": "invoke(AgentState{task})",
+          "source": {
+            "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+          },
+          "target": {
+            "$ref": "b1a90cc2-621b-40ea-ad74-6a32d2f26cf3"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "5"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "f77a4faf-8e0c-4355-930f-0025429f4f29",
+          "name": "plan=[pas1,pas2,pas3]",
+          "source": {
+            "$ref": "b1a90cc2-621b-40ea-ad74-6a32d2f26cf3"
+          },
+          "target": {
+            "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "6"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "9d9072ff-c002-4e2a-8ee5-cffa0adf394e",
+          "name": "invoke(AgentState{plan[0]})",
+          "source": {
+            "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+          },
+          "target": {
+            "$ref": "b12cb129-5922-485f-8955-1b54ad3f61f6"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "7"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "2f273b65-3ffe-4b1c-8eca-790acd447739",
+          "name": "POST tool callback {tool,input}",
+          "source": {
+            "$ref": "b12cb129-5922-485f-8955-1b54ad3f61f6"
+          },
+          "target": {
+            "$ref": "03f7d7a3-55e0-41a4-a59f-1feb169bf309"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "8"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "0dbaa1a2-8bc6-4260-8738-357cb2cbecd1",
+          "name": "{result}",
+          "source": {
+            "$ref": "03f7d7a3-55e0-41a4-a59f-1feb169bf309"
+          },
+          "target": {
+            "$ref": "b12cb129-5922-485f-8955-1b54ad3f61f6"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "9"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "43999152-aeea-4779-8a3c-796f2f78e240",
+          "name": "(pas_curent, rezultat)",
+          "source": {
+            "$ref": "b12cb129-5922-485f-8955-1b54ad3f61f6"
+          },
+          "target": {
+            "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "10"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "1c25e1e4-f4b9-40df-85cd-5c2be66de5f9",
+          "name": "invoke(AgentState{task,past_steps})",
+          "source": {
+            "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+          },
+          "target": {
+            "$ref": "4c0375c6-f05e-4a29-ac49-70ced146183c"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "11"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "f657e2ae-0c76-4165-917a-f55190842738",
+          "name": "plan actualizat / raspuns final",
+          "source": {
+            "$ref": "4c0375c6-f05e-4a29-ac49-70ced146183c"
+          },
+          "target": {
+            "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "12"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "1ab63459-71ef-4806-8b45-4217da1d0e56",
+          "name": "AgentResponse",
+          "source": {
+            "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+          },
+          "target": {
+            "$ref": "950699a7-8105-422b-b3f0-1fa893d5fc1e"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "13"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "dea9ed0d-9a6f-457a-9888-be3886f9206f",
+          "name": "SET+PUBLISH",
+          "source": {
+            "$ref": "950699a7-8105-422b-b3f0-1fa893d5fc1e"
+          },
+          "target": {
+            "$ref": "21cea852-8090-47c6-8149-4580358b6625"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "14"
+        },
+        {
+          "_type": "UMLMessage",
+          "_id": "f340512e-b75d-4310-96a8-7befb1afb9a6",
+          "name": "200 {message}",
+          "source": {
+            "$ref": "f02e50dd-dadc-4ee3-a925-c2727c9d2c03"
+          },
+          "target": {
+            "$ref": "e7b205c9-f8d6-4a69-aa63-ee95a57ff867"
+          },
+          "messageSort": "synch",
+          "sequenceNumber": "15"
+        }
+      ],
+      "ownedDiagrams": [
+        {
+          "_type": "UMLClassDiagram",
+          "_id": "6c4f9d34-2074-438d-88c4-f10998f6d2fb",
+          "name": "Modelul de date ORM",
+          "ownedViews": [
+            {
+              "_type": "UMLClassView",
+              "_id": "e83836c3-0e28-46d1-b152-168c4275bbdd",
+              "model": {
+                "$ref": "72888bf4-0b4e-4f87-b956-d0afa304d8af"
+              },
+              "x": 60,
+              "y": 80,
+              "width": 240,
+              "height": 180
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "9f5a8c2e-5f54-4349-bc49-4f66e125a80e",
+              "model": {
+                "$ref": "501d3e58-39cd-456a-9f2c-0dcae103677e"
+              },
+              "x": 380,
+              "y": 80,
+              "width": 240,
+              "height": 160
+            },
+            {
+              "_type": "UMLAssociationView",
+              "_id": "3619ab17-70e7-4300-a608-80035788f104",
+              "model": {
+                "$ref": "16cc3550-bb68-44e8-a728-34da0bed4c2a"
+              },
+              "source": {
+                "$ref": "e83836c3-0e28-46d1-b152-168c4275bbdd"
+              },
+              "target": {
+                "$ref": "9f5a8c2e-5f54-4349-bc49-4f66e125a80e"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLClassDiagram",
+          "_id": "df0feb8c-07e8-49cc-b0fb-243f3cc2a30e",
+          "name": "Ierarhia modelelor AI",
+          "ownedViews": [
+            {
+              "_type": "UMLInterfaceView",
+              "_id": "785fd852-bd9a-4630-97a9-681581d26764",
+              "model": {
+                "$ref": "d771ca47-5d25-42c1-a804-78dff9b33438"
+              },
+              "x": 260,
+              "y": 40,
+              "width": 220,
+              "height": 160
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "7606e94c-a2d3-49ba-b739-1a428ea85388",
+              "model": {
+                "$ref": "b1f69a91-13dd-4f43-8815-e48e4013dce7"
+              },
+              "x": 20,
+              "y": 280,
+              "width": 200,
+              "height": 120
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "551293f9-1a7e-4166-83de-254ffb45265e",
+              "model": {
+                "$ref": "d67c7ddc-c734-4db3-8e7b-876593fddd3c"
+              },
+              "x": 240,
+              "y": 280,
+              "width": 200,
+              "height": 120
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "1aa50bae-3ca7-4ac2-bc2d-854376f31ceb",
+              "model": {
+                "$ref": "6dc7a227-3d5b-4236-8aa4-7047505b43c0"
+              },
+              "x": 460,
+              "y": 280,
+              "width": 200,
+              "height": 120
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "57f5c328-dc09-48c6-b895-b5ec0e3e6c91",
+              "model": {
+                "$ref": "407b1ada-eded-442c-afc9-96423deff8bf"
+              },
+              "x": 680,
+              "y": 280,
+              "width": 200,
+              "height": 120
+            },
+            {
+              "_type": "UMLGeneralizationView",
+              "_id": "970a492b-69b0-48cb-8e2c-fe4ac13f2799",
+              "model": {
+                "$ref": "9c3f815e-bdea-4145-9361-f254935aada1"
+              },
+              "source": {
+                "$ref": "7606e94c-a2d3-49ba-b739-1a428ea85388"
+              },
+              "target": {
+                "$ref": "785fd852-bd9a-4630-97a9-681581d26764"
+              }
+            },
+            {
+              "_type": "UMLGeneralizationView",
+              "_id": "298986dc-471b-43e4-90a8-fe3cfbc63c32",
+              "model": {
+                "$ref": "b51b141d-a60e-4869-a99c-f12be7303308"
+              },
+              "source": {
+                "$ref": "551293f9-1a7e-4166-83de-254ffb45265e"
+              },
+              "target": {
+                "$ref": "785fd852-bd9a-4630-97a9-681581d26764"
+              }
+            },
+            {
+              "_type": "UMLGeneralizationView",
+              "_id": "fcef0e73-ee6f-41a6-b98a-4e9dfd327023",
+              "model": {
+                "$ref": "5e43bd2f-3372-4afe-bff6-c99576abdcce"
+              },
+              "source": {
+                "$ref": "1aa50bae-3ca7-4ac2-bc2d-854376f31ceb"
+              },
+              "target": {
+                "$ref": "785fd852-bd9a-4630-97a9-681581d26764"
+              }
+            },
+            {
+              "_type": "UMLGeneralizationView",
+              "_id": "b6f2b3f3-8249-4a5a-9638-79543f39b96b",
+              "model": {
+                "$ref": "734f0795-8b1a-44de-a2b1-d80970d2afc7"
+              },
+              "source": {
+                "$ref": "57f5c328-dc09-48c6-b895-b5ec0e3e6c91"
+              },
+              "target": {
+                "$ref": "785fd852-bd9a-4630-97a9-681581d26764"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "741a838e-cf11-466d-b3a3-0c334a13f846",
+              "model": {
+                "$ref": "bf0d1350-e334-421d-8812-d7226eaf70ba"
+              },
+              "source": {
+                "$ref": "57f5c328-dc09-48c6-b895-b5ec0e3e6c91"
+              },
+              "target": {
+                "$ref": "551293f9-1a7e-4166-83de-254ffb45265e"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLClassDiagram",
+          "_id": "1ced92c7-273c-45b5-88e5-d1051ef83f52",
+          "name": "Sistemul de agent",
+          "ownedViews": [
+            {
+              "_type": "UMLClassView",
+              "_id": "ab6eb695-523d-4e2a-9f4b-9c927dc4c96a",
+              "model": {
+                "$ref": "59525a88-f530-4c02-953f-2faeeed1eb88"
+              },
+              "x": 20,
+              "y": 20,
+              "width": 220,
+              "height": 140
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "e789874b-4009-405a-b381-6b52d4277b93",
+              "model": {
+                "$ref": "15178075-6e1d-4036-bd3d-9d560b1b7e40"
+              },
+              "x": 280,
+              "y": 20,
+              "width": 220,
+              "height": 120
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "e8b69737-8713-47a9-9613-c966db6e55c4",
+              "model": {
+                "$ref": "99c971b3-6082-4b85-a833-c6d3734cabb4"
+              },
+              "x": 540,
+              "y": 20,
+              "width": 200,
+              "height": 120
+            },
+            {
+              "_type": "UMLInterfaceView",
+              "_id": "8d50716c-85a0-41d1-85b6-eca9b3a1c11a",
+              "model": {
+                "$ref": "c4f3c7ec-78c9-4f3d-aa06-70856abfc7e6"
+              },
+              "x": 100,
+              "y": 240,
+              "width": 200,
+              "height": 100
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "a86b7171-9083-4bef-aef4-99ef0dce580c",
+              "model": {
+                "$ref": "5c0518e7-d6d1-479c-b20e-92d737e53f8e"
+              },
+              "x": 20,
+              "y": 400,
+              "width": 180,
+              "height": 80
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "7b6116de-9839-4eea-bc52-87e5bbad3a48",
+              "model": {
+                "$ref": "5c2261dc-1726-4c99-9d20-cd95c785821a"
+              },
+              "x": 220,
+              "y": 400,
+              "width": 200,
+              "height": 80
+            },
+            {
+              "_type": "UMLClassView",
+              "_id": "eb325d65-bdb5-4f4d-b9e8-fcaf399a5a8e",
+              "model": {
+                "$ref": "b376dd95-5902-400c-8ffe-f8373875f00e"
+              },
+              "x": 540,
+              "y": 240,
+              "width": 200,
+              "height": 120
+            },
+            {
+              "_type": "UMLAssociationView",
+              "_id": "1a23c61e-7cc4-473b-8d37-2682874f14d0",
+              "model": {
+                "$ref": "dfddfd38-7206-4d25-9878-f4879cad847e"
+              },
+              "source": {
+                "$ref": "ab6eb695-523d-4e2a-9f4b-9c927dc4c96a"
+              },
+              "target": {
+                "$ref": "e789874b-4009-405a-b381-6b52d4277b93"
+              }
+            },
+            {
+              "_type": "UMLGeneralizationView",
+              "_id": "df54bfb0-8041-44a6-9a8a-724abed58324",
+              "model": {
+                "$ref": "2c367e27-ce12-4a81-83b1-ec84f12dfa76"
+              },
+              "source": {
+                "$ref": "a86b7171-9083-4bef-aef4-99ef0dce580c"
+              },
+              "target": {
+                "$ref": "8d50716c-85a0-41d1-85b6-eca9b3a1c11a"
+              }
+            },
+            {
+              "_type": "UMLGeneralizationView",
+              "_id": "337c14b8-9dae-4ae1-b748-211af03a7923",
+              "model": {
+                "$ref": "f629ff85-26b5-4194-a50c-eef8de94fbff"
+              },
+              "source": {
+                "$ref": "7b6116de-9839-4eea-bc52-87e5bbad3a48"
+              },
+              "target": {
+                "$ref": "8d50716c-85a0-41d1-85b6-eca9b3a1c11a"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLUseCaseDiagram",
+          "_id": "b923dee3-8bf0-4bc2-acd0-ecb458291326",
+          "name": "UC-1 Autentificare",
+          "ownedViews": [
+            {
+              "_type": "UMLActorView",
+              "_id": "3706c773-8d75-4d7f-848c-e3177fdb9fbf",
+              "model": {
+                "$ref": "a170b7ca-dd1f-4ce2-ac9f-259d346368a6"
+              },
+              "x": 30,
+              "y": 200,
+              "width": 40,
+              "height": 60
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "2c99bca3-653a-4827-bf91-229dd83bdb01",
+              "model": {
+                "$ref": "b4576019-5c4f-4ef4-ac8a-6c07972bbfbc"
+              },
+              "x": 160,
+              "y": 40,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "c8c3ff23-f926-4896-bd9f-b81620c045d0",
+              "model": {
+                "$ref": "5e47b464-23a2-4bc0-a4b9-827c63a483f4"
+              },
+              "x": 160,
+              "y": 120,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "f8342684-019e-4322-b737-31ae8b8dc8c1",
+              "model": {
+                "$ref": "8f6d6f64-f8a8-4560-a010-e65218be3c65"
+              },
+              "x": 160,
+              "y": 200,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "bd87398b-89b3-43e3-8742-718e699781f8",
+              "model": {
+                "$ref": "14c0071f-cbb9-4be6-b6f3-1f6120a5165e"
+              },
+              "x": 160,
+              "y": 280,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "6062fb58-fa02-4eb2-ad11-3d7f03e5f0fd",
+              "model": {
+                "$ref": "e2fb0525-e960-42eb-b9b6-9a18c34bed29"
+              },
+              "x": 160,
+              "y": 360,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "4df2a1ab-1c32-4c00-8952-ac96881d1b3a",
+              "model": {
+                "$ref": "6aeb22db-11da-427a-9327-da6b3aca0b43"
+              },
+              "x": 440,
+              "y": 120,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLIncludeView",
+              "_id": "7381ba1e-abc2-45eb-a691-9902b215e860",
+              "model": {
+                "$ref": "3434c09f-5f0a-4ad2-9fc1-e6a52875a253"
+              },
+              "source": {
+                "$ref": "2c99bca3-653a-4827-bf91-229dd83bdb01"
+              },
+              "target": {
+                "$ref": "4df2a1ab-1c32-4c00-8952-ac96881d1b3a"
+              }
+            },
+            {
+              "_type": "UMLIncludeView",
+              "_id": "409cb8d4-82e9-47f0-b861-be6beba37151",
+              "model": {
+                "$ref": "12ae1210-0e38-4179-be2e-9d6cebefd1e6"
+              },
+              "source": {
+                "$ref": "c8c3ff23-f926-4896-bd9f-b81620c045d0"
+              },
+              "target": {
+                "$ref": "4df2a1ab-1c32-4c00-8952-ac96881d1b3a"
+              }
+            },
+            {
+              "_type": "UMLIncludeView",
+              "_id": "122b7638-af2f-4075-b710-1fb8dc8cdfc8",
+              "model": {
+                "$ref": "30220e13-5f76-40d3-a331-e12aed4bfaaa"
+              },
+              "source": {
+                "$ref": "f8342684-019e-4322-b737-31ae8b8dc8c1"
+              },
+              "target": {
+                "$ref": "c8c3ff23-f926-4896-bd9f-b81620c045d0"
+              }
+            },
+            {
+              "_type": "UMLIncludeView",
+              "_id": "cdbfe718-ddd1-4d9d-bdb8-3282ba5df38b",
+              "model": {
+                "$ref": "269e9973-243e-4b13-a2fd-158536483bb4"
+              },
+              "source": {
+                "$ref": "bd87398b-89b3-43e3-8742-718e699781f8"
+              },
+              "target": {
+                "$ref": "c8c3ff23-f926-4896-bd9f-b81620c045d0"
+              }
+            },
+            {
+              "_type": "UMLIncludeView",
+              "_id": "b66888be-3898-4090-b714-d006e0a7ca48",
+              "model": {
+                "$ref": "a51b339c-ee1c-4b8c-a137-109f27f4fe4d"
+              },
+              "source": {
+                "$ref": "6062fb58-fa02-4eb2-ad11-3d7f03e5f0fd"
+              },
+              "target": {
+                "$ref": "c8c3ff23-f926-4896-bd9f-b81620c045d0"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLUseCaseDiagram",
+          "_id": "c83afa36-1fd6-4f8b-af5c-250474f8620a",
+          "name": "UC-2 Gateway AI",
+          "ownedViews": [
+            {
+              "_type": "UMLActorView",
+              "_id": "f239efc1-1123-4326-9e9e-473dbbdc00cb",
+              "model": {
+                "$ref": "be20e9b9-5fa5-461c-908c-a05c67e61f87"
+              },
+              "x": 20,
+              "y": 180,
+              "width": 40,
+              "height": 60
+            },
+            {
+              "_type": "UMLActorView",
+              "_id": "333bfd6e-bcef-4dc7-b601-615b4df9bafb",
+              "model": {
+                "$ref": "a00c225a-c2ec-4b43-8c6f-ffff1b22dc4d"
+              },
+              "x": 680,
+              "y": 180,
+              "width": 40,
+              "height": 60
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "229c80d7-2b25-41c8-8b6d-94eb95a7179e",
+              "model": {
+                "$ref": "989a0aad-c995-4e2b-86b5-84a4390df829"
+              },
+              "x": 140,
+              "y": 40,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "c47296fa-ac70-4923-808e-29774085a30a",
+              "model": {
+                "$ref": "89e79964-08dc-4227-9d7d-fd8d3f6fc477"
+              },
+              "x": 140,
+              "y": 110,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "9e46b2b8-c846-42ff-8909-2adeb4edeaf1",
+              "model": {
+                "$ref": "d94275d6-7e9f-432c-a8c3-74cb52f2318c"
+              },
+              "x": 140,
+              "y": 180,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "93ecda1b-838c-4e90-ac30-f6bb3378c216",
+              "model": {
+                "$ref": "8ab78740-6572-408b-8fb1-f7746686d2d5"
+              },
+              "x": 140,
+              "y": 250,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "4aea2892-d16e-4bff-b7e2-b93138568ce2",
+              "model": {
+                "$ref": "0ebaab33-7581-40b1-b9f4-309becec06b9"
+              },
+              "x": 140,
+              "y": 320,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "3e9aee93-6e0c-4430-a12b-9615265fa05c",
+              "model": {
+                "$ref": "58ad0cd8-f1d1-4c22-821a-00f7c4e451f1"
+              },
+              "x": 140,
+              "y": 390,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "70f8699d-3011-4412-ae4f-f4217346c249",
+              "model": {
+                "$ref": "a844aabf-69b3-42dd-9c33-8e83f24e61ad"
+              },
+              "x": 420,
+              "y": 220,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "66ae2e53-d478-4750-aef0-d97ada37b0fc",
+              "model": {
+                "$ref": "87b30bbf-66eb-42f2-a1e4-b4cd6db954ba"
+              },
+              "x": 420,
+              "y": 290,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLIncludeView",
+              "_id": "3d6590f6-556e-4a25-a691-23d928b0fe8a",
+              "model": {
+                "$ref": "0141a082-bdf3-441f-9494-b724ecbdde4c"
+              },
+              "source": {
+                "$ref": "93ecda1b-838c-4e90-ac30-f6bb3378c216"
+              },
+              "target": {
+                "$ref": "70f8699d-3011-4412-ae4f-f4217346c249"
+              }
+            },
+            {
+              "_type": "UMLIncludeView",
+              "_id": "df4ce61f-e7f9-4917-b06f-3a8791f9a229",
+              "model": {
+                "$ref": "cd8dbf39-4f81-4a96-a41c-75468935b8fe"
+              },
+              "source": {
+                "$ref": "93ecda1b-838c-4e90-ac30-f6bb3378c216"
+              },
+              "target": {
+                "$ref": "66ae2e53-d478-4750-aef0-d97ada37b0fc"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLUseCaseDiagram",
+          "_id": "2ea4f6f5-f641-4618-ba04-584fe0b2808e",
+          "name": "UC-3 Sistemul de agent",
+          "ownedViews": [
+            {
+              "_type": "UMLActorView",
+              "_id": "942ca5a8-297d-48e8-8e54-7d24909e05ea",
+              "model": {
+                "$ref": "edff11a5-a3fb-4617-a9d5-01845ff0b5eb"
+              },
+              "x": 20,
+              "y": 80,
+              "width": 40,
+              "height": 60
+            },
+            {
+              "_type": "UMLActorView",
+              "_id": "9c0b2ec7-3f72-458f-8c8f-7e8a2e534a0a",
+              "model": {
+                "$ref": "a8891a5d-a495-4479-bea2-64ee7e23baff"
+              },
+              "x": 680,
+              "y": 200,
+              "width": 40,
+              "height": 60
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "71426f0e-3b51-4510-a1b0-ddee5edcef7f",
+              "model": {
+                "$ref": "e29d9fd7-9412-4d73-85ef-1d78bc8a5854"
+              },
+              "x": 140,
+              "y": 40,
+              "width": 220,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "eca8245d-2726-40d4-b46c-0fb3f2a42d45",
+              "model": {
+                "$ref": "aef3e940-79b9-4d90-8c0f-cc07445dcf40"
+              },
+              "x": 140,
+              "y": 120,
+              "width": 220,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "9af21222-b9f8-45c9-81ed-76b49f2fd59e",
+              "model": {
+                "$ref": "7d65b501-f301-48ad-9974-b4c4d4756904"
+              },
+              "x": 140,
+              "y": 200,
+              "width": 220,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "e9c0813b-342e-44ce-b97d-e47b041069ab",
+              "model": {
+                "$ref": "bdd837db-edb9-48a6-a539-20cffb5a9e79"
+              },
+              "x": 420,
+              "y": 40,
+              "width": 220,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "66a1e1e2-020b-4aa0-8009-cbefa20f197d",
+              "model": {
+                "$ref": "b84dd888-26dc-4120-9770-2b8f85d9b05c"
+              },
+              "x": 420,
+              "y": 120,
+              "width": 220,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "958216fa-3cb5-4423-9714-b1eb0b5bdf10",
+              "model": {
+                "$ref": "129fda57-d284-4c3e-9e81-96e0af05962d"
+              },
+              "x": 420,
+              "y": 200,
+              "width": 220,
+              "height": 50
+            },
+            {
+              "_type": "UMLUseCaseView",
+              "_id": "b3f94d9b-4017-41c5-8c78-15e2e5f49ab2",
+              "model": {
+                "$ref": "602d6bc1-e42f-46ea-bd5d-2f07efb4282e"
+              },
+              "x": 420,
+              "y": 280,
+              "width": 220,
+              "height": 50
+            },
+            {
+              "_type": "UMLExtendView",
+              "_id": "f0ac241a-d83f-4a18-a39d-c05298f2cc33",
+              "model": {
+                "$ref": "1d575e71-d504-40cf-bd49-ca9fcc0c4924"
+              },
+              "source": {
+                "$ref": "eca8245d-2726-40d4-b46c-0fb3f2a42d45"
+              },
+              "target": {
+                "$ref": "71426f0e-3b51-4510-a1b0-ddee5edcef7f"
+              }
+            },
+            {
+              "_type": "UMLIncludeView",
+              "_id": "3154da56-a2d0-4c3e-9863-5b917fafed5e",
+              "model": {
+                "$ref": "c9147569-34dd-4cb5-8ff4-4bdc3cfbb726"
+              },
+              "source": {
+                "$ref": "958216fa-3cb5-4423-9714-b1eb0b5bdf10"
+              },
+              "target": {
+                "$ref": "b3f94d9b-4017-41c5-8c78-15e2e5f49ab2"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLComponentDiagram",
+          "_id": "03df44d0-e576-4337-927d-d977b0cd2f93",
+          "name": "Diagrama de componente",
+          "ownedViews": [
+            {
+              "_type": "UMLComponentView",
+              "_id": "6eb34176-efd9-420d-92dc-a3bb4c852210",
+              "model": {
+                "$ref": "b55a8321-c97e-4207-be8c-05af91d61826"
+              },
+              "x": 200,
+              "y": 40,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "d92e78da-0146-4359-a41f-0546a36e4c02",
+              "model": {
+                "$ref": "771337f8-2bd9-4bd1-948b-098690b16b94"
+              },
+              "x": 40,
+              "y": 160,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "5b52972a-5be1-4744-a244-f071dc5d58e7",
+              "model": {
+                "$ref": "6ee75cb3-8949-40c8-8d47-74e581b03cef"
+              },
+              "x": 240,
+              "y": 160,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "9ab93dd7-8d91-486f-a6aa-a515bec7b5ac",
+              "model": {
+                "$ref": "a4ec9ad9-6eeb-4480-afef-463755732fe3"
+              },
+              "x": 440,
+              "y": 160,
+              "width": 200,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "3da4798e-ec9c-4586-a128-4cc1294acd1d",
+              "model": {
+                "$ref": "d0daffc8-7875-42e7-8309-473b2769b560"
+              },
+              "x": 440,
+              "y": 280,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "47f7be21-1ee8-4f26-94b1-fbc169af7e42",
+              "model": {
+                "$ref": "ee5c3236-c40a-4ff1-a06b-c7028975a9f9"
+              },
+              "x": 40,
+              "y": 280,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "bb552baf-f78a-45f5-af55-94499f77fa14",
+              "model": {
+                "$ref": "d301f49f-af44-4b19-a342-a35ec517ea89"
+              },
+              "x": 40,
+              "y": 380,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "0f5d576f-954b-4bc9-88b1-65a280880141",
+              "model": {
+                "$ref": "c9228903-3a0f-4433-96cb-6d3fc300f27a"
+              },
+              "x": 340,
+              "y": 380,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "09274172-51ed-493b-aeee-90ea601a3d71",
+              "model": {
+                "$ref": "de966ced-d1a1-49c3-a495-547424e32bbb"
+              },
+              "x": 540,
+              "y": 380,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "c0d555d4-e64c-4999-b434-15f0a120a943",
+              "model": {
+                "$ref": "e178dfb9-3c27-42d7-8c37-beb86c5c86b0"
+              },
+              "x": 200,
+              "y": 460,
+              "width": 180,
+              "height": 50
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "da9819fd-38e3-453b-afcc-108f477d058d",
+              "model": {
+                "$ref": "f9fc893a-8f07-42b3-894e-482558e53e6d"
+              },
+              "source": {
+                "$ref": "6eb34176-efd9-420d-92dc-a3bb4c852210"
+              },
+              "target": {
+                "$ref": "d92e78da-0146-4359-a41f-0546a36e4c02"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "67539b8a-4bab-4b22-b937-09943d126b32",
+              "model": {
+                "$ref": "1da5beed-ee09-4303-a058-510e0019e8c6"
+              },
+              "source": {
+                "$ref": "6eb34176-efd9-420d-92dc-a3bb4c852210"
+              },
+              "target": {
+                "$ref": "5b52972a-5be1-4744-a244-f071dc5d58e7"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "91cdfa20-d9ec-4a7f-b484-f474adc08886",
+              "model": {
+                "$ref": "a40b4f2c-0f10-4080-894d-068d5cde70d3"
+              },
+              "source": {
+                "$ref": "6eb34176-efd9-420d-92dc-a3bb4c852210"
+              },
+              "target": {
+                "$ref": "9ab93dd7-8d91-486f-a6aa-a515bec7b5ac"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "bc90da76-1873-481a-91ab-9e24723754be",
+              "model": {
+                "$ref": "8402ac33-e3a1-4bd9-a9a6-696935c22222"
+              },
+              "source": {
+                "$ref": "d92e78da-0146-4359-a41f-0546a36e4c02"
+              },
+              "target": {
+                "$ref": "47f7be21-1ee8-4f26-94b1-fbc169af7e42"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "b6ffa391-e0ea-49c7-b5e0-f9011165556e",
+              "model": {
+                "$ref": "5451b05f-ffd1-40d3-984d-985c9d91a77d"
+              },
+              "source": {
+                "$ref": "47f7be21-1ee8-4f26-94b1-fbc169af7e42"
+              },
+              "target": {
+                "$ref": "bb552baf-f78a-45f5-af55-94499f77fa14"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "b052c4b6-60da-4399-822e-827e7d9f08cd",
+              "model": {
+                "$ref": "fafb1f01-1c88-4b15-a88d-7ef3449025fe"
+              },
+              "source": {
+                "$ref": "9ab93dd7-8d91-486f-a6aa-a515bec7b5ac"
+              },
+              "target": {
+                "$ref": "3da4798e-ec9c-4586-a128-4cc1294acd1d"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "2716c80f-096a-453d-8581-89d1715f1f8e",
+              "model": {
+                "$ref": "6ac8481e-4bdc-4b6a-a012-e514b4479905"
+              },
+              "source": {
+                "$ref": "9ab93dd7-8d91-486f-a6aa-a515bec7b5ac"
+              },
+              "target": {
+                "$ref": "0f5d576f-954b-4bc9-88b1-65a280880141"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "50fccd89-3d5c-44a7-ab25-cf661fd9ea2f",
+              "model": {
+                "$ref": "803fedd2-272b-4e38-9609-22c3527d91db"
+              },
+              "source": {
+                "$ref": "5b52972a-5be1-4744-a244-f071dc5d58e7"
+              },
+              "target": {
+                "$ref": "09274172-51ed-493b-aeee-90ea601a3d71"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "3605288b-9d57-4267-9508-cc5d8f60e3c5",
+              "model": {
+                "$ref": "24851516-ab1b-4e26-9822-7b67e8d010bd"
+              },
+              "source": {
+                "$ref": "5b52972a-5be1-4744-a244-f071dc5d58e7"
+              },
+              "target": {
+                "$ref": "0f5d576f-954b-4bc9-88b1-65a280880141"
+              }
+            },
+            {
+              "_type": "UMLDependencyView",
+              "_id": "b98bad1e-34cc-4bb8-a4e4-0b2643b07c45",
+              "model": {
+                "$ref": "e8381d24-b0d7-4de2-80f7-26b2b4c825db"
+              },
+              "source": {
+                "$ref": "9ab93dd7-8d91-486f-a6aa-a515bec7b5ac"
+              },
+              "target": {
+                "$ref": "c0d555d4-e64c-4999-b434-15f0a120a943"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLDeploymentDiagram",
+          "_id": "2d33e0a4-78bf-4935-b4bd-ef12ee38e4ec",
+          "name": "Deployment — infrastructura curentă",
+          "ownedViews": [
+            {
+              "_type": "UMLNodeView",
+              "_id": "75c1207e-3a3b-4ff0-b6dc-44a52bb2284f",
+              "model": {
+                "$ref": "94c37cc8-5f8e-4bb2-a4ca-437428d61361"
+              },
+              "x": 40,
+              "y": 40,
+              "width": 260,
+              "height": 160
+            },
+            {
+              "_type": "UMLNodeView",
+              "_id": "faf629d6-1241-4245-8264-aac2dd39066b",
+              "model": {
+                "$ref": "6641db3e-cb5e-4eaf-afbe-1bf544c8a31e"
+              },
+              "x": 360,
+              "y": 40,
+              "width": 200,
+              "height": 100
+            },
+            {
+              "_type": "UMLNodeView",
+              "_id": "5fc36da8-8a4a-4f30-a049-9edf91ca8025",
+              "model": {
+                "$ref": "3e50384f-d36a-41ad-8ea1-ce048e115910"
+              },
+              "x": 360,
+              "y": 180,
+              "width": 200,
+              "height": 100
+            },
+            {
+              "_type": "UMLNodeView",
+              "_id": "e2052c63-d75a-4401-9c53-67883fd44363",
+              "model": {
+                "$ref": "5733981c-1b0a-4833-b218-1220191fbcc7"
+              },
+              "x": 360,
+              "y": 320,
+              "width": 200,
+              "height": 100
+            },
+            {
+              "_type": "UMLNodeView",
+              "_id": "3243419a-1bfe-4c9f-825f-6ddccfbafa86",
+              "model": {
+                "$ref": "98d825ff-0553-4ac3-96aa-e945e5906676"
+              },
+              "x": 40,
+              "y": 260,
+              "width": 200,
+              "height": 100
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "8e8b4d2a-27b9-4a2f-9cbe-ed660a374576",
+              "model": {
+                "$ref": "1ecb6f67-1a26-4d90-b942-22e46f0afbe6"
+              },
+              "x": 60,
+              "y": 80,
+              "width": 130,
+              "height": 40
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "bc5aecb3-f912-49d6-ba61-910f049d3075",
+              "model": {
+                "$ref": "2274cab4-8a1a-414a-a593-5450d862554c"
+              },
+              "x": 60,
+              "y": 140,
+              "width": 130,
+              "height": 40
+            }
+          ]
+        },
+        {
+          "_type": "UMLDeploymentDiagram",
+          "_id": "8d924823-568a-431e-9189-fcfcc8cdb33f",
+          "name": "Deployment — arhitectura GCE (referință)",
+          "ownedViews": [
+            {
+              "_type": "UMLNodeView",
+              "_id": "7ddd897a-0cf5-4d1a-b548-2ee6125cf4e7",
+              "model": {
+                "$ref": "b10fdc41-5818-4fd9-8e8f-c4de16741738"
+              },
+              "x": 40,
+              "y": 40,
+              "width": 340,
+              "height": 240
+            },
+            {
+              "_type": "UMLNodeView",
+              "_id": "065b1206-617b-4950-9f1b-76ed16b3b472",
+              "model": {
+                "$ref": "7d650237-4ce2-4120-8264-e5399a787ba0"
+              },
+              "x": 440,
+              "y": 40,
+              "width": 200,
+              "height": 100
+            },
+            {
+              "_type": "UMLNodeView",
+              "_id": "f4b91f87-533b-4ad1-bdd4-49a3458faf4d",
+              "model": {
+                "$ref": "e8b6d0f9-a34c-44d9-900c-93367ef4b02c"
+              },
+              "x": 440,
+              "y": 180,
+              "width": 200,
+              "height": 100
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "f3cb7995-b8ff-4860-bc57-0fe087ffdeda",
+              "model": {
+                "$ref": "d866a5c7-cde1-48eb-a290-38faf19f674e"
+              },
+              "x": 60,
+              "y": 100,
+              "width": 140,
+              "height": 40
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "e4b373fb-25b3-4f50-be9d-e9ae19e99e36",
+              "model": {
+                "$ref": "e396ac04-5919-4668-b02e-d4ea03fe929c"
+              },
+              "x": 60,
+              "y": 160,
+              "width": 140,
+              "height": 40
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "23483135-4efc-47e8-b778-727e597abde5",
+              "model": {
+                "$ref": "c42a46f6-c7c1-4965-a246-1a2ff5abcb6a"
+              },
+              "x": 220,
+              "y": 100,
+              "width": 140,
+              "height": 40
+            },
+            {
+              "_type": "UMLComponentView",
+              "_id": "6eea5652-6061-46f9-9cd3-f14ad2d98c9f",
+              "model": {
+                "$ref": "e1646ac5-18aa-4eb4-91e5-b45a5f5ea722"
+              },
+              "x": 220,
+              "y": 160,
+              "width": 140,
+              "height": 40
+            }
+          ]
+        },
+        {
+          "_type": "UMLSequenceDiagram",
+          "_id": "70ba60c4-c403-4540-ba51-2d8f42273df5",
+          "name": "Flux autentificare JWT",
+          "ownedViews": [
+            {
+              "_type": "UMLLifelineView",
+              "_id": "a21f4d52-046a-4937-baef-494ead186ce3",
+              "model": {
+                "$ref": "540581b4-a6de-4971-ad79-afe7e5036c33"
+              },
+              "x": 80,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "b8e89cdf-a391-4e41-a377-40638281fd96",
+              "model": {
+                "$ref": "16cda078-1a10-4946-86e5-06bfcc7f9533"
+              },
+              "x": 240,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "93d9b550-6ee5-43dc-958c-1e56d5ed787a",
+              "model": {
+                "$ref": "0b0340bb-c5dc-4ed7-b20f-9859291d32e2"
+              },
+              "x": 400,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "6cada060-1f37-4653-a030-9b74124a7ba8",
+              "model": {
+                "$ref": "35c0f1f9-78d7-446f-9386-149d8522bd9a"
+              },
+              "x": 560,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "6a24bced-e26f-47b2-a6dd-8f750032c48e",
+              "model": {
+                "$ref": "9721f65c-e514-42d1-9ea0-86283ac2fb5b"
+              },
+              "source": {
+                "$ref": "a21f4d52-046a-4937-baef-494ead186ce3"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "3d193d4b-b50a-4c1e-bb13-6de94ee29dde",
+              "model": {
+                "$ref": "432fd1a4-6fe9-4d34-a0d5-b03ed4886cbd"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "6cada060-1f37-4653-a030-9b74124a7ba8"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "b3d8e222-acb0-4315-96a7-b9b7c8ec104b",
+              "model": {
+                "$ref": "dd2f0cc9-a3ec-4321-99e5-fd1d4a601647"
+              },
+              "source": {
+                "$ref": "6cada060-1f37-4653-a030-9b74124a7ba8"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "d741dda6-b202-4c8b-b671-cc763f33a480",
+              "model": {
+                "$ref": "ecc22cbb-5a30-49ba-9d93-e6a1f4935113"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "93d9b550-6ee5-43dc-958c-1e56d5ed787a"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "abc31c12-0447-49df-bc20-61a2c2b36c84",
+              "model": {
+                "$ref": "1355c22c-db9c-4520-aa00-e69913a4a1b3"
+              },
+              "source": {
+                "$ref": "93d9b550-6ee5-43dc-958c-1e56d5ed787a"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "ae87bdea-a968-4eec-8567-34cb9579219a",
+              "model": {
+                "$ref": "c20439f8-7276-421c-8e38-1942ffb856c6"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "6cada060-1f37-4653-a030-9b74124a7ba8"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "55e36788-419f-4629-a44e-5b7c5e8ab744",
+              "model": {
+                "$ref": "d4fe0212-6d3f-4969-9849-e7b2a606ade0"
+              },
+              "source": {
+                "$ref": "6cada060-1f37-4653-a030-9b74124a7ba8"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "d6941d8a-ce14-4c60-a7f3-94b48041d87d",
+              "model": {
+                "$ref": "d55df522-8f8c-4065-8bf1-dfaa22d3d550"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "93d9b550-6ee5-43dc-958c-1e56d5ed787a"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "eda6c884-a99f-4f59-b0ec-91925844c2a7",
+              "model": {
+                "$ref": "f185eb18-57b2-459a-a7cc-a338d92f52bd"
+              },
+              "source": {
+                "$ref": "93d9b550-6ee5-43dc-958c-1e56d5ed787a"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "82f8a6f0-1c03-4b8c-acc9-e1dc41c34f82",
+              "model": {
+                "$ref": "270f44ee-99eb-4c74-b600-a5c04e2e61c7"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "a21f4d52-046a-4937-baef-494ead186ce3"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "4223a08b-2895-4e45-a7b6-cf54de6f4af5",
+              "model": {
+                "$ref": "f2d30ea5-5976-43da-9016-ea53efcdfff4"
+              },
+              "source": {
+                "$ref": "a21f4d52-046a-4937-baef-494ead186ce3"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "7f6e8057-00ad-4158-a2b1-b1360ea1bceb",
+              "model": {
+                "$ref": "a321a4e2-8b0c-48c5-ba98-4e3f85a2dcaa"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "6cada060-1f37-4653-a030-9b74124a7ba8"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "f96e33c1-415a-40b4-b8a4-307eae56d9cd",
+              "model": {
+                "$ref": "47e236f4-9528-4187-8a6b-a042b1e72680"
+              },
+              "source": {
+                "$ref": "6cada060-1f37-4653-a030-9b74124a7ba8"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "ee90bda0-fb25-4b08-9fa2-b96061ac62e1",
+              "model": {
+                "$ref": "4b809f9e-50a8-4dd8-aa01-c936136619ba"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "93d9b550-6ee5-43dc-958c-1e56d5ed787a"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "538b8bc1-77dc-47dd-af82-bf58c55b677e",
+              "model": {
+                "$ref": "70e7a16c-52f4-4221-89ad-410aa3507c05"
+              },
+              "source": {
+                "$ref": "93d9b550-6ee5-43dc-958c-1e56d5ed787a"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "80dd85e7-bb82-457b-a2f4-f6639a444471",
+              "model": {
+                "$ref": "46e6d60e-6f41-4680-aa10-df7335ba6ba7"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "93d9b550-6ee5-43dc-958c-1e56d5ed787a"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "2d41c1cf-d715-46d9-8338-733369a24410",
+              "model": {
+                "$ref": "ea77f12a-1fc0-4c30-9638-12b43c2d5b0d"
+              },
+              "source": {
+                "$ref": "93d9b550-6ee5-43dc-958c-1e56d5ed787a"
+              },
+              "target": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "b84fce3c-abe7-4eb9-b7c2-cc4b8e1ea800",
+              "model": {
+                "$ref": "df526697-4a0c-4f60-9771-c64b39c6db58"
+              },
+              "source": {
+                "$ref": "b8e89cdf-a391-4e41-a377-40638281fd96"
+              },
+              "target": {
+                "$ref": "a21f4d52-046a-4937-baef-494ead186ce3"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLSequenceDiagram",
+          "_id": "3169f0f8-99ef-4a1b-825d-184708e9aa6e",
+          "name": "Agent ReAct — flux mesaj",
+          "ownedViews": [
+            {
+              "_type": "UMLLifelineView",
+              "_id": "2ebd56d1-f37e-4d48-a240-6647e3fda286",
+              "model": {
+                "$ref": "a9f5e13d-18ed-4819-a047-08d8e1fa9f0c"
+              },
+              "x": 80,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "c9b5be57-b004-4ea8-b7a6-28bce4561eda",
+              "model": {
+                "$ref": "6277887a-fa5e-4049-8644-373c00e6b971"
+              },
+              "x": 240,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "979f5644-5182-412f-8aaf-8d68bb8b15e6",
+              "model": {
+                "$ref": "118c6f29-28fb-45a8-9ecd-cd78999593ea"
+              },
+              "x": 400,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "5710578d-be96-444e-b801-14de470714b0",
+              "model": {
+                "$ref": "e0fb59da-738c-47b0-be8e-6fe5a36982ef"
+              },
+              "x": 560,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "f016abf7-bff4-4b44-bf4f-34e561a36ada",
+              "model": {
+                "$ref": "0f330550-c38d-49a1-8372-3a1326237ef4"
+              },
+              "x": 720,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "d6388785-bff1-4a66-a8b9-003261957ce7",
+              "model": {
+                "$ref": "fa42efeb-b6b3-47ad-a0a9-67328784fc96"
+              },
+              "x": 880,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "6b700e4f-9711-471d-8198-19b4d23b1171",
+              "model": {
+                "$ref": "154528eb-91bd-4ae8-a1f5-b31d3b91960f"
+              },
+              "x": 1040,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "2104048b-6f1e-4bcf-9871-206747defc07",
+              "model": {
+                "$ref": "667e3e55-a97d-4b88-b512-f803561200bc"
+              },
+              "source": {
+                "$ref": "2ebd56d1-f37e-4d48-a240-6647e3fda286"
+              },
+              "target": {
+                "$ref": "c9b5be57-b004-4ea8-b7a6-28bce4561eda"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "7cff4936-24b9-48e2-b461-35584b717801",
+              "model": {
+                "$ref": "5df45dd6-b067-42b6-a968-2b9d58bc1a0f"
+              },
+              "source": {
+                "$ref": "c9b5be57-b004-4ea8-b7a6-28bce4561eda"
+              },
+              "target": {
+                "$ref": "c9b5be57-b004-4ea8-b7a6-28bce4561eda"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "e484bc48-fc1b-4b80-bf08-d68b77f5c1e3",
+              "model": {
+                "$ref": "24c380ca-63a5-41e0-80ba-a2d5e0932e41"
+              },
+              "source": {
+                "$ref": "c9b5be57-b004-4ea8-b7a6-28bce4561eda"
+              },
+              "target": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "be7da0ae-aa60-4fde-85b5-d1e98ed901a0",
+              "model": {
+                "$ref": "008d35e9-9f28-4cba-be50-ca3ada65eb3e"
+              },
+              "source": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              },
+              "target": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "3bc6ab4e-536e-4321-b706-038ff3b9a734",
+              "model": {
+                "$ref": "38228e29-8311-4e26-9468-ed68db19dc0a"
+              },
+              "source": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              },
+              "target": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "072d26f7-01ff-478d-95ea-f05c45cd2fc6",
+              "model": {
+                "$ref": "a18017d8-f8f3-47bd-b49d-ea40df8146cb"
+              },
+              "source": {
+                "$ref": "5710578d-be96-444e-b801-14de470714b0"
+              },
+              "target": {
+                "$ref": "5710578d-be96-444e-b801-14de470714b0"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "4ca216d8-2a31-422f-8a18-ef42e8da147e",
+              "model": {
+                "$ref": "6deb2a75-a1e7-4b43-930c-25329360be0c"
+              },
+              "source": {
+                "$ref": "5710578d-be96-444e-b801-14de470714b0"
+              },
+              "target": {
+                "$ref": "f016abf7-bff4-4b44-bf4f-34e561a36ada"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "95fbecfd-56f3-4ebc-9525-13012269ccc0",
+              "model": {
+                "$ref": "ad6dd1d0-2b97-4920-a955-936d86986b1e"
+              },
+              "source": {
+                "$ref": "f016abf7-bff4-4b44-bf4f-34e561a36ada"
+              },
+              "target": {
+                "$ref": "d6388785-bff1-4a66-a8b9-003261957ce7"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "eb79347f-a5dd-4fa3-9419-aed26f00b0ad",
+              "model": {
+                "$ref": "0f0267b9-0d27-462b-a9f1-236e7fea0a1b"
+              },
+              "source": {
+                "$ref": "d6388785-bff1-4a66-a8b9-003261957ce7"
+              },
+              "target": {
+                "$ref": "f016abf7-bff4-4b44-bf4f-34e561a36ada"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "7ec9378c-02d4-4930-bbee-9ee8916648ab",
+              "model": {
+                "$ref": "86c575b0-da99-4fc9-b304-afb6c5670f89"
+              },
+              "source": {
+                "$ref": "f016abf7-bff4-4b44-bf4f-34e561a36ada"
+              },
+              "target": {
+                "$ref": "6b700e4f-9711-471d-8198-19b4d23b1171"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "092fddc3-8e98-498c-9e23-83c2623e41bf",
+              "model": {
+                "$ref": "7c0b1242-f62e-4077-a9be-61cf311bbb0a"
+              },
+              "source": {
+                "$ref": "6b700e4f-9711-471d-8198-19b4d23b1171"
+              },
+              "target": {
+                "$ref": "f016abf7-bff4-4b44-bf4f-34e561a36ada"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "09b8baa2-8e1d-429f-b735-0915d8e6b544",
+              "model": {
+                "$ref": "a702ace2-9d6f-4eb5-8a2f-08a1348c308f"
+              },
+              "source": {
+                "$ref": "d6388785-bff1-4a66-a8b9-003261957ce7"
+              },
+              "target": {
+                "$ref": "f016abf7-bff4-4b44-bf4f-34e561a36ada"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "6ed94606-90d9-42fd-a48f-9f8bdf485681",
+              "model": {
+                "$ref": "90a3ac8c-97c0-4bb6-b029-f139418f4d95"
+              },
+              "source": {
+                "$ref": "f016abf7-bff4-4b44-bf4f-34e561a36ada"
+              },
+              "target": {
+                "$ref": "5710578d-be96-444e-b801-14de470714b0"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "e2f098bc-e7b7-4a94-9dbd-cba5d0a8b600",
+              "model": {
+                "$ref": "280ccf27-95f6-4487-b081-3b75444713a0"
+              },
+              "source": {
+                "$ref": "5710578d-be96-444e-b801-14de470714b0"
+              },
+              "target": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "0a1aa69e-ff6e-4329-936a-ba400a445fd5",
+              "model": {
+                "$ref": "625bbc77-09ef-4c4c-943d-cf44275b2371"
+              },
+              "source": {
+                "$ref": "5710578d-be96-444e-b801-14de470714b0"
+              },
+              "target": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "96bcb0d1-75b9-4058-8914-f9c15418343f",
+              "model": {
+                "$ref": "514237c7-821d-4903-acc9-f319410e9ffd"
+              },
+              "source": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              },
+              "target": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "7428eadf-fe43-4394-9698-8cc30fc09654",
+              "model": {
+                "$ref": "7748eb6f-8cd8-4781-9d97-192869b63b37"
+              },
+              "source": {
+                "$ref": "979f5644-5182-412f-8aaf-8d68bb8b15e6"
+              },
+              "target": {
+                "$ref": "c9b5be57-b004-4ea8-b7a6-28bce4561eda"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "0526b97f-646f-4671-bba9-6fdd09a9cdc9",
+              "model": {
+                "$ref": "0b5f542b-9461-4dd2-8379-1a1537b8106b"
+              },
+              "source": {
+                "$ref": "c9b5be57-b004-4ea8-b7a6-28bce4561eda"
+              },
+              "target": {
+                "$ref": "2ebd56d1-f37e-4d48-a240-6647e3fda286"
+              }
+            }
+          ]
+        },
+        {
+          "_type": "UMLSequenceDiagram",
+          "_id": "128bd241-83aa-4827-b153-560cbda50eea",
+          "name": "Planning Agent — Plan-and-Execute",
+          "ownedViews": [
+            {
+              "_type": "UMLLifelineView",
+              "_id": "6baa0cc2-f926-4ccd-92f7-08dd3a3338fd",
+              "model": {
+                "$ref": "e7b205c9-f8d6-4a69-aa63-ee95a57ff867"
+              },
+              "x": 80,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "db70c918-f154-41ea-9d0d-4c75c10cf0fc",
+              "model": {
+                "$ref": "f02e50dd-dadc-4ee3-a925-c2727c9d2c03"
+              },
+              "x": 240,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "d0266b27-b77e-40d8-961a-0f397b6678aa",
+              "model": {
+                "$ref": "21cea852-8090-47c6-8149-4580358b6625"
+              },
+              "x": 400,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "14dd033f-5c69-4a98-bc21-7403dab19868",
+              "model": {
+                "$ref": "950699a7-8105-422b-b3f0-1fa893d5fc1e"
+              },
+              "x": 560,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "6e940932-6d79-413d-8f7a-224c5d714c2c",
+              "model": {
+                "$ref": "ff2bdd31-9ac6-4e1e-a523-9eea446e3ef1"
+              },
+              "x": 720,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "b3101b96-e020-4608-9a89-5d0269ba4f31",
+              "model": {
+                "$ref": "b1a90cc2-621b-40ea-ad74-6a32d2f26cf3"
+              },
+              "x": 880,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "4bc8ecad-cb5b-4ed5-82e0-d66d13b48de0",
+              "model": {
+                "$ref": "b12cb129-5922-485f-8955-1b54ad3f61f6"
+              },
+              "x": 1040,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "543b9f49-a3ae-4542-a062-3183f68bb15c",
+              "model": {
+                "$ref": "4c0375c6-f05e-4a29-ac49-70ced146183c"
+              },
+              "x": 1200,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLLifelineView",
+              "_id": "4998e422-e859-45df-b23c-de9effb2d73f",
+              "model": {
+                "$ref": "03f7d7a3-55e0-41a4-a59f-1feb169bf309"
+              },
+              "x": 1360,
+              "y": 40,
+              "width": 100,
+              "height": 500
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "8cbd8895-6166-409f-9ec6-61c2461070fc",
+              "model": {
+                "$ref": "84ed42b4-1d30-4203-8d58-417ddf2a34e7"
+              },
+              "source": {
+                "$ref": "6baa0cc2-f926-4ccd-92f7-08dd3a3338fd"
+              },
+              "target": {
+                "$ref": "db70c918-f154-41ea-9d0d-4c75c10cf0fc"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "fdd447f1-d5da-46c2-8593-ea3afb41e56d",
+              "model": {
+                "$ref": "b3c2b30a-478e-4e07-887a-5850425038d3"
+              },
+              "source": {
+                "$ref": "db70c918-f154-41ea-9d0d-4c75c10cf0fc"
+              },
+              "target": {
+                "$ref": "d0266b27-b77e-40d8-961a-0f397b6678aa"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "537f7ba7-0261-4d56-93db-2098c45c12ea",
+              "model": {
+                "$ref": "ae85861e-468f-4fec-9996-2f75e13857ca"
+              },
+              "source": {
+                "$ref": "14dd033f-5c69-4a98-bc21-7403dab19868"
+              },
+              "target": {
+                "$ref": "14dd033f-5c69-4a98-bc21-7403dab19868"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "628c9549-f859-4cf8-9ac7-bd5afb627c66",
+              "model": {
+                "$ref": "234cf89f-271b-471c-a73c-6b303deb5a50"
+              },
+              "source": {
+                "$ref": "14dd033f-5c69-4a98-bc21-7403dab19868"
+              },
+              "target": {
+                "$ref": "6e940932-6d79-413d-8f7a-224c5d714c2c"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "a84c6d1e-a07f-4429-b7ce-5258b058a76f",
+              "model": {
+                "$ref": "ffe09a66-ce94-4620-94b4-c7c6329c7598"
+              },
+              "source": {
+                "$ref": "6e940932-6d79-413d-8f7a-224c5d714c2c"
+              },
+              "target": {
+                "$ref": "b3101b96-e020-4608-9a89-5d0269ba4f31"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "4dcb7df9-1f60-4dd9-be71-6af7beeefc79",
+              "model": {
+                "$ref": "f77a4faf-8e0c-4355-930f-0025429f4f29"
+              },
+              "source": {
+                "$ref": "b3101b96-e020-4608-9a89-5d0269ba4f31"
+              },
+              "target": {
+                "$ref": "6e940932-6d79-413d-8f7a-224c5d714c2c"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "6f54e0f7-3446-4728-ad30-ccc1b00b0183",
+              "model": {
+                "$ref": "9d9072ff-c002-4e2a-8ee5-cffa0adf394e"
+              },
+              "source": {
+                "$ref": "6e940932-6d79-413d-8f7a-224c5d714c2c"
+              },
+              "target": {
+                "$ref": "4bc8ecad-cb5b-4ed5-82e0-d66d13b48de0"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "fe4d8d75-78ee-4a52-b329-add9defa82aa",
+              "model": {
+                "$ref": "2f273b65-3ffe-4b1c-8eca-790acd447739"
+              },
+              "source": {
+                "$ref": "4bc8ecad-cb5b-4ed5-82e0-d66d13b48de0"
+              },
+              "target": {
+                "$ref": "4998e422-e859-45df-b23c-de9effb2d73f"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "17ae32a4-4d42-4d67-a2ef-f3e5a4275237",
+              "model": {
+                "$ref": "0dbaa1a2-8bc6-4260-8738-357cb2cbecd1"
+              },
+              "source": {
+                "$ref": "4998e422-e859-45df-b23c-de9effb2d73f"
+              },
+              "target": {
+                "$ref": "4bc8ecad-cb5b-4ed5-82e0-d66d13b48de0"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "c2c59d62-9007-40dd-b4d5-142423c4a48f",
+              "model": {
+                "$ref": "43999152-aeea-4779-8a3c-796f2f78e240"
+              },
+              "source": {
+                "$ref": "4bc8ecad-cb5b-4ed5-82e0-d66d13b48de0"
+              },
+              "target": {
+                "$ref": "6e940932-6d79-413d-8f7a-224c5d714c2c"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "5c146e02-c364-42e6-b061-5fa051ce1bb0",
+              "model": {
+                "$ref": "1c25e1e4-f4b9-40df-85cd-5c2be66de5f9"
+              },
+              "source": {
+                "$ref": "6e940932-6d79-413d-8f7a-224c5d714c2c"
+              },
+              "target": {
+                "$ref": "543b9f49-a3ae-4542-a062-3183f68bb15c"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "a77b3f8d-f1ed-4795-a2cf-ee6c9701c85d",
+              "model": {
+                "$ref": "f657e2ae-0c76-4165-917a-f55190842738"
+              },
+              "source": {
+                "$ref": "543b9f49-a3ae-4542-a062-3183f68bb15c"
+              },
+              "target": {
+                "$ref": "6e940932-6d79-413d-8f7a-224c5d714c2c"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "01bdfd33-c145-4c81-8030-7ad93b57238f",
+              "model": {
+                "$ref": "1ab63459-71ef-4806-8b45-4217da1d0e56"
+              },
+              "source": {
+                "$ref": "6e940932-6d79-413d-8f7a-224c5d714c2c"
+              },
+              "target": {
+                "$ref": "14dd033f-5c69-4a98-bc21-7403dab19868"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "be8d2354-03ed-43f8-93db-1626449753f3",
+              "model": {
+                "$ref": "dea9ed0d-9a6f-457a-9888-be3886f9206f"
+              },
+              "source": {
+                "$ref": "14dd033f-5c69-4a98-bc21-7403dab19868"
+              },
+              "target": {
+                "$ref": "d0266b27-b77e-40d8-961a-0f397b6678aa"
+              }
+            },
+            {
+              "_type": "UMLMessageView",
+              "_id": "82afe82f-a9c2-4f72-87d8-157f3005e6d2",
+              "model": {
+                "$ref": "f340512e-b75d-4310-96a8-7befb1afb9a6"
+              },
+              "source": {
+                "$ref": "db70c918-f154-41ea-9d0d-4c75c10cf0fc"
+              },
+              "target": {
+                "$ref": "6baa0cc2-f926-4ccd-92f7-08dd3a3338fd"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
