@@ -173,7 +173,12 @@ DEFINITION = {
     ),
     "input_instructions": (
         "sourceFolder: the root directory to scan — use ask_user(input_type='folder') to let the user pick it. "
-        "extensions: list of file extensions to search for, e.g. ['.jpg', '.png', '.mp3']. "
+        "extensions: list of file extensions to search for — choose based on the user's intent:\n"
+        "  Photos/Images: ['.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp', '.gif', '.bmp', '.tiff', '.tif']\n"
+        "  Music/Audio:   ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma', '.opus', '.aiff']\n"
+        "  Videos:        ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v']\n"
+        "  Documents:     ['.pdf', '.docx', '.doc', '.pptx', '.xlsx', '.xls', '.txt', '.md']\n"
+        "  All media:     combine Photos + Music + Videos lists above.\n"
         "maxAnalyze: max number of files to AI-analyze (default 50, max 200). "
         "The tool uses NTFS MFT for fast full-drive scanning — run the app as Administrator."
     ),
@@ -211,6 +216,11 @@ def execute(input_data: dict) -> str:
 
     if not source_folder:
         return json.dumps({"success": False, "error": "sourceFolder is required."})
+    # Normalise: accept C:/ C:\ C: and resolve to the real path
+    source_folder = source_folder.replace("/", "\\").rstrip("\\")
+    # For root drives like "C:" add back the trailing backslash
+    if len(source_folder) == 2 and source_folder[1] == ":":
+        source_folder += "\\"
     try:
         source_folder = os.path.realpath(source_folder)
     except Exception:

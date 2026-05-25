@@ -184,7 +184,7 @@ def execute():
                 "modified_input": None,
             }
         logger.info("Tool '%s' waiting for approval (req %s)", tool_name, req_id)
-        approved = event.wait(timeout=110)  # slightly under the 120 s server timeout
+        approved = event.wait(timeout=870)  # slightly under the 900 s server read timeout
         with _PENDING_LOCK:
             pending = _PENDING.pop(req_id, None)
 
@@ -706,6 +706,46 @@ def ai_gateway_status():
         return jsonify(r.json()), r.status_code
     except _req.exceptions.ConnectionError:
         return jsonify({"status": "offline", "error": "AI Gateway is not running"}), 503
+
+
+@tools_bp.get("/user-folders")
+def user_folders():
+    """Return common user folder paths that exist on this system."""
+    home = Path(__file__).home()
+    candidates = [
+        ("Desktop",   home / "Desktop"),
+        ("Documents", home / "Documents"),
+        ("Downloads", home / "Downloads"),
+        ("Pictures",  home / "Pictures"),
+        ("Videos",    home / "Videos"),
+        ("Music",     home / "Music"),
+    ]
+    return jsonify({name: str(p) for name, p in candidates if p.is_dir()})
+
+
+@tools_bp.get("/pick-folder")
+def pick_folder():
+    """Open native Windows folder-browser dialog and return the selected path."""
+    import subprocess
+    ps_script = (
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "$d = New-Object System.Windows.Forms.FolderBrowserDialog; "
+        "$d.Description = 'Select a folder'; "
+        "$d.ShowNewFolderButton = $true; "
+        "[System.Windows.Forms.Application]::EnableVisualStyles() | Out-Null; "
+        "if ($d.ShowDialog() -eq 'OK') { Write-Output $d.SelectedPath }"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-WindowStyle", "Hidden", "-Command", ps_script],
+            capture_output=True, text=True, timeout=120,
+        )
+        path = result.stdout.strip()
+        if path:
+            return jsonify({"path": path})
+        return jsonify({"path": None, "cancelled": True})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 @tools_bp.get("/preview")

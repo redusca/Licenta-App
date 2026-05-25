@@ -134,6 +134,32 @@ PROACTIVE TOOL USE — take action, do not ask for clarification when:
 - When a filename is mentioned but the path is unknown, list files first to
   locate it, then read it — never ask the user to specify paths you can find.
 
+SMART DRIVE WORKFLOW — always follow this exact sequence when the user asks to create
+a smart/virtual/AI drive or to organize files into a drive:
+  Step 1: ask_user(question="Which folder should I scan for files?", input_type="folder", answer="")
+  Step 2: smart_drive_scan(sourceFolder=<answer from step 1>, extensions=[relevant extensions])
+  Step 3: smart_drive_build(driveName=..., outputPath=<ask_user folder>, action="shortcuts",
+          files=<files list from step 2 result>)
+  • NEVER call smart_drive_build with an empty files list.
+  • NEVER use ask_user(input_type="file") to collect individual files — always scan a folder.
+  • For outputPath in smart_drive_build, use ask_user(input_type="folder") to let the user pick
+    where to save the drive (separate from the source folder).
+
+TOOL CHAINING — when a step needs output produced by a previous step, use {{step_N.field}} placeholders:
+  • {{step_N.answer}}                — the user's typed answer from ask_user step N (folder path, text, etc.)
+  • {{step_N.results[0].outputPath}} — the output file path from the first result of step N
+  • {{step_N.results[0].path}}       — the source path echoed back from step N's first result
+  • {{step_N.virtualDrivePath}}      — the virtual drive folder created by step N
+  Placeholders are resolved at runtime once step N has completed.
+  Example — ask folder, then scan:
+    Step 1: ask_user(question="Which folder?", input_type="folder", answer="")
+    Step 2: smart_drive_scan(sourceFolder="{{step_1.answer}}", extensions=[...])
+  Example — remove background then vectorize to SVG:
+    Step 1: remove_background(files=[{{"path": "C:/img.jpg"}}], outputMode="copy")
+    Step 2: image_to_svg(files=[{{"path": "{{step_1.results[0].outputPath}}"}}], outputMode="copy")
+  Use outputMode="copy" for intermediate steps so no outputPath folder is required.
+  Only use outputMode="virtual_drive" on the LAST step, and only when the user explicitly asks for a virtual drive.
+
 RULES:
 - Default to a single "llm" step for conversational or knowledge requests.
 - Only add tool steps when the task genuinely needs them.
@@ -182,6 +208,7 @@ IMPORTANT: Do NOT call any tools — write the final answer directly in plain te
 # ---------------------------------------------------------------------------
 
 def _tools_desc(tools: list[dict]) -> str:
+    """Full descriptions used by the LLM executor step."""
     if not tools:
         return "(no external tools — use only llm steps)"
     lines = []
@@ -194,6 +221,19 @@ def _tools_desc(tools: list[dict]) -> str:
             line += f"\n  input_instructions: {t['input_instructions']}"
         if t.get("output_description"):
             line += f"\n  output_description: {t['output_description']}"
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _tools_desc_short(tools: list[dict]) -> str:
+    """Compact descriptions for the planner — name + description + usage hints."""
+    if not tools:
+        return "(no external tools — use only llm steps)"
+    lines = []
+    for t in tools:
+        line = f"- {t['name']}: {t['description']}"
+        if t.get("input_instructions"):
+            line += f"\n  [HOW TO USE: {t['input_instructions']}]"
         lines.append(line)
     return "\n".join(lines)
 
@@ -230,30 +270,67 @@ def _find_tool(tools: list[dict], name: str) -> dict | None:
     return None
 
 
+def _resolve_templates(value: Any, step_outputs: dict[int, Any]) -> Any:
+    """
+    Recursively replace {step_N.a.b.c} or {{step_N.a.b.c}} placeholders.
+
+    Path segments that look like integers index into lists; everything else is a
+    dict key.  If a segment can't be resolved the placeholder is left unchanged.
+    """
+    if isinstance(value, str):
+        def _replacer(m: re.Match) -> str:
+            step_id = int(m.group(1))
+            parts = m.group(2).split(".")
+            data: Any = step_outputs.get(step_id)
+            if data is None:
+                return m.group(0)
+            for part in parts:
+                if isinstance(data, dict):
+                    data = data.get(part)
+                elif isinstance(data, list):
+                    try:
+                        data = data[int(part)]
+                    except (ValueError, IndexError):
+                        return m.group(0)
+                else:
+                    return m.group(0)
+                if data is None:
+                    return m.group(0)
+            return str(data)
+        # Accept both single-brace {step_N.x} and double-brace {{step_N.x}}
+        return re.sub(r"\{+step_(\d+)\.([^{}]+?)\}+", _replacer, value)
+    if isinstance(value, dict):
+        return {k: _resolve_templates(v, step_outputs) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_resolve_templates(item, step_outputs) for item in value]
+    return value
+
+
 # ---------------------------------------------------------------------------
 # Groq calls
 # ---------------------------------------------------------------------------
 
 async def _plan(task: str, tools: list[dict], history: list[dict]) -> list[dict]:
     client = _get_groq()
-    system = _PLAN_SYSTEM.format(tools_desc=_tools_desc(tools))
+    system = _PLAN_SYSTEM.format(tools_desc=_tools_desc_short(tools))
 
     messages = [{"role": "system", "content": system}]
-    messages.extend(history[-8:])
+    messages.extend(history[-4:])
     messages.append({"role": "user", "content": task})
 
     resp = await client.chat.completions.create(
         model=settings.GROQ_MODEL,
         messages=messages,
         temperature=1,
-        max_completion_tokens=2048,
+        max_completion_tokens=1024,
         top_p=1,
-        reasoning_effort="medium",
         stream=False,
         stop=None,
     )
     raw = resp.choices[0].message.content or ""
     data = _extract_json(raw)
+    if isinstance(data, list):
+        return data
     return data.get("steps", [])
 
 
@@ -281,7 +358,6 @@ async def _stream_llm_step(
         temperature=1,
         max_completion_tokens=1024,
         top_p=1,
-        reasoning_effort="medium",
         stop=None,
     )
     stream = await client.chat.completions.create(**llm_kwargs, stream=True)
@@ -321,6 +397,50 @@ async def _stream_llm_step(
         yield content
 
 
+def _compact_result(result: str, max_len: int = 1200) -> str:
+    """
+    Shrink a step result for the synthesizer prompt.
+
+    For large JSON tool outputs we extract a human-readable summary so the
+    synthesizer gets the key facts without blowing the context window.
+    """
+    if len(result) <= max_len:
+        return result
+    try:
+        data = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        return result[:max_len] + f"\n…[truncated, {len(result)} chars total]"
+
+    # Smart Drive scan — keep counts + first few file names
+    if isinstance(data, dict) and "files" in data and "total_files" in data:
+        files = data.get("files", [])
+        sample = [f.get("filename") or f.get("path", "") for f in files[:5]]
+        summary = (
+            f"success={data.get('success')}, total_files={data.get('total_files')}, "
+            f"analyzed={len(files)}, not_analyzed={len(data.get('not_analyzed', []))}, "
+            f"sample_files={sample}"
+        )
+        return f"[scan result summary] {summary}"
+
+    # Generic tool result with a results array
+    if isinstance(data, dict) and "results" in data:
+        results_list = data.get("results", [])
+        succeeded = data.get("succeeded", sum(1 for r in results_list if r.get("success")))
+        failed = data.get("failed", len(results_list) - succeeded)
+        outputs = [r.get("outputPath") or r.get("path", "") for r in results_list[:5] if r.get("success")]
+        summary = (
+            f"success={data.get('success')}, total={data.get('total', len(results_list))}, "
+            f"succeeded={succeeded}, failed={failed}, output_paths={outputs}"
+        )
+        return f"[tool result summary] {summary}"
+
+    # Fallback: serialize compactly and truncate
+    compact = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    if len(compact) <= max_len:
+        return compact
+    return compact[:max_len] + f"…[truncated]"
+
+
 async def _stream_synthesize(
     task: str,
     step_results: list[dict],
@@ -328,7 +448,7 @@ async def _stream_synthesize(
 ) -> AsyncGenerator[str, None]:
     client = _get_groq()
     results_str = "\n".join(
-        f"Step {r['id']} — {r['description']}:\n{r['result']}"
+        f"Step {r['id']} — {r['description']}:\n{_compact_result(r['result'])}"
         for r in step_results
     )
     system = _SYNTHESIZER_SYSTEM.format(task=task, step_results=results_str)
@@ -344,7 +464,6 @@ async def _stream_synthesize(
         temperature=1,
         max_completion_tokens=2048,
         top_p=1,
-        reasoning_effort="medium",
         stop=None,
     )
 
@@ -393,8 +512,10 @@ async def _call_tool(tool: dict, input_data: dict) -> str:
     tool_name = tool.get("name", "unknown")
     if not callback_url:
         return f"[Error] Tool '{tool_name}' has no callback_url."
+    # Long read timeout: scan + AI analysis of 50+ files can take 10+ minutes.
+    _timeout = httpx.Timeout(connect=10.0, read=900.0, write=30.0, pool=10.0)
     try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=_timeout) as client:
             resp = await client.post(
                 callback_url, json={"tool": tool_name, "input": input_data}
             )
@@ -407,7 +528,7 @@ async def _call_tool(tool: dict, input_data: dict) -> str:
             f"Connection refused or host unreachable. ({type(exc).__name__})"
         )
     except httpx.TimeoutException:
-        return f"[Error] Tool '{tool_name}' — request timed out after 30 s ({callback_url})"
+        return f"[Error] Tool '{tool_name}' — request timed out ({callback_url})"
     except httpx.HTTPStatusError as exc:
         return (
             f"[Error] Tool '{tool_name}' HTTP {exc.response.status_code}: "
@@ -493,6 +614,13 @@ async def run_planning_agent(
     # ── 2. Execute ───────────────────────────────────────────────────────────
     step_results: list[dict] = []
 
+    # Context for Smart Drive workflow: carry values between steps at runtime
+    ctx_source_folder: str = ""   # filled by ask_user(input_type='folder')
+    ctx_scan_files: list = []     # filled by smart_drive_scan result
+
+    # Generic inter-step output store: step_id → parsed JSON result dict
+    step_outputs: dict[int, Any] = {}
+
     for step in steps:
         step_id: int   = step.get("id", 0)
         step_desc: str = step.get("description", "")
@@ -507,9 +635,66 @@ async def run_planning_agent(
         }
 
         if step_type == "tool":
-            tool_name: str  = step.get("tool", "")
-            tool_input: dict = step.get("input", {})
+            tool_name: str   = step.get("tool", "")
+            tool_input: dict = dict(step.get("input", {}))   # shallow copy — safe to mutate
+
+            # Resolve {{step_N.field}} placeholders before execution
+            tool_input = _resolve_templates(tool_input, step_outputs)
+
             tool_obj = _find_tool(tools, tool_name)
+
+            # ── Smart Drive: inject context into tool inputs ──────────────────
+            if tool_name == "smart_drive_scan":
+                sf = (tool_input.get("sourceFolder") or "").strip()
+                if not sf:
+                    if ctx_source_folder:
+                        tool_input["sourceFolder"] = ctx_source_folder
+                        logger.info(
+                            "Injected ctx_source_folder=%r → smart_drive_scan.sourceFolder",
+                            ctx_source_folder,
+                        )
+                    else:
+                        # LLM skipped the ask_user step — ask for the folder now
+                        ask_tool = _find_tool(tools, "ask_user")
+                        if ask_tool:
+                            auto_ask_input = {
+                                "question": "Which folder should I scan for files?",
+                                "input_type": "folder",
+                                "answer": "",
+                            }
+                            yield {
+                                "type": "tool_call",
+                                "step_id": step_id,
+                                "tool": "ask_user",
+                                "input": auto_ask_input,
+                                "message": "Cer folderul sursă pentru scanare…",
+                            }
+                            ask_result = await _call_tool(ask_tool, auto_ask_input)
+                            yield {
+                                "type": "tool_result",
+                                "step_id": step_id,
+                                "tool": "ask_user",
+                                "result": ask_result,
+                                "message": f"Folder ales: {ask_result[:80]}",
+                            }
+                            if (
+                                not ask_result.startswith("[Error]")
+                                and not ask_result.startswith("[Rejected]")
+                            ):
+                                candidate = ask_result.strip()
+                                if candidate:
+                                    ctx_source_folder = candidate
+                                    tool_input["sourceFolder"] = ctx_source_folder
+                                    logger.info(
+                                        "Auto-asked: ctx_source_folder=%r", ctx_source_folder
+                                    )
+            elif tool_name == "smart_drive_build":
+                if not tool_input.get("files") and ctx_scan_files:
+                    tool_input["files"] = ctx_scan_files
+                    logger.info(
+                        "Injected %d files → smart_drive_build.files", len(ctx_scan_files)
+                    )
+            # ── end injection B ───────────────────────────────────────────────
 
             if tool_obj is None:
                 err = f"Tool '{tool_name}' nu a fost găsit în lista de tool-uri."
@@ -542,6 +727,53 @@ async def run_planning_agent(
                         else f"Tool {tool_name} a returnat un rezultat"
                     ),
                 }
+
+                # ── Store parsed result for {step_N.*} template resolution ──
+                if not result.startswith("[Error]") and not result.startswith("[Rejected]"):
+                    try:
+                        parsed = json.loads(result)
+                        if isinstance(parsed, dict):
+                            step_outputs[step_id] = parsed
+                        else:
+                            # Scalar JSON (number, bool) — also expose as .answer/.raw
+                            step_outputs[step_id] = {"answer": result, "raw": result, "value": parsed}
+                    except (json.JSONDecodeError, TypeError):
+                        # Plain string result (e.g. ask_user) — expose as .answer and .raw
+                        step_outputs[step_id] = {"answer": result, "raw": result}
+
+                # ── Smart Drive: capture context from completed tool ───────────
+                if not result.startswith("[Error]") and not result.startswith("[Rejected]"):
+                    if tool_name == "ask_user":
+                        if step.get("input", {}).get("input_type") == "folder":
+                            candidate = result.strip()
+                            if candidate:
+                                ctx_source_folder = candidate
+                                logger.info(
+                                    "Captured ctx_source_folder=%r from ask_user",
+                                    ctx_source_folder,
+                                )
+                    elif tool_name == "smart_drive_scan":
+                        try:
+                            scan_data = json.loads(result)
+                            if scan_data.get("success"):
+                                analyzed = scan_data.get("files", [])
+                                not_analyzed = scan_data.get("not_analyzed", [])
+                                not_analyzed_dicts = [
+                                    {
+                                        "path": p,
+                                        "filename": os.path.basename(p),
+                                        "extension": os.path.splitext(p)[1].lower(),
+                                    }
+                                    for p in not_analyzed
+                                ]
+                                ctx_scan_files = analyzed + not_analyzed_dicts
+                                logger.info(
+                                    "Captured %d scan files (%d analyzed + %d not_analyzed)",
+                                    len(ctx_scan_files), len(analyzed), len(not_analyzed_dicts),
+                                )
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                # ── end injection A ───────────────────────────────────────────
 
         else:  # llm step
             step_prompt: str = step.get("prompt", step_desc)

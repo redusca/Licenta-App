@@ -1,77 +1,167 @@
+import { Link } from 'react-router-dom'
+
+const STATS = [
+  { val: '4',       label: 'AI Models' },
+  { val: '5',       label: 'Agent Workers' },
+  { val: ':8000',   label: 'FastAPI Port' },
+  { val: '2',       label: 'Deploy Modes' },
+]
+
+const FEATURES = [
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+    ),
+    title: 'Auth & Access Control',
+    desc: 'JWT-based authentication with Supabase PostgreSQL. Users register, receive tokens, and authenticate every API call. AgentKey table maps users to their AI gateway credentials.',
+  },
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+      </svg>
+    ),
+    title: 'AI Gateway',
+    desc: 'Lazy-load/unload pattern for 4 models: Swin2SR (image super-resolution), Whisper (audio transcription), Gemini (language), and VideoSubtitle. Each loads on demand, unloads after idle timeout.',
+  },
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <path d="M3 9h18M9 21V9"/>
+      </svg>
+    ),
+    title: 'LangGraph Agent',
+    desc: 'ReAct + Plan-and-Execute agent graph orchestrated by LangGraph. AgentPool maintains up to 5 concurrent workers, each backed by a Redis task queue (LPUSH/BRPOP) for durable message passing.',
+  },
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+    ),
+    title: 'SSE Streaming',
+    desc: 'Agent progress streams via Server-Sent Events. The client receives real-time plan steps, tool call results, and final output — no polling, no websocket overhead.',
+  },
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    ),
+    title: 'Human-in-the-Loop',
+    desc: 'Tool execution requires approval from the FileO desktop app. The server POSTs tool call parameters to the callback_url, waits for approval, then continues the agent graph with the returned result.',
+  },
+  {
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+      </svg>
+    ),
+    title: 'Self-Hostable',
+    desc: 'Two deployment modes: server_proxy routes agent traffic through this server, direct_container runs locally inside the FileO Electron app. Docker Compose stack included.',
+  },
+]
+
+const ARCH = `
+┌──────────────────────────────────────────────────────────┐
+│                  Licenta Server  :8000                   │
+│                                                          │
+│  ┌─────────────┐  ┌─────────────────┐  ┌─────────────┐  │
+│  │  Auth       │  │  AI Gateway     │  │  Agent API  │  │
+│  │  /auth/*    │  │  /ai/*          │  │  /agent/*   │  │
+│  │  JWT+Supabase│  │  Swin2SR        │  │  LangGraph  │  │
+│  └─────────────┘  │  Whisper        │  │  AgentPool  │  │
+│                   │  Gemini         │  │  5 workers  │  │
+│                   │  VideoSubtitle  │  └──────┬──────┘  │
+│                   └─────────────────┘         │         │
+│                                               ▼         │
+│                                         Redis Queue     │
+└──────────────────────────────────────────────────────────┘
+         │ tool callbacks          │ SSE streaming
+         ▼                         ▼
+   FileO Desktop App          Browser Client
+`
+
+function InlineCode({ children }: { children: string }) {
+  return (
+    <code style={{
+      fontFamily: 'var(--font-mono)', fontSize: 12, padding: '1px 5px',
+      borderRadius: 4, background: 'var(--surface-2)', color: 'var(--accent-ink)',
+      border: '1px solid var(--border)',
+    }}>{children}</code>
+  )
+}
+
 export default function Home() {
   return (
-    <main className="max-w-6xl mx-auto px-4 py-16">
+    <main className="page-body">
       {/* Hero */}
-      <div className="text-center mb-20">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-900/40 border border-brand-700/40 text-brand-400 text-xs font-medium mb-6">
-          Open source · Self-hostable · Private AI
-        </div>
-        <h1 className="text-5xl sm:text-6xl font-bold text-white tracking-tight mb-6 leading-tight">
-          Run AI agents in<br />
-          <span className="text-brand-400">secure containers</span>
+      <section className="hero">
+        <span className="hero-badge">FastAPI · LangGraph · Redis · Supabase</span>
+        <h1 className="display" style={{ fontSize: 42, marginBottom: 18 }}>
+          AI Agent Server<br />
+          <em>built for FileO</em>
         </h1>
-        <p className="text-lg text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Licenta lets you deploy private AI agent environments backed by your own API key.
-          Host on our server or bring your own infrastructure — your data never leaves your control.
+        <p className="hero-sub">
+          A self-hostable FastAPI backend that manages authentication, runs
+          AI models on demand, and orchestrates LangGraph agents with
+          human-in-the-loop tool approval. Private by design.
         </p>
-        <div className="flex items-center justify-center gap-4 flex-wrap">
-          <a href="/containers" className="btn-primary px-6 py-3 text-base">Get started</a>
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noreferrer"
-            className="btn-secondary px-6 py-3 text-base"
-          >
-            View on GitHub
-          </a>
+        <div className="hero-actions">
+          <Link to="/downloads" className="btn btn-primary btn-lg">
+            Download for Windows
+          </Link>
+          <Link to="/wiki" className="btn btn-secondary btn-lg">
+            Read the docs
+          </Link>
         </div>
-      </div>
+      </section>
 
-      {/* Feature grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {FEATURES.map(f => (
-          <div key={f.title} className="card hover:border-gray-700 transition-colors">
-            <div className="text-3xl mb-4">{f.icon}</div>
-            <h3 className="text-white font-semibold mb-2">{f.title}</h3>
-            <p className="text-gray-400 text-sm leading-relaxed">{f.desc}</p>
+      {/* Stats */}
+      <div className="stats-row">
+        {STATS.map(s => (
+          <div key={s.label} className="stat-card">
+            <span className="stat-val">{s.val}</span>
+            <span className="stat-label">{s.label}</span>
           </div>
         ))}
       </div>
 
-      {/* Quick code sample */}
-      <div className="mt-16 card">
-        <h2 className="text-white font-semibold mb-4">Quick start</h2>
-        <pre className="font-mono text-sm text-green-400 bg-black/40 rounded-lg p-4 overflow-x-auto">
-{`# 1. Init your agent session
-POST /api/agent/init
-{ "tools": [{ "name": "search", "description": "...", "requires_ai": false }] }
+      {/* Features */}
+      <section className="features-section">
+        <p className="section-label">What's inside</p>
+        <div className="features-grid">
+          {FEATURES.map(f => (
+            <div key={f.title} className="feature-card">
+              <div className="feature-icon">{f.icon}</div>
+              <div className="feature-title">{f.title}</div>
+              <div className="feature-desc">{f.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
-# 2. Chat with the agent
-POST /api/agent/chat
-{ "session_id": "...", "message": "Find the latest news about AI" }
-
-# Response
-{ "response": "...", "tool_calls": [...], "secondary_ai_calls": [...] }`}
-        </pre>
-      </div>
+      {/* Architecture diagram */}
+      <section className="arch-section">
+        <p className="section-label">Architecture</p>
+        <div className="arch-box">
+          <pre>{ARCH}</pre>
+        </div>
+        <p style={{ marginTop: 16, fontSize: 13, color: 'var(--muted)' }}>
+          Three API blueprints: <InlineCode>/auth</InlineCode>, <InlineCode>/ai</InlineCode>, and <InlineCode>/agent</InlineCode>.
+          {' '}Redis for task queuing, Supabase PostgreSQL for persistence.{' '}
+          See the <Link to="/wiki" style={{ color: 'var(--accent-ink)' }}>Wiki</Link> for full API reference.
+        </p>
+      </section>
     </main>
   )
 }
-
-const FEATURES = [
-  {
-    icon: '🔒',
-    title: 'Private by design',
-    desc: 'Each user gets their own isolated container. Your AI key and data never touch anyone else\'s environment.',
-  },
-  {
-    icon: '🚀',
-    title: 'One-click deploy',
-    desc: 'Register, paste your Gemini API key, click Deploy. Your container is live in seconds on our infrastructure.',
-  },
-  {
-    icon: '🔧',
-    title: 'Bring your own tools',
-    desc: 'Define custom tools at session init time. The agent picks them up automatically and can call the AI for tool-level reasoning.',
-  },
-]

@@ -229,14 +229,39 @@ def stream_chat():
     payload = {"message": message, "tools": tools}
 
     def _generate():
-        try:
-            resp = requests.post(
-                url,
+        nonlocal url
+
+        def _post_stream(target_url: str):
+            return requests.post(
+                target_url,
                 headers=headers,
                 json=payload,
                 stream=True,
                 timeout=(10, 300),
             )
+
+        try:
+            resp = _post_stream(url)
+
+            # Chat expired (server restarted, in-memory store wiped) — auto-recover.
+            if resp.status_code == 404:
+                try:
+                    cr = requests.post(
+                        f"{server_url}/api/agent/chats",
+                        headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+                        json={"tools": tools, "title": ""},
+                        timeout=10,
+                    )
+                    cr.raise_for_status()
+                    new_chat_id = cr.json()["chat_id"]
+                    _ACTIVE_CHATS[api_key] = new_chat_id
+                    url = f"{server_url}/api/agent/chats/{new_chat_id}/message"
+                    resp = _post_stream(url)
+                except Exception as exc2:
+                    err = json.dumps({"type": "error", "message": f"Chat expired; auto-recover failed: {exc2}"})
+                    yield f"data: {err}\n\ndata: [DONE]\n\n".encode()
+                    return
+
             resp.raise_for_status()
             for chunk in resp.iter_content(chunk_size=None):
                 if chunk:

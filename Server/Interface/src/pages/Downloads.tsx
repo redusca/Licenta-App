@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react'
 
 const GITHUB_REPO = 'redusca/Licenta-App'
-const GITHUB_RELEASES_PAGE = `https://github.com/${GITHUB_REPO}/releases`
 const RELEASES_API = '/api/releases'
-
-// ── GitHub API types ──────────────────────────────────────────────────────────
 
 interface GhAsset {
   name: string
@@ -24,137 +21,32 @@ interface GhRelease {
   assets: GhAsset[]
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function assetFor(assets: GhAsset[], pattern: RegExp) {
-  return assets.find(a => pattern.test(a.name))
+function fmtSize(bytes: number) {
+  if (!bytes) return ''
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function fmtSize(bytes: number) {
-  if (!bytes) return ''
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-// ── Download button ───────────────────────────────────────────────────────────
-
-function DownloadButton({ asset, icon, label }: { asset?: GhAsset; icon: string; label: string }) {
-  if (!asset) {
-    return (
-      <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-800/40 border border-gray-700/40 opacity-40 cursor-not-allowed select-none">
-        <span className="text-2xl">{icon}</span>
-        <div>
-          <div className="text-white font-medium text-sm">{label}</div>
-          <div className="text-gray-600 text-xs">Not available</div>
-        </div>
-      </div>
-    )
-  }
+function WinIcon() {
   return (
-    <a
-      href={asset.browser_download_url}
-      target="_blank"
-      rel="noreferrer"
-      className="flex items-center gap-3 px-4 py-3 rounded-xl bg-brand-500/10 border border-brand-500/30 hover:bg-brand-500/20 hover:border-brand-500/60 transition-all group"
-    >
-      <span className="text-2xl">{icon}</span>
-      <div className="flex-1 min-w-0">
-        <div className="text-white font-medium text-sm group-hover:text-brand-300 transition-colors">{label}</div>
-        {asset.size > 0 && <div className="text-gray-400 text-xs">{fmtSize(asset.size)}</div>}
-      </div>
-      <svg className="w-4 h-4 text-brand-400 group-hover:text-brand-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-      </svg>
-    </a>
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3 5.6L10.5 4.5V11.5H3V5.6ZM11.5 4.35L21 3V11.5H11.5V4.35ZM3 12.5H10.5V19.5L3 18.4V12.5ZM11.5 12.5H21V21L11.5 19.65V12.5Z"/>
+    </svg>
   )
 }
 
-// ── Single release card ───────────────────────────────────────────────────────
-
-function ReleaseCard({ release, isLatest }: { release: GhRelease; isLatest: boolean }) {
-  const winAsset  = assetFor(release.assets, /\.exe$/i)
-  const macAsset  = assetFor(release.assets, /\.dmg$/i)
-  const linAsset  = assetFor(release.assets, /\.(AppImage|deb|tar\.gz)$/i)
-
+function DownloadArrow() {
   return (
-    <section className="card mb-6">
-      {/* ── Header ── */}
-      <div className="flex flex-wrap items-center gap-2 mb-3">
-        <a
-          href={release.html_url}
-          target="_blank"
-          rel="noreferrer"
-          className="font-mono font-bold text-brand-400 hover:text-brand-300 transition-colors text-lg"
-        >
-          {release.tag_name}
-        </a>
-
-        {isLatest && (
-          <span className="text-xs font-semibold bg-brand-500/20 text-brand-300 border border-brand-500/40 px-2 py-0.5 rounded-full">
-            Latest
-          </span>
-        )}
-        {release.prerelease && (
-          <span className="text-xs font-semibold bg-yellow-500/10 text-yellow-400 border border-yellow-500/30 px-2 py-0.5 rounded-full">
-            Pre-release
-          </span>
-        )}
-
-        <span className="ml-auto text-xs text-gray-500">{fmtDate(release.published_at)}</span>
-      </div>
-
-      {/* ── Release name (if different from tag) ── */}
-      {release.name && release.name !== release.tag_name && (
-        <p className="text-gray-300 text-sm font-medium mb-2">{release.name}</p>
-      )}
-
-      {/* ── Release notes ── */}
-      {release.body && (
-        <p className="text-gray-500 text-sm mb-4 whitespace-pre-line leading-relaxed">{release.body}</p>
-      )}
-
-      {/* ── Download buttons ── */}
-      {release.assets.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <DownloadButton asset={winAsset} icon="🪟" label="Windows" />
-          <DownloadButton asset={macAsset} icon="🍎" label="macOS" />
-          <DownloadButton asset={linAsset} icon="🐧" label="Linux" />
-        </div>
-      ) : (
-        <p className="text-xs text-gray-600 italic">No binaries attached — source only.</p>
-      )}
-
-      {/* ── Link to GitHub release page ── */}
-      <div className="mt-4 pt-3 border-t border-gray-800 flex items-center gap-4 text-xs text-gray-600">
-        <a
-          href={release.html_url}
-          target="_blank"
-          rel="noreferrer"
-          className="hover:text-brand-400 transition-colors"
-        >
-          View on GitHub ↗
-        </a>
-        {release.assets.map(a => (
-          <a
-            key={a.name}
-            href={a.browser_download_url}
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-brand-400 transition-colors truncate"
-            title={a.name}
-          >
-            {a.name}{a.size > 0 ? ` (${fmtSize(a.size)})` : ''}
-          </a>
-        ))}
-      </div>
-    </section>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
   )
 }
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Downloads() {
   const [releases, setReleases] = useState<GhRelease[]>([])
@@ -167,70 +59,139 @@ export default function Downloads() {
         if (!r.ok) throw new Error(`Server returned ${r.status}`)
         return r.json() as Promise<GhRelease[]>
       })
-      // Show all releases (including pre-releases), skip drafts only
       .then(data => setReleases(data.filter(r => !r.draft)))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 
-  // Latest stable release (non-prerelease), or latest overall if none exists
-  const latestStable = releases.find(r => !r.prerelease) ?? releases[0]
+  const latest = releases.find(r => !r.prerelease) ?? releases[0]
+  const winAsset = latest?.assets.find(a => /\.exe$/i.test(a.name))
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-12">
-      <div className="flex items-baseline justify-between mb-2">
-        <h1 className="text-3xl font-bold text-white">Downloads</h1>
-        <a
-          href={GITHUB_RELEASES_PAGE}
-          target="_blank"
-          rel="noreferrer"
-          className="text-sm text-brand-400 hover:text-brand-300 transition-colors"
-        >
-          All releases on GitHub ↗
-        </a>
-      </div>
-      <p className="text-gray-400 mb-10">
-        Desktop client releases — each version links directly to its GitHub release page and assets.
+    <main className="page-body dl-page">
+      <h1 style={{ fontSize: 30, fontWeight: 700, color: 'var(--ink)', margin: '0 0 8px' }}>
+        Download FileO
+      </h1>
+      <p style={{ margin: '0 0 36px', fontSize: 15, color: 'var(--muted)' }}>
+        Desktop client for Windows. Bundles the FileO app and the local Flask server.
       </p>
 
-      {/* ── Loading / error states ───────────────────────────────────────────── */}
-      {loading && (
-        <div className="card mb-6">
-          <p className="text-gray-500 text-sm">Loading releases…</p>
+      {/* Main download card */}
+      <div className="dl-card">
+        <div className="dl-icon">
+          <WinIcon />
         </div>
-      )}
-      {error && (
-        <div className="card mb-6 border-red-500/30">
-          <p className="text-red-400 text-sm">Could not load releases: {error}</p>
+        <h2 className="dl-title">Windows Installer</h2>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          {latest && (
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999,
+              background: 'var(--accent-soft)', color: 'var(--accent-ink)',
+              border: '1px solid var(--border-2)',
+            }}>
+              {latest.tag_name}
+            </span>
+          )}
+          {latest?.prerelease && (
+            <span style={{
+              fontSize: 11, fontWeight: 500, padding: '3px 9px', borderRadius: 999,
+              background: 'var(--surface-3)', color: 'var(--muted)',
+              border: '1px solid var(--border)',
+            }}>
+              pre-release
+            </span>
+          )}
         </div>
-      )}
-      {!loading && !error && releases.length === 0 && (
-        <div className="card mb-6">
-          <p className="text-gray-500 text-sm">No releases published yet.</p>
+
+        <p className="dl-sub">
+          Windows 10 / 11 · x86-64 · Electron + Flask bundled
+          {latest && ` · Released ${fmtDate(latest.published_at)}`}
+          {winAsset?.size ? ` · ${fmtSize(winAsset.size)}` : ''}
+        </p>
+
+        {loading ? (
+          <div style={{ color: 'var(--muted)', fontSize: 13 }}>Loading releases…</div>
+        ) : error ? (
+          <a
+            href={`https://github.com/${GITHUB_REPO}/releases`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-primary"
+          >
+            View on GitHub ↗
+          </a>
+        ) : winAsset ? (
+          <a
+            href={winAsset.browser_download_url}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-primary btn-lg"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}
+          >
+            <DownloadArrow />
+            Download .exe
+          </a>
+        ) : (
+          <span style={{ fontSize: 13, color: 'var(--muted)' }}>No binary attached yet</span>
+        )}
+
+        {/* Requirements */}
+        <div className="dl-req" style={{ marginTop: 28 }}>
+          <p className="dl-req-title">System requirements</p>
+          {[
+            'Windows 10 or Windows 11 (x86-64)',
+            'No Python installation required — bundled via PyInstaller',
+            '4 GB RAM recommended (8 GB for AI models)',
+            'GPU optional — models fall back to CPU automatically',
+            'Internet connection for Gemini API calls only',
+          ].map(req => (
+            <div key={req} className="dl-req-row">
+              <div className="dl-dot"/>
+              {req}
+            </div>
+          ))}
         </div>
+      </div>
+
+      {/* Older releases */}
+      {!loading && !error && releases.length > 1 && (
+        <p style={{ marginTop: 20, fontSize: 13, color: 'var(--muted)' }}>
+          Looking for an older version?{' '}
+          <a
+            href={`https://github.com/${GITHUB_REPO}/releases`}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: 'var(--accent-ink)' }}
+          >
+            View all releases on GitHub ↗
+          </a>
+        </p>
       )}
 
-      {/* ── Release list ─────────────────────────────────────────────────────── */}
-      {releases.map(r => (
-        <ReleaseCard key={r.id} release={r} isLatest={r.id === latestStable?.id} />
-      ))}
-
-      {/* ── Docker images ────────────────────────────────────────────────────── */}
-      <section className="card mt-4">
-        <h2 className="text-white font-semibold mb-4">Self-host with Docker</h2>
-        <div className="font-mono text-sm text-green-400 bg-black/40 rounded-lg p-4 space-y-1.5">
-          <div className="text-gray-600"># Container agent image</div>
-          <div>docker pull ghcr.io/{GITHUB_REPO.split('/')[0]}/licenta-container:latest</div>
-          <div className="pt-2 text-gray-600"># Full server stack (from repo root)</div>
+      {/* Docker section */}
+      <section style={{ marginTop: 44 }}>
+        <h2 style={{ fontSize: 17, fontWeight: 600, color: 'var(--ink)', margin: '0 0 12px' }}>
+          Self-host with Docker
+        </h2>
+        <div style={{
+          background: 'var(--surface)', border: '1px solid var(--border)',
+          borderRadius: 10, padding: '14px 18px',
+          fontFamily: 'var(--font-mono)', fontSize: 12.5,
+          color: 'var(--ink-2)', lineHeight: 1.8,
+        }}>
+          <div style={{ color: 'var(--muted)', marginBottom: 4 }}># Full server stack</div>
           <div>docker compose -f Server/docker/docker-compose.yml up --build</div>
+          <div style={{ color: 'var(--muted)', margin: '12px 0 4px' }}># Server image only</div>
+          <div>docker pull ghcr.io/redusca/licenta-server:latest</div>
         </div>
-        <p className="mt-3 text-xs text-gray-600">
-          Source code and Dockerfiles are on{' '}
+        <p style={{ marginTop: 10, fontSize: 13, color: 'var(--muted)' }}>
+          Source code and Dockerfiles on{' '}
           <a
             href={`https://github.com/${GITHUB_REPO}`}
             target="_blank"
             rel="noreferrer"
-            className="text-brand-400 hover:text-brand-300"
+            style={{ color: 'var(--accent-ink)' }}
           >
             github.com/{GITHUB_REPO}
           </a>.

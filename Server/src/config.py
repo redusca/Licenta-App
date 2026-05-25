@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Groq - planning agent
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "openai/gpt-oss-120b"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     # Container image name (only needed for the ZIP download feature)
     CONTAINER_IMAGE_NAME: str = "licenta-container:latest"

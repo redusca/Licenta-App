@@ -29,53 +29,52 @@ export default function AuthModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div
-        className="w-full max-w-md card mx-4 shadow-2xl"
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-white">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-card" onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: 'var(--ink)' }}>
             {mode === 'login' ? 'Sign in' : 'Create account'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-300 transition-colors text-xl leading-none">×</button>
+          <button
+            onClick={onClose}
+            className="icon-btn"
+            style={{ fontSize: 18, lineHeight: 1 }}
+          >
+            ×
+          </button>
         </div>
 
-        {/* Tab toggle */}
-        <div className="flex bg-gray-800 rounded-lg p-1 mb-6 gap-1">
+        <div className="tab-group">
           {(['login', 'register'] as const).map(m => (
             <button
               key={m}
+              className={'tab-btn' + (mode === m ? ' active' : '')}
               onClick={() => { setMode(m); setError('') }}
-              className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                mode === m ? 'bg-brand-600 text-white' : 'text-gray-400 hover:text-gray-200'
-              }`}
             >
               {m === 'login' ? 'Sign in' : 'Register'}
             </button>
           ))}
         </div>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="block text-xs text-gray-400 mb-1.5">Email</label>
+            <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Email</label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              className="input"
+              className="field-input"
               placeholder="you@example.com"
               required
             />
           </div>
           <div>
-            <label className="block text-xs text-gray-400 mb-1.5">Password</label>
+            <label style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>Password</label>
             <input
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              className="input"
+              className="field-input"
               placeholder="••••••••"
               required
               minLength={8}
@@ -83,10 +82,17 @@ export default function AuthModal({ onClose }: Props) {
           </div>
 
           {error && (
-            <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 px-3 py-2 rounded-lg">{error}</p>
+            <p style={{
+              margin: 0, fontSize: 13, padding: '8px 12px', borderRadius: 8,
+              background: 'oklch(0.25 0.08 25 / 0.15)',
+              border: '1px solid oklch(0.5 0.15 25 / 0.3)',
+              color: 'oklch(0.65 0.15 25)',
+            }}>
+              {error}
+            </p>
           )}
 
-          <button type="submit" disabled={loading} className="btn-primary w-full justify-center">
+          <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
             {loading ? 'Loading…' : mode === 'login' ? 'Sign in' : 'Create account'}
           </button>
         </form>

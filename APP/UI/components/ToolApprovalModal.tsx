@@ -26,7 +26,7 @@ import {
   AlertTriangle, Check, X, Wrench, Info,
   FolderOpen, HardDrive, ToggleLeft, ToggleRight,
   MessageSquare, Plus, FileText, Copy, Brain,
-  FolderPlus, Image, Music, FileSearch,
+  Image, Music, FileSearch, Loader2, FolderSearch,
 } from 'lucide-react';
 import { FolderPickerModal } from './FolderPickerModal';
 
@@ -451,17 +451,34 @@ const FieldInput: React.FC<FieldProps> = ({
     case 'folder':
     case 'file': {
       const mode = kind === 'folder' ? 'folder' : 'file';
+      const pickNative = async () => {
+        try {
+          const res = await fetch(`${FLASK}/api/tools/pick-folder`);
+          const data = await res.json();
+          if (data.path) onChange(fieldKey, data.path);
+        } catch { /* ignore */ }
+      };
       return (
         <div className="flex gap-2">
           <input type="text" value={str} onChange={e => onChange(fieldKey, e.target.value)}
             placeholder={kind === 'folder' ? 'Choose a folder…' : 'Choose a file…'}
             spellCheck={false}
             className="flex-1 text-sm font-mono bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors min-w-0" />
-          <button type="button" onClick={() => onPickerOpen(fieldKey, mode)}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-sm text-slate-600 dark:text-slate-300 transition-colors">
-            {kind === 'folder' ? <FolderOpen className="w-4 h-4" /> : <HardDrive className="w-4 h-4" />}
-            Browse
-          </button>
+          {kind === 'folder' && (
+            <button type="button" onClick={pickNative}
+              title="Open Windows folder picker"
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm transition-colors">
+              <FolderOpen className="w-4 h-4" />
+              Browse
+            </button>
+          )}
+          {kind !== 'folder' && (
+            <button type="button" onClick={() => onPickerOpen(fieldKey, mode)}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-sm text-slate-600 dark:text-slate-300 transition-colors">
+              <HardDrive className="w-4 h-4" />
+              Browse
+            </button>
+          )}
         </div>
       );
     }
@@ -522,12 +539,6 @@ function fileTypeIcon(type: string | undefined) {
   return <FileSearch className="w-4 h-4 text-slate-400" />;
 }
 
-function fmtBytes(n: number | undefined): string {
-  if (!n) return '';
-  if (n < 1024)        return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject }) => {
   const rawFiles: SmartDriveFile[] = Array.isArray(tool.input.files) ? tool.input.files : [];
@@ -538,17 +549,14 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
     filename: f.filename || f.path.split(/[\\/]/).pop() || f.path,
   }));
 
-  // Collect unique folder names proposed by the agent
-  const agentFolders = Array.from(new Set(enriched.map(f => f.folder || '').filter(Boolean)));
-
-  const [driveName,   setDriveName]   = useState<string>(tool.input.driveName || 'Smart Drive');
-  const [outputPath,  setOutputPath]  = useState<string>(tool.input.outputPath || '');
-  const [action,      setAction]      = useState<'shortcuts' | 'move'>(tool.input.action === 'move' ? 'move' : 'shortcuts');
-  const [checked,     setChecked]     = useState<boolean[]>(enriched.map(() => true));
-  const [folders,     setFolders]     = useState<string[]>(enriched.map(f => f.folder || ''));
-  const [extraFiles,  setExtraFiles]  = useState<SmartDriveFile[]>([]);
-  const [showPicker,  setShowPicker]  = useState<'output' | 'add' | null>(null);
-  const [newFilePath, setNewFilePath] = useState('');
+  const [driveName,  setDriveName]  = useState<string>(tool.input.driveName || 'Smart Drive');
+  const [outputPath, setOutputPath] = useState<string>(tool.input.outputPath || '');
+  const [action,     setAction]     = useState<'shortcuts' | 'move'>(tool.input.action === 'move' ? 'move' : 'shortcuts');
+  const [checked,    setChecked]    = useState<boolean[]>(enriched.map(() => true));
+  const [folders,    setFolders]    = useState<string[]>(enriched.map(f => f.folder || ''));
+  const [extraFiles, setExtraFiles] = useState<SmartDriveFile[]>([]);
+  const [showPicker, setShowPicker] = useState<'output' | 'add_file' | 'scan_folder' | null>(null);
+  const [scanning,   setScanning]   = useState(false);
 
   const allFiles = [...enriched, ...extraFiles];
   const allChecked = [...checked, ...extraFiles.map(() => true)];
@@ -584,29 +592,54 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
     setExtraFiles(prev => prev.filter((_, idx) => idx !== ei));
   };
 
-  const handleConfirm = () => {
-    const finalFiles = allFiles
-      .filter((_, i) => allChecked[i])
-      .map((f, i) => ({
-        path: f.path,
-        folder: allFolders[allChecked.slice(0, allFiles.indexOf(f) + 1).filter(Boolean).length - 1 + allFiles.slice(0, allFiles.indexOf(f)).filter((_, j) => !allChecked[j]).length] || allFolders[allFiles.indexOf(f)] || '',
-        ai_description: f.ai_description,
-      }));
+  const scanSourceFolder = async (folderPath: string) => {
+    setScanning(true);
+    try {
+      const resp = await fetch(`${FLASK}/api/tools/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tool: 'smart_drive_scan',
+          input: {
+            sourceFolder: folderPath,
+            extensions: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.tiff',
+                         '.mp3', '.wav', '.flac', '.m4a', '.aac',
+                         '.mp4', '.avi', '.mkv', '.mov',
+                         '.pdf', '.docx', '.doc', '.txt', '.md'],
+            maxAnalyze: 50,
+          },
+        }),
+      });
+      const data = await resp.json();
+      const result = JSON.parse(data.result || '{}');
+      if (Array.isArray(result.files)) {
+        const newFiles: SmartDriveFile[] = result.files.map((f: any) => ({
+          path: f.path,
+          filename: f.filename || f.path.split(/[\\/]/).pop() || f.path,
+          extension: f.extension || '',
+          size_bytes: f.size_bytes,
+          type: f.type || 'other',
+          ai_description: f.ai_description || null,
+          ai_tags: f.ai_tags || [],
+          folder: '',
+        }));
+        setExtraFiles(prev => [...prev, ...newFiles]);
+      }
+    } catch (e) {
+      console.error('Scan failed:', e);
+    } finally {
+      setScanning(false);
+    }
+  };
 
-    // simpler: rebuild from checked indices
+  const handleConfirm = () => {
     const out: Array<{path: string; folder: string; ai_description?: string | null}> = [];
     allFiles.forEach((f, i) => {
       if (allChecked[i]) {
         out.push({ path: f.path, folder: allFolders[i] || '', ai_description: f.ai_description });
       }
     });
-
-    onApprove(tool.id, {
-      driveName,
-      outputPath,
-      action,
-      files: out,
-    });
+    onApprove(tool.id, { driveName, outputPath, action, files: out });
   };
 
   return (
@@ -659,8 +692,15 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
                     />
                     <button
                       type="button"
-                      onClick={() => setShowPicker('output')}
-                      className="shrink-0 flex items-center gap-1 px-2.5 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-xs text-slate-600 dark:text-slate-300 transition-colors"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(`${FLASK}/api/tools/pick-folder`);
+                          const data = await res.json();
+                          if (data.path) setOutputPath(data.path);
+                        } catch { /* ignore */ }
+                      }}
+                      title="Open Windows folder picker"
+                      className="shrink-0 flex items-center gap-1 px-2.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs transition-colors"
                     >
                       <FolderOpen className="w-3.5 h-3.5" />
                     </button>
@@ -677,10 +717,10 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
                       key={opt}
                       type="button"
                       onClick={() => setAction(opt)}
-                      className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-colors ${
                         action === opt
                           ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
-                          : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-violet-300'
+                          : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:border-violet-400 dark:hover:border-violet-500'
                       }`}
                     >
                       {opt === 'shortcuts' ? 'Create shortcuts' : 'Move files'}
@@ -771,14 +811,27 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
                   ))}
                 </div>
 
-                {/* Add more files */}
-                <button
-                  type="button"
-                  onClick={() => setShowPicker('add')}
-                  className="mt-2 w-full py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-violet-400 dark:hover:border-violet-500 text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <FolderPlus className="w-3.5 h-3.5" /> Add more files
-                </button>
+                {/* Add files — scan folder or pick individual file */}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPicker('scan_folder')}
+                    disabled={scanning}
+                    className="flex-1 py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-violet-400 dark:hover:border-violet-500 disabled:opacity-50 text-slate-500 hover:text-violet-600 dark:hover:text-violet-400 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    {scanning
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Scanning…</>
+                      : <><FolderSearch className="w-3.5 h-3.5" /> Scan source folder</>
+                    }
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPicker('add_file')}
+                    className="flex-1 py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add file
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -812,7 +865,16 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
           onSelect={path => { setOutputPath(path); setShowPicker(null); }}
         />
       )}
-      {showPicker === 'add' && (
+      {showPicker === 'scan_folder' && (
+        <FolderPickerModal
+          isOpen
+          mode="folder"
+          title="Select a folder to scan for files"
+          onClose={() => setShowPicker(null)}
+          onSelect={path => { setShowPicker(null); scanSourceFolder(path); }}
+        />
+      )}
+      {showPicker === 'add_file' && (
         <FolderPickerModal
           isOpen
           mode="file"

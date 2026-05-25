@@ -24,9 +24,9 @@ const ChevRight   = (p: { size?: number }) => <Svg size={p.size}><path d="m9 6 6
 
 // ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV = [
-  { path: '/files',    label: 'My Drives', Icon: DriveIcon,    hint: '⌘1' },
-  { path: '/chat',     label: 'Agent',     Icon: SparkleIcon,  hint: '⌘2' },
-  { path: '/tools',    label: 'Tools',     Icon: ToolsIcon,    hint: '⌘3' },
+  { path: '/files', label: 'My Drives', Icon: DriveIcon    },
+  { path: '/chat',  label: 'Agent',     Icon: SparkleIcon  },
+  { path: '/tools', label: 'Tools',     Icon: ToolsIcon    },
 ];
 
 // ─── Brand mark ──────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ function Sidebar({ active }: { active: string }) {
 
       {/* Nav */}
       <nav style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-        {NAV.map(({ path, label, Icon, hint }) => {
+        {NAV.map(({ path, label, Icon }) => {
           const isActive = active.startsWith(path);
           return (
             <NavLink key={path} to={path} title={label} style={{ textDecoration: 'none' }}>
@@ -112,9 +112,6 @@ function Sidebar({ active }: { active: string }) {
                 <span style={{ flexShrink: 0, display: 'inline-flex' }}><Icon size={19} /></span>
                 <span style={{ flex: 1, opacity: hover ? 1 : 0, transition: 'opacity .15s', whiteSpace: 'nowrap' }}>
                   {label}
-                </span>
-                <span style={{ opacity: hover ? 1 : 0, transition: 'opacity .15s' }}>
-                  <span className="kbd">{hint}</span>
                 </span>
               </div>
             </NavLink>

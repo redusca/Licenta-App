@@ -259,3 +259,47 @@ input, textarea { font: inherit; color: inherit; }
 
 /* ─── Configure dark mode strategy ────────────────────────────────────────── */
 @variant dark (&:where(.dark, .dark *));
+
+/* ─── Light-mode: remap dark Tailwind slate classes used in tool pages ─────── */
+/* Tool pages use hardcoded dark slate classes; these rules make them adapt to  */
+/* the light theme by mapping to CSS surface/border/ink tokens instead.         */
+html:not(.dark) .bg-slate-900 { background-color: var(--surface) !important; }
+html:not(.dark) .bg-slate-800 { background-color: var(--surface-2) !important; }
+html:not(.dark) .bg-slate-700 { background-color: var(--surface-3) !important; }
+html:not(.dark) .bg-slate-600 { background-color: var(--surface-3) !important; }
+html:not(.dark) .bg-slate-800\/50 { background-color: var(--surface-2) !important; }
+html:not(.dark) .bg-slate-800\/30 { background-color: var(--surface-2) !important; }
+html:not(.dark) .bg-slate-900\/50 { background-color: var(--surface) !important; }
+html:not(.dark) .bg-slate-900\/30 { background-color: var(--surface) !important; }
+
+html:not(.dark) .border-slate-800 { border-color: var(--border) !important; }
+html:not(.dark) .border-slate-700 { border-color: var(--border-2) !important; }
+html:not(.dark) .border-slate-600 { border-color: var(--border-2) !important; }
+
+html:not(.dark) .text-slate-200 { color: var(--ink) !important; }
+html:not(.dark) .text-slate-300 { color: var(--ink-2) !important; }
+html:not(.dark) .text-slate-400 { color: var(--muted) !important; }
+html:not(.dark) .text-slate-500 { color: var(--faint) !important; }
+html:not(.dark) .text-slate-600 { color: var(--faint) !important; }
+
+/* Hover states */
+html:not(.dark) .hover\:bg-slate-800:hover { background-color: var(--surface-2) !important; }
+html:not(.dark) .hover\:bg-slate-700:hover { background-color: var(--surface-3) !important; }
+html:not(.dark) .hover\:bg-slate-600:hover { background-color: var(--surface-3) !important; }
+html:not(.dark) .hover\:border-slate-600:hover { border-color: var(--border-2) !important; }
+html:not(.dark) .hover\:text-slate-300:hover { color: var(--ink-2) !important; }
+html:not(.dark) .hover\:bg-slate-800\/50:hover { background-color: var(--surface-2) !important; }
+html:not(.dark) .hover\:bg-slate-800\/30:hover { background-color: var(--surface-2) !important; }
+html:not(.dark) .hover\:text-slate-200:hover { color: var(--ink) !important; }
+html:not(.dark) .hover\:text-white:hover { color: var(--ink) !important; }
+html:not(.dark) .hover\:border-slate-500:hover { border-color: var(--border-2) !important; }
+
+/* White text inside form fields becomes dark in light mode */
+html:not(.dark) select.text-white { color: var(--ink) !important; }
+html:not(.dark) input.text-white { color: var(--ink) !important; }
+/* Group-hover light text → readable in light mode */
+html:not(.dark) .group:hover .group-hover\:text-white { color: var(--ink) !important; }
+html:not(.dark) .group:hover .group-hover\:text-slate-200 { color: var(--ink) !important; }
+
+/* Disabled buttons: 60% opacity in light mode so they remain clearly visible */
+html:not(.dark) button:disabled { opacity: 0.6 !important; }

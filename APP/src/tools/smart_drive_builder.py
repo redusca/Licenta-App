@@ -91,11 +91,24 @@ def execute(input_data: dict) -> str:
 
     drive_type = "move" if action == "move" else "shortcut"
 
-    # 1. Create the root virtual drive folder
-    try:
-        drive_path = create_drive(output_path, drive_name, drive_type)
-    except Exception as exc:
-        return json.dumps({"success": False, "error": f"Failed to create virtual drive: {exc}"})
+    # 1. Create (or reuse) the root virtual drive folder
+    config_path = os.path.join(output_path, ".drive_config.json")
+    if os.path.isfile(config_path):
+        # outputPath is already a virtual drive — use it directly
+        drive_path = output_path
+        try:
+            with open(config_path, "r", encoding="utf-8") as fh:
+                cfg = json.load(fh)
+            cfg["type"] = drive_type
+            with open(config_path, "w", encoding="utf-8") as fh:
+                json.dump(cfg, fh, indent=2)
+        except Exception:
+            pass
+    else:
+        try:
+            drive_path = create_drive(output_path, drive_name, drive_type)
+        except Exception as exc:
+            return json.dumps({"success": False, "error": f"Failed to create virtual drive: {exc}"})
 
     # 2. Register in known_drives.json
     try:
