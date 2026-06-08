@@ -24,15 +24,12 @@ import imageio_ffmpeg
 
 _FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 
 _CONFIG_FILENAME = ".drive_config.json"
 SUPPORTED_INPUT_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".mpeg", ".mpg"}
 OUTPUT_FORMATS = {"mp4", "avi", "mkv", "mov", "wmv", "flv", "webm"}
-
-# ── Agent tool definition (used by /api/tools) ─────────────────────────────────
 
 DEFINITION = {
     "name": "video_converter",
@@ -41,13 +38,19 @@ DEFINITION = {
         "Supports three output modes: replace originals, copy alongside, or virtual drive."
     ),
     "input_instructions": (
-        "files: array of {path, outputFormat} — use ask_user(input_type='file') to pick each video from a virtual drive. "
+        "files: array of {path, outputFormat} — provide file paths directly if you already have them (e.g. from a prior tool's output). "
+        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
+        "CHAINING: if a previous tool returned a result, extract each item's outputPath "
+        "and pass them as [{\"path\": outputPath, \"outputFormat\": \"mp4\"}, ...] — do NOT call ask_user again. "
         "outputFormat per file: 'mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', or 'webm'. "
-        "outputMode: 'replace' overwrites original, 'copy' places result alongside, 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+        "outputMode: 'copy' is recommended when chaining (keeps originals); "
+        "'replace' overwrites original; 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder."
     ),
     "output_description": (
-        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}. "
+        "CHAINING: each result's outputPath is the produced file — pass it directly as the 'path' "
+        "in the next tool's files array without calling ask_user."
     ),
     "parameters": {
         "type": "object",
@@ -70,8 +73,6 @@ DEFINITION = {
         "required": ["files", "outputMode"],
     },
 }
-
-# ── Tool-drives registry helpers ───────────────────────────────────────────────
 
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
@@ -96,14 +97,7 @@ def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     drives.append({"path": drive_path, "name": name, "tool": tool})
     _save_tool_drives(drives)
 
-# ── Virtual drive creation ─────────────────────────────────────────────────────
-
 def _ensure_virtual_drive(output_path: str) -> str:
-    """
-    Ensure the VideoConversionResults virtual drive exists inside output_path.
-    Creates the folder + .drive_config.json if missing.
-    Returns the full drive path.
-    """
     drive_name = "VideoConversionResults"
     drive_path = os.path.join(output_path, drive_name)
     os.makedirs(drive_path, exist_ok=True)
@@ -126,25 +120,13 @@ def _ensure_virtual_drive(output_path: str) -> str:
     _register_tool_drive(drive_path, drive_name, "video_converter")
     return drive_path
 
-# ── Single-video conversion ────────────────────────────────────────────────────
-
 def _convert_video(
     src_path: str,
     out_format: str,
     dst_path: str,
 ) -> None:
-    """Invoke ffmpeg to convert video format."""
-    cmd = [
-        _FFMPEG_EXE,
-        "-y",               # Overwrite output
-        "-i", src_path,     # Input file
-        # To avoid re-encoding if not strictly necessary, we could try `-c copy`,
-        # but formats often require specific codecs. Doing a standard transcode is safer.
-        dst_path
-    ]
-    
+    cmd = [_FFMPEG_EXE, "-y", "-i", src_path, dst_path]
     try:
-        # Run ffmpeg, capture output for debugging if it fails
         result = subprocess.run(
             cmd,
             stdout=subprocess.PIPE,
@@ -162,7 +144,6 @@ def _convert_video(
         )
 
 def _unique_path(path: str) -> str:
-    """Return a non-colliding path by appending a numeric suffix if needed."""
     if not os.path.exists(path):
         return path
     stem, ext = os.path.splitext(path)
@@ -172,13 +153,7 @@ def _unique_path(path: str) -> str:
         counter += 1
     return path
 
-# ── Public executor ────────────────────────────────────────────────────────────
-
 def execute(input: dict) -> str:
-    """
-    Batch-convert videos.
-    Returns a JSON string (for agent compatibility).
-    """
     files: list = input.get("files", [])
     output_mode: str = input.get("outputMode", "copy")
     output_path: str = input.get("outputPath", "")
@@ -251,14 +226,11 @@ def execute(input: dict) -> str:
 
     return json.dumps(response)
 
-# ── Single item processing (used by parallel executor) ───────────────────────
-
 def _process_single_item(
     item: dict,
     output_mode: str,
     virtual_drive_path: str | None,
 ) -> dict:
-    """Convert a single file and return its result dict."""
     src = item.get("path", "")
     raw_fmt = item.get("outputFormat", "").lower().lstrip(".")
 
@@ -298,11 +270,6 @@ def _process_single_item(
         return {"path": src, "success": False, "error": str(exc)}
 
 def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
-    """
-    Parallel batch-convert. Uses a thread pool. Video conversion is CPU intensive,
-    so we default to 2 workers to avoid choking the machine.
-    Returns a JSON string with results in original order.
-    """
     files: list = input_data.get("files", [])
     output_mode: str = input_data.get("outputMode", "copy")
     output_path: str = input_data.get("outputPath", "")

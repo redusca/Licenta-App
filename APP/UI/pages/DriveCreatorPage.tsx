@@ -258,7 +258,7 @@ export const DriveCreatorPage: React.FC = () => {
                         {/* Convert button */}
                         <div className="mt-8">
                             <button type="button" onClick={runTool} disabled={!canRun}
-                                className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm shadow-lg shadow-emerald-900/20">
+                                className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px 14px' }}>
                                 {running ? (
                                     <>
                                         <Loader2 className="w-4 h-4 animate-spin" />

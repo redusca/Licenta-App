@@ -59,7 +59,14 @@ def _analyze_image(path: str) -> dict[str, Any]:
         resp = requests.post(
             f"{_AI_GATEWAY}/api/ai/vision/llama-scout",
             files={"file": ("thumb.jpg", img_bytes, "image/jpeg")},
-            data={"max_tokens": "200"},
+            data={
+                "max_tokens": "80",
+                "prompt": (
+                    "Describe this image in 50 words or fewer. "
+                    "Focus on the main subject, objects, and setting. "
+                    "Be concise and factual."
+                ),
+            },
             timeout=(5, 60),
         )
         resp.raise_for_status()
@@ -183,8 +190,13 @@ DEFINITION = {
         "The tool uses NTFS MFT for fast full-drive scanning — run the app as Administrator."
     ),
     "output_description": (
-        "JSON {total_found, analyzed, files:[{path, filename, extension, size_bytes, type, "
-        "ai_description, ai_tags, ai_error}], not_analyzed:[...paths]}"
+        "JSON object: {total_found, analyzed, scan_method, files: [...], not_analyzed: [...]}. "
+        "IMPORTANT — chaining to smart_drive_build: "
+        "Each item in 'files' has {path, filename, type, ai_description, ai_tags}. "
+        "To build the drive you MUST read ALL items from 'files', filter them based on "
+        "ai_description matching the user's intent, and pass the matching ones as the "
+        "'files' parameter of smart_drive_build — copying 'path' and 'ai_description' "
+        "from each matching item. Do NOT pass an empty files list."
     ),
     "parameters": {
         "type": "object",

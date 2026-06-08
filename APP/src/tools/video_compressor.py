@@ -22,14 +22,11 @@ import imageio_ffmpeg
 
 _FFMPEG_EXE = imageio_ffmpeg.get_ffmpeg_exe()
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 
 _CONFIG_FILENAME = ".drive_config.json"
 SUPPORTED_INPUT_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm"}
-
-# ── Agent tool definition (used by /api/tools) ─────────────────────────────────
 
 DEFINITION = {
     "name": "video_compressor",
@@ -38,15 +35,21 @@ DEFINITION = {
         "Supports batch processing and output mode selection."
     ),
     "input_instructions": (
-        "files: array of {path, codec?, crf?, maxResolution?, stripAudio?} — use ask_user(input_type='file') to pick each video from a virtual drive. "
+        "files: array of {path, codec?, crf?, maxResolution?, stripAudio?} — provide file paths directly if you already have them (e.g. from video_converter output). "
+        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
+        "CHAINING: if a previous tool returned a result, extract each item's outputPath "
+        "and pass them as [{\"path\": outputPath}, ...] — do NOT call ask_user again. "
         "codec: 'h264' (default) or 'h265'. crf: quality 0-51, default 28 (lower = better quality). "
         "maxResolution: 'original', '1080p', '720p', '480p', or '360p'. stripAudio: true to remove audio. "
-        "outputMode: 'replace' overwrites original, 'copy' adds _compressed suffix, 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+        "outputMode: 'copy' is recommended when chaining (keeps originals); "
+        "'replace' overwrites original; 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder."
     ),
     "output_description": (
         "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?} "
-        "— output files are always MP4 format."
+        "— output files are always MP4. "
+        "CHAINING: each result's outputPath is the produced MP4 — pass it directly as the 'path' "
+        "in the next tool's files array without calling ask_user."
     ),
     "parameters": {
         "type": "object",
@@ -69,8 +72,6 @@ DEFINITION = {
         "required": ["files", "outputMode"],
     },
 }
-
-# ── Tool-drives registry helpers ───────────────────────────────────────────────
 
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
@@ -118,8 +119,6 @@ def _ensure_virtual_drive(output_path: str) -> str:
     _register_tool_drive(drive_path, drive_name, "video_compressor")
     return drive_path
 
-# ── Video processing ──────────────────────────────────────────────────────────
-
 def _compress_video(
     src_path: str,
     dst_path: str,
@@ -128,24 +127,16 @@ def _compress_video(
     max_resolution: str,
     strip_audio: bool
 ) -> None:
-    cmd = [
-        _FFMPEG_EXE,
-        "-y",               # Overwrite output
-        "-i", src_path      # Input file
-    ]
-    
-    # Codec setup
+    cmd = [_FFMPEG_EXE, "-y", "-i", src_path]
+
     if codec == "h265" or codec == "hevc":
         cmd.extend(["-c:v", "libx265"])
     else:
         cmd.extend(["-c:v", "libx264"])
 
-    # CRF
     cmd.extend(["-crf", str(crf)])
-    # preset to balance speed
     cmd.extend(["-preset", "fast"])
 
-    # Resolution downscale
     if max_resolution != "original":
         scale_val = {
             "1080p": "1080",
@@ -156,14 +147,13 @@ def _compress_video(
         if scale_val:
             cmd.extend(["-vf", f"scale=-2:{scale_val}"])
 
-    # Audio handling
     if strip_audio:
         cmd.append("-an")
     else:
-        cmd.extend(["-c:a", "aac", "-b:a", "128k"]) # Compress audio too
-    
+        cmd.extend(["-c:a", "aac", "-b:a", "128k"])
+
     cmd.append(dst_path)
-    
+
     try:
         result = subprocess.run(
             cmd,
@@ -178,7 +168,6 @@ def _compress_video(
         raise RuntimeError("ffmpeg is not installed or not in PATH.")
 
 def _unique_path(path: str) -> str:
-    """Return a non-colliding path by appending a numeric suffix if needed."""
     if not os.path.exists(path):
         return path
     stem, ext = os.path.splitext(path)
@@ -187,8 +176,6 @@ def _unique_path(path: str) -> str:
         path = f"{stem}_{counter}{ext}"
         counter += 1
     return path
-
-# ── Single item processing (used by parallel executor) ───────────────────────
 
 def _process_single_item(
     item: dict,
@@ -212,7 +199,6 @@ def _process_single_item(
 
     try:
         if output_mode == "replace":
-            # For safe replacement, write to tmp first
             tmp = src + ".vid_comp_tmp.mp4"
             _compress_video(src, tmp, codec, crf, max_resolution, strip_audio)
             os.remove(src)
@@ -236,11 +222,9 @@ def _process_single_item(
         return {"path": src, "success": False, "error": str(exc)}
 
 def execute(input_data: dict) -> str:
-    """Batch-compress videos synchronously."""
     return execute_parallel(input_data, max_workers=1)
 
 def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
-    """Parallel batch-compress"""
     files: list = input_data.get("files", [])
     output_mode: str = input_data.get("outputMode", "copy")
     output_path: str = input_data.get("outputPath", "")

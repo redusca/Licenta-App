@@ -1,24 +1,3 @@
-"""
-Tool executor API — called by the agent container to execute tools locally.
-
-The agent container never runs tool code itself.  When the LLM decides to
-call a tool, the container POSTs to this endpoint.  The APP executes the
-tool and returns the result; the container feeds it back to the LLM.
-
-Endpoints
----------
-POST /api/tools/execute
-    Body: { "tool": "<name>", "input": { ...args } }
-    Response: { "result": "<string>" }
-
-GET /api/tools
-    Returns the list of available tool definitions to register with the agent.
-    Each definition includes a `callback_url` pointing back to this endpoint.
-
-GET /api/tools/catalog
-    Returns the full UI-facing tool catalog (tools + categories).
-    The frontend fetches this once on startup to build the Tools page.
-"""
 from __future__ import annotations
 
 import json
@@ -45,17 +24,13 @@ from tools import pdf_merger as pdf_merger_tool
 from tools import model_converter as model_converter_tool
 from tools import document_converter as document_converter_tool
 from tools import subtitle_generator as subtitle_generator_tool
-from tools.subtitle_generator import build_srt as _build_srt, srt_time as _srt_time
+from tools.subtitle_generator import build_srt as _build_srt
 from tools import document_analytics as document_analytics_tool
 from tools import smart_drive_scanner as smart_drive_scanner_tool
 from tools import smart_drive_builder as smart_drive_builder_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
-
-# ── Sound-effect normaliser ───────────────────────────────────────────────────
-# Whisper sometimes produces bracket-notation for non-speech sounds.
-# Map them to friendly SRT markers; drop noise-only annotations entirely.
 
 _SFX_MAP: list[tuple[re.Pattern, str]] = [
     (re.compile(r'\[(?:laughing|laughter|laugh|laughs?|giggling|giggles?)\]', re.I), '*laughs*'),
@@ -67,11 +42,9 @@ _SFX_MAP: list[tuple[re.Pattern, str]] = [
     (re.compile(r'\[(?:crying|cries|sobs?|sobbing|weeping)\]', re.I), '*cries*'),
     (re.compile(r'\[(?:whistling?|whistle)\]', re.I), '*whistles*'),
     (re.compile(r'\[(?:coughing?|coughs?)\]', re.I), '*coughs*'),
-    # Drop pure noise/silence/inaudible annotations
     (re.compile(r'\[(?:noise|background noise|ambient|silence|inaudible|unintelligible|(?:speaking )?foreign (?:language|speech))\]', re.I), ''),
 ]
 
-# Matches segments that are almost entirely laugh vocalisations ("ha ha ha", "heh heh", etc.)
 _LAUGH_NOISE_RE = re.compile(
     r'^[\s,!\.\-]*((?:ha|hah|haha|heh|hee|ah|aha|lol)[\s,!\.\-]*){3,}[\s,!\.\-]*$',
     re.I,
@@ -79,7 +52,6 @@ _LAUGH_NOISE_RE = re.compile(
 
 
 def _normalize_sfx(chunks: list[dict]) -> list[dict]:
-    """Replace/remove Whisper sound-effect tokens; tag laugh-noise segments."""
     out: list[dict] = []
     for seg in chunks:
         text = seg.get("text", "").strip()
@@ -97,26 +69,89 @@ def _normalize_sfx(chunks: list[dict]) -> list[dict]:
 
 tools_bp = Blueprint("tools", __name__)
 
-# Path to the tool-drives registry written by image_converter
 _TOOL_DRIVES_PATH = Path(__file__).parent.parent.parent / "data" / "tool_drives.json"
-
-# ── Human-in-the-loop pending tool system ─────────────────────────────────────
-# Maps request_id → pending dict with threading.Event for blocking /execute
 
 _PENDING: dict[str, dict] = {}
 _PENDING_LOCK = threading.Lock()
 
-# Tools that require user approval before the agent can run them.
-# Individual tool DEFINITION dicts may also set requires_approval=True/False.
+_LAST_OUTPUT_PATHS: list[str] = []
+_LAST_OUTPUT_LOCK = threading.Lock()
+
+# Stores the full files list from the most recent smart_drive_scan result
+_LAST_SCAN_FILES: list[dict] = []
+_LAST_SCAN_LOCK = threading.Lock()
+
+
+def _looks_like_real_path(p: str) -> bool:
+    if not p or len(p) < 3:
+        return False
+    if re.match(r'^[A-Za-z]:[/\\]', p):  # Windows: C:\ or C:/
+        return True
+    if p.startswith('\\\\') or p.startswith('//'):  # UNC
+        return True
+    if p.startswith('/') and len(p) > 1:  # Linux/Mac
+        return True
+    return False
+
+
+def _substitute_placeholders(tool_input: dict, real_paths: list[str]) -> dict:
+    if not real_paths:
+        return tool_input
+    files = tool_input.get("files")
+    if not isinstance(files, list) or not files:
+        return tool_input
+
+    path_iter = iter(real_paths)
+    new_files: list[dict] = []
+    for item in files:
+        if not isinstance(item, dict):
+            new_files.append(item)
+            continue
+        path = item.get("path", "")
+        if _looks_like_real_path(path):
+            new_files.append(item)
+        else:
+            try:
+                new_files.append({**item, "path": next(path_iter)})
+            except StopIteration:
+                new_files.append(item)
+    return {**tool_input, "files": new_files}
+
+
+def _record_outputs(result_json: str, tool_name: str = "") -> None:
+    try:
+        parsed = json.loads(result_json)
+    except Exception:
+        return
+    if not isinstance(parsed, dict):
+        return
+
+    # Track outputPaths for file-chaining tools
+    paths: list[str] = []
+    if isinstance(parsed.get("results"), list):
+        paths = [
+            r["outputPath"] for r in parsed["results"]
+            if isinstance(r, dict) and r.get("success") and r.get("outputPath")
+        ]
+    elif parsed.get("outputPath"):
+        paths = [parsed["outputPath"]]
+    if paths:
+        with _LAST_OUTPUT_LOCK:
+            _LAST_OUTPUT_PATHS.clear()
+            _LAST_OUTPUT_PATHS.extend(paths)
+
+    # Track full file list from smart_drive_scan so build can inject it if needed
+    if tool_name == "smart_drive_scan" and isinstance(parsed.get("files"), list):
+        with _LAST_SCAN_LOCK:
+            _LAST_SCAN_FILES.clear()
+            _LAST_SCAN_FILES.extend(parsed["files"])
+
 _APPROVAL_REQUIRED = frozenset({
     "image_converter", "remove_background", "image_to_svg",
     "video_converter", "video_compressor", "audio_converter",
     "drive_creator", "pdf_merger", "model_converter", "document_converter",
     "smart_drive_build",
 })
-
-# ── Tool registry ─────────────────────────────────────────────────────────────
-# Maps tool name → executor module.  Add new tools here.
 
 _TOOLS: dict[str, object] = {
     "ask_user": ask_user_tool,
@@ -139,18 +174,8 @@ _TOOLS: dict[str, object] = {
 }
 
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-
 @tools_bp.post("/execute")
 def execute():
-    """
-    Execute a tool on behalf of the agent server.
-
-    If the tool is in _APPROVAL_REQUIRED (or its DEFINITION sets
-    requires_approval=True), this endpoint blocks until the user
-    approves or rejects via /api/tools/approve or /api/tools/reject.
-    The agent server has a 120 s timeout for tool callbacks.
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -170,6 +195,30 @@ def execute():
     )
 
     if needs_approval:
+        # Replace LLM-generated placeholder paths with the real paths from the
+        # previous tool's output before surfacing the approval card to the user.
+        with _LAST_OUTPUT_LOCK:
+            current_outputs = list(_LAST_OUTPUT_PATHS)
+        tool_input = _substitute_placeholders(tool_input, current_outputs)
+
+        # If smart_drive_build received no files (agent failed to chain), inject
+        # the full scan result so the user can review/deselect in the approval card.
+        if tool_name == "smart_drive_build":
+            files = tool_input.get("files")
+            if not isinstance(files, list) or len(files) == 0:
+                with _LAST_SCAN_LOCK:
+                    scan_files = list(_LAST_SCAN_FILES)
+                if scan_files:
+                    logger.warning(
+                        "smart_drive_build received 0 files — injecting %d files from last scan",
+                        len(scan_files),
+                    )
+                    injected = [
+                        {"path": f["path"], "ai_description": f.get("ai_description"), "folder": ""}
+                        for f in scan_files if f.get("path")
+                    ]
+                    tool_input = {**tool_input, "files": injected}
+
         req_id = str(uuid.uuid4())
         event = threading.Event()
         safe_defn = {k: v for k, v in definition.items() if k != "callback_url"}
@@ -184,7 +233,7 @@ def execute():
                 "modified_input": None,
             }
         logger.info("Tool '%s' waiting for approval (req %s)", tool_name, req_id)
-        approved = event.wait(timeout=870)  # slightly under the 900 s server read timeout
+        approved = event.wait(timeout=870)
         with _PENDING_LOCK:
             pending = _PENDING.pop(req_id, None)
 
@@ -197,6 +246,7 @@ def execute():
 
     try:
         result: str = tool.execute(tool_input)
+        _record_outputs(result, tool_name)
         logger.info("Tool '%s' executed successfully", tool_name)
         return jsonify({"result": result})
     except Exception as exc:
@@ -206,29 +256,16 @@ def execute():
 
 @tools_bp.get("")
 def list_tools():
-    """
-    Return tool definitions to register with the agent at session init.
-
-    The caller should append `callback_url` pointing to this APP's
-    /api/tools/execute endpoint before sending the list to the agent.
-    """
     definitions = []
     for name, mod in _TOOLS.items():
-        defn = dict(mod.DEFINITION)          # shallow copy so we don't mutate
-        defn.setdefault("callback_url", "")  # caller fills this in
+        defn = dict(mod.DEFINITION)
+        defn.setdefault("callback_url", "")
         definitions.append(defn)
     return jsonify(definitions)
 
 
 @tools_bp.get("/catalog")
 def get_catalog():
-    """
-    Return the full UI-facing tool catalog.
-
-    Called by the frontend on startup to populate the Tools page.
-    The catalog is built from tools/catalog.py which is loaded once
-    when the backend starts.
-    """
     return jsonify({
         "tools": CATALOG_TOOLS,
         "categories": CATALOG_CATEGORIES,
@@ -237,7 +274,6 @@ def get_catalog():
 
 @tools_bp.get("/pending")
 def get_pending_approvals():
-    """Return all tool executions currently waiting for user approval."""
     with _PENDING_LOCK:
         result = [
             {
@@ -253,10 +289,6 @@ def get_pending_approvals():
 
 @tools_bp.post("/approve/<request_id>")
 def approve_tool(request_id: str):
-    """
-    Approve a pending tool execution.
-    Body (optional): { "input": { ...modified_args } }
-    """
     with _PENDING_LOCK:
         pending = _PENDING.get(request_id)
     if not pending:
@@ -271,7 +303,6 @@ def approve_tool(request_id: str):
 
 @tools_bp.post("/reject/<request_id>")
 def reject_tool(request_id: str):
-    """Reject a pending tool execution."""
     with _PENDING_LOCK:
         pending = _PENDING.get(request_id)
     if not pending:
@@ -284,19 +315,6 @@ def reject_tool(request_id: str):
 
 @tools_bp.post("/image-converter/run")
 def image_converter_run():
-    """
-    Direct frontend endpoint for the Image Converter tool.
-    Uses parallel execution when more than 1 file is provided.
-
-    Body: {
-        "files": [{"path": "...", "outputFormat": "png"}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/...",   # required for virtual_drive mode
-        "quality": 85,
-        "preserveMetadata": true
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -316,18 +334,6 @@ def image_converter_run():
 
 @tools_bp.post("/remove-background/run")
 def remove_background_run():
-    """
-    Direct frontend endpoint for the Remove Background tool.
-    Uses parallel execution when more than 1 file is provided.
-
-    Body: {
-        "files": [{"path": "..."}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/...",   # required for virtual_drive mode
-        "preserveMetadata": true
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -347,21 +353,6 @@ def remove_background_run():
 
 @tools_bp.post("/image-to-svg/run")
 def image_to_svg_run():
-    """
-    Direct frontend endpoint for the Image to SVG Vectorizer tool.
-    Uses parallel execution when more than 1 file is provided.
-
-    Body: {
-        "files": [{"path": "..."}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/...",   # required for virtual_drive mode
-        "colormode": "color" | "binary",
-        "hierarchical": "stacked" | "cutout",
-        "filterSpeckle": 4,
-        "colorPrecision": 6
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -381,17 +372,6 @@ def image_to_svg_run():
 
 @tools_bp.post("/video-converter/run")
 def video_converter_run():
-    """
-    Direct frontend endpoint for the Video Converter tool.
-    Uses parallel execution when more than 1 file is provided.
-
-    Body: {
-        "files": [{"path": "...", "outputFormat": "mp4"}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/..."
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -411,17 +391,6 @@ def video_converter_run():
 
 @tools_bp.post("/video-compressor/run")
 def video_compressor_run():
-    """
-    Direct frontend endpoint for the Video Compressor tool.
-    Uses parallel execution when more than 1 file is provided.
-
-    Body: {
-        "files": [{"path": "...", "codec": "h264", "crf": 28, "maxResolution": "original", "stripAudio": false}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/..."
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -441,17 +410,6 @@ def video_compressor_run():
 
 @tools_bp.post("/audio-converter/run")
 def audio_converter_run():
-    """
-    Direct frontend endpoint for the Audio Converter tool.
-    Uses parallel execution when more than 1 file is provided.
-
-    Body: {
-        "files": [{"path": "...", "outputFormat": "mp3"}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/..."
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -472,18 +430,6 @@ def audio_converter_run():
 
 @tools_bp.post("/drive-creator/run")
 def drive_creator_run():
-    """
-    Direct frontend endpoint for the Drive Creator tool.
-
-    Body: {
-        "sourceFolder": "C:/...",
-        "extensions": [".jpg", ".png"],
-        "driveName": "Image Drive",
-        "action": "shortcuts" | "move",
-        "outputPath": "C:/..."
-    }
-    Response: JSON with success, total, succeeded, failed, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -499,15 +445,6 @@ def drive_creator_run():
 
 @tools_bp.post("/space-analyzer/run")
 def space_analyzer_run():
-    """
-    Direct frontend endpoint for the Space Analyzer tool.
-
-    Body: {
-        "driveLetter": "C",
-        "targetDir": "C:/Optional/Subfolder"
-    }
-    Response: JSON with success, data
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -522,22 +459,6 @@ def space_analyzer_run():
 
 @tools_bp.post("/pdf-merger/run")
 def pdf_merger_run():
-    """
-    Direct frontend endpoint for the PDF Toolkit tool.
-
-    Body: {
-        "action": "merge" | "split" | "convert" | "reorder" | "page_info",
-        "files": [{"path": "..."}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/...",
-        "outputFilename": "merged",
-        "pageRanges": "1-3,5",
-        "convertTo": "docx" | "pdf",
-        "addBookmarks": true,
-        "pageOrder": [3, 1, 2]
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -557,16 +478,6 @@ def pdf_merger_run():
 
 @tools_bp.post("/model-converter/run")
 def model_converter_run():
-    """
-    Direct frontend endpoint for the 3D Model Converter tool.
-
-    Body: {
-        "files": [{"path": "...", "outputFormat": "glb"}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/..."
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -582,17 +493,6 @@ def model_converter_run():
 
 @tools_bp.post("/document-converter/run")
 def document_converter_run():
-    """
-    Direct frontend endpoint for the Document Converter tool.
-    Uses parallel execution when more than 1 file is provided.
-
-    Body: {
-        "files": [{"path": "...", "outputFormat": "pdf"}, ...],
-        "outputMode": "replace" | "copy" | "virtual_drive",
-        "outputPath": "C:/..."
-    }
-    Response: JSON with success, total, succeeded, failed, results, virtualDrivePath?
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -612,10 +512,6 @@ def document_converter_run():
 
 @tools_bp.get("/space-analyzer/drives")
 def space_analyzer_drives():
-    """
-    Returns a list of available physical drive letters on Windows.
-    Response: { "drives": ["C", "D"] }
-    """
     try:
         import os
         import string
@@ -634,11 +530,6 @@ def space_analyzer_drives():
 
 @tools_bp.post("/blend-to-glb")
 def blend_to_glb():
-    """
-    Convert a .blend file to .glb using Blender CLI (headless).
-    Body: { "path": "C:/path/to/file.blend" }
-    Response: { "glbPath": "C:/path/to/file.glb" }
-    """
     import subprocess
     import shutil
 
@@ -647,10 +538,8 @@ def blend_to_glb():
     if not blend_path or not os.path.isfile(blend_path):
         return jsonify({"error": "Invalid .blend file path"}), 400
 
-    # Find Blender executable
     blender_exe = shutil.which("blender")
     if not blender_exe:
-        # Check common Windows install locations
         for candidate in [
             r"C:\Program Files\Blender Foundation\Blender 4.2\blender.exe",
             r"C:\Program Files\Blender Foundation\Blender 4.1\blender.exe",
@@ -666,11 +555,9 @@ def blend_to_glb():
     if not blender_exe:
         return jsonify({"error": "Blender is not installed or not found in PATH. Install Blender to open .blend files."}), 400
 
-    # Output path: same directory, same name but .glb
     base, _ = os.path.splitext(blend_path)
     glb_path = base + ".glb"
 
-    # Blender Python script to export as GLB
     export_script = (
         "import bpy\n"
         f"bpy.ops.export_scene.gltf(filepath=r'{glb_path}', export_format='GLB')\n"
@@ -699,7 +586,6 @@ _AI_GATEWAY_BASE = "http://127.0.0.1:8000"
 
 @tools_bp.get("/ai-gateway/status")
 def ai_gateway_status():
-    """Proxy to the AI Gateway status endpoint."""
     import requests as _req
     try:
         r = _req.get(f"{_AI_GATEWAY_BASE}/api/ai/status", timeout=5)
@@ -708,9 +594,57 @@ def ai_gateway_status():
         return jsonify({"status": "offline", "error": "AI Gateway is not running"}), 503
 
 
+@tools_bp.post("/open-file")
+def open_file():
+    import subprocess
+    import sys
+    data = request.get_json(force=True) or {}
+    path = data.get("path", "").strip()
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "Path not found"}), 404
+    try:
+        if sys.platform == "win32":
+            os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+        return jsonify({"ok": True})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@tools_bp.post("/show-in-folder")
+def show_in_folder():
+    import subprocess
+    import sys
+    data = request.get_json(force=True) or {}
+    path = data.get("path", "").strip()
+    if not path or not os.path.exists(path):
+        # Try opening parent directory even if the file doesn't exist
+        parent = os.path.dirname(path)
+        if not parent or not os.path.isdir(parent):
+            return jsonify({"error": "Path not found"}), 404
+        path = parent
+
+    try:
+        if sys.platform == "win32":
+            if os.path.isfile(path):
+                subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])  # /select highlights the file
+            else:
+                subprocess.Popen(["explorer", os.path.normpath(path)])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", path])
+        else:
+            folder = path if os.path.isdir(path) else os.path.dirname(path)
+            subprocess.Popen(["xdg-open", folder])
+        return jsonify({"ok": True})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 @tools_bp.get("/user-folders")
 def user_folders():
-    """Return common user folder paths that exist on this system."""
     home = Path(__file__).home()
     candidates = [
         ("Desktop",   home / "Desktop"),
@@ -725,7 +659,6 @@ def user_folders():
 
 @tools_bp.get("/pick-folder")
 def pick_folder():
-    """Open native Windows folder-browser dialog and return the selected path."""
     import subprocess
     ps_script = (
         "Add-Type -AssemblyName System.Windows.Forms; "
@@ -750,7 +683,6 @@ def pick_folder():
 
 @tools_bp.get("/preview")
 def file_preview():
-    """Serve a local file for in-app preview."""
     from flask import send_file
     path = request.args.get("path", "")
     if not path or not os.path.isfile(path):
@@ -763,16 +695,6 @@ def file_preview():
 
 @tools_bp.post("/image-enhancer/run")
 def image_enhancer_run():
-    """
-    Proxy to AI Gateway: Swin2SR ×2 super-resolution.
-
-    Body: {
-        "filePath": "C:/...",
-        "outputMode": "copy" | "virtual_drive",
-        "outputPath": "C:/..."
-    }
-    Response: { success, outputPath, previewBase64, metrics }
-    """
     import base64
     import requests as _req
 
@@ -844,19 +766,6 @@ def image_enhancer_run():
 
 @tools_bp.post("/audio-transcriber/run")
 def audio_transcriber_run():
-    """
-    Proxy to AI Gateway: Whisper Large V3 speech-to-text.
-
-    Body: {
-        "filePath": "C:/...",
-        "language": "en" | "ro" | ... | "auto",
-        "maxNewTokens": 256,
-        "expectedText": "",
-        "outputMode": "copy" | "virtual_drive" | "",
-        "outputPath": "C:/..."
-    }
-    Response: { success, transcription, outputPath?, metrics }
-    """
     import requests as _req
 
     data = request.get_json(force=True)
@@ -935,12 +844,6 @@ def audio_transcriber_run():
 
 @tools_bp.post("/image-enhancer/stream")
 def image_enhancer_stream():
-    """
-    SSE proxy: streams Swin2SR progress events from the AI Gateway to the frontend.
-
-    Body: same as /image-enhancer/run
-    Stream: SSE events with stage/message/progress, final event adds outputPath.
-    """
     import requests as _req
     import base64
 
@@ -1037,12 +940,6 @@ def image_enhancer_stream():
 
 @tools_bp.post("/audio-transcriber/stream")
 def audio_transcriber_stream():
-    """
-    SSE proxy: streams Whisper progress events from the AI Gateway to the frontend.
-
-    Body: same as /audio-transcriber/run
-    Stream: SSE events with stage/message/progress, final event adds outputPath.
-    """
     import requests as _req
 
     data = request.get_json(force=True) or {}
@@ -1147,21 +1044,6 @@ def audio_transcriber_stream():
 
 @tools_bp.post("/subtitle-generator/stream")
 def subtitle_generator_stream():
-    """
-    SSE endpoint: extract audio from a video, transcribe with Whisper (timestamps),
-    optionally translate each segment, then produce and save an SRT subtitle file.
-
-    Body: {
-        "videoPath": "C:/...",
-        "sourceLanguage": "auto" | "en" | "ro" | ...,
-        "translateTo": "" | "en" | "fr" | ...,
-        "outputMode": "copy" | "virtual_drive",
-        "outputPath": "C:/..."
-    }
-    Stream: SSE events:
-        {stage, message, progress}
-        done → {stage:"done", srtPath, srtContent, numSegments, metrics}
-    """
     import subprocess
     import tempfile
     import requests as _req
@@ -1208,7 +1090,6 @@ def subtitle_generator_stream():
     def _generate():
         tmp_audio = None
         try:
-            # ── Extract audio ─────────────────────────────────────────────
             yield _evt({"stage": "extracting_audio", "message": "Extracting audio from video...", "progress": 0.05})
             tmp_audio = tempfile.mktemp(suffix=".wav")
             try:
@@ -1235,7 +1116,6 @@ def subtitle_generator_stream():
                 yield _err_event(f"Cannot read extracted audio: {exc}")
                 return
 
-            # ── Send to AI Gateway ─────────────────────────────────────────
             yield _evt({"stage": "loading_model", "message": "Connecting to AI Gateway...", "progress": 0.1})
 
             form_data: dict = {}
@@ -1257,7 +1137,6 @@ def subtitle_generator_stream():
                 yield _err_event(str(exc))
                 return
 
-            # ── Proxy SSE from AI Gateway until "done" ─────────────────────
             chunks_result: list[dict] | None = None
             gw_metrics: dict = {}
 
@@ -1285,7 +1164,6 @@ def subtitle_generator_stream():
                             yield _err_event(evt.get("message", "AI Gateway error"))
                             return
                         else:
-                            # re-scale progress to leave room for translate + save steps
                             raw_pct = evt.get("progress", 0)
                             scaled_pct = 0.1 + raw_pct * 0.7  # 0.1 → 0.8
                             yield _evt({**evt, "progress": round(scaled_pct, 3)})
@@ -1294,10 +1172,8 @@ def subtitle_generator_stream():
                 yield _err_event("No response from AI Gateway.")
                 return
 
-            # ── Normalise sound effects ────────────────────────────────────
             chunks_result = _normalize_sfx(chunks_result)
 
-            # ── Translation (optional) ─────────────────────────────────────
             final_chunks = chunks_result
             if translate_to and chunks_result:
                 yield _evt({
@@ -1311,8 +1187,7 @@ def subtitle_generator_stream():
                     translated: list[dict] = []
                     for seg in chunks_result:
                         text = seg.get("text", "").strip()
-                        # Keep sound-effect markers as-is — don't translate *laughs* etc.
-                        if re.match(r'^\*[^*]+\*$', text):
+                        if re.match(r'^\*[^*]+\*$', text):  # keep SFX markers (*laughs*, etc.) as-is
                             translated.append({**seg, "text": text})
                             continue
                         try:
@@ -1334,12 +1209,10 @@ def subtitle_generator_stream():
                         "progress": 0.83,
                     })
 
-            # ── Generate SRT ───────────────────────────────────────────────
             yield _evt({"stage": "generating_srt", "message": "Building SRT file...", "progress": 0.92})
 
             srt_content = _build_srt(final_chunks)
 
-            # ── Save SRT ───────────────────────────────────────────────────
             if output_mode == "virtual_drive" and output_path:
                 out_dir = os.path.join(output_path, "SubtitleResults")
                 os.makedirs(out_dir, exist_ok=True)
@@ -1379,15 +1252,6 @@ def subtitle_generator_stream():
 
 @tools_bp.post("/document-analytics/run")
 def document_analytics_run():
-    """
-    Analyze a document file and return statistics + LLM insights.
-
-    Body: {
-        "filePath": "C:/path/to/document.pdf",
-        "includeLLM": true
-    }
-    Response: { success, stats, llm_insights, text_preview, file_name, file_size, file_ext }
-    """
     data = request.get_json(force=True)
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -1403,10 +1267,6 @@ def document_analytics_run():
 
 @tools_bp.get("/created-drives")
 def get_created_drives():
-    """
-    Return the list of virtual drives created by tools (from tool_drives.json).
-    Used by the Tool Drives page in the frontend.
-    """
     if not _TOOL_DRIVES_PATH.exists():
         return jsonify({"drives": []})
     try:

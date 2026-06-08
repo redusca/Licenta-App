@@ -418,8 +418,7 @@ export const SpaceAnalyzerPage: React.FC = () => {
                     </div>
                 </div>
 
-                <button type="button" onClick={runTool} disabled={running}
-                    className="shrink-0 flex items-center justify-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors text-sm shadow-sm">
+                <button type="button" onClick={runTool} disabled={running} className="btn btn-primary">
                     {running && !data ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                     Analyze {targetDirInput ? 'Folder' : driveLetter + ':'}
                 </button>

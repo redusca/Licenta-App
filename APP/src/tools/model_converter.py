@@ -23,7 +23,6 @@ from pathlib import Path
 from config import APP_VERSION
 from migrations import get_latest_schema_version
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 _CONFIG_FILENAME = ".drive_config.json"
@@ -33,8 +32,6 @@ OUTPUT_FORMATS = {"obj", "stl", "ply", "glb", "gltf"}
 
 # Formats that require Blender CLI for export (not natively supported by trimesh)
 BLENDER_EXPORT_FORMATS = {"fbx", "dae"}
-
-# ── Agent tool definition ──────────────────────────────────────────────────────
 
 DEFINITION = {
     "name": "model_converter",
@@ -63,18 +60,22 @@ DEFINITION = {
         "required": ["files", "outputMode"],
     },
     "input_instructions": (
-        "files: array of {path, outputFormat} — use ask_user(input_type='file') to pick each 3D model from a virtual drive. "
+        "files: array of {path, outputFormat} — provide file paths directly if you already have them (e.g. from a prior tool's output). "
+        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
+        "CHAINING: if a previous tool returned a result, extract each item's outputPath "
+        "and pass them as [{\"path\": outputPath, \"outputFormat\": \"glb\"}, ...] — do NOT call ask_user again. "
         "Supported inputs: OBJ, FBX, GLB, GLTF, STL, PLY, DAE. "
         "outputFormat per file: 'obj', 'stl', 'ply', 'glb', 'gltf' (trimesh); 'fbx' or 'dae' requires Blender installed. "
-        "outputMode: 'replace' overwrites original, 'copy' places result alongside, 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+        "outputMode: 'copy' is recommended when chaining (keeps originals); "
+        "'replace' overwrites original; 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder."
     ),
     "output_description": (
-        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}. "
+        "CHAINING: each result's outputPath is the produced model file — pass it directly as the 'path' "
+        "in the next tool's files array without calling ask_user."
     ),
 }
-
-# ── Tool-drives registry helpers ───────────────────────────────────────────────
 
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
@@ -99,8 +100,6 @@ def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     drives.append({"path": drive_path, "name": name, "tool": tool})
     _save_tool_drives(drives)
 
-# ── Virtual drive creation ─────────────────────────────────────────────────────
-
 def _ensure_virtual_drive(output_path: str) -> str:
     drive_name = "ModelConversionResults"
     drive_path = os.path.join(output_path, drive_name)
@@ -124,10 +123,7 @@ def _ensure_virtual_drive(output_path: str) -> str:
     _register_tool_drive(drive_path, drive_name, "model_converter")
     return drive_path
 
-# ── Blender helpers ────────────────────────────────────────────────────────────
-
 def _find_blender() -> str | None:
-    """Locate the Blender executable."""
     import shutil
     blender_exe = shutil.which("blender")
     if blender_exe:
@@ -144,7 +140,6 @@ def _find_blender() -> str | None:
     return None
 
 def _blender_convert(src_path: str, dst_path: str, out_format: str) -> None:
-    """Use Blender CLI (headless) to convert to FBX or DAE."""
     blender_exe = _find_blender()
     if not blender_exe:
         raise RuntimeError(
@@ -152,7 +147,6 @@ def _blender_convert(src_path: str, dst_path: str, out_format: str) -> None:
             "Install Blender or choose a format like GLB, OBJ, STL, or PLY."
         )
 
-    # Build Blender python export script based on format
     if out_format == "fbx":
         export_line = f"bpy.ops.export_scene.fbx(filepath=r'{dst_path}')"
     elif out_format == "dae":
@@ -160,7 +154,6 @@ def _blender_convert(src_path: str, dst_path: str, out_format: str) -> None:
     else:
         raise RuntimeError(f"Unsupported Blender export format: {out_format}")
 
-    # Build import script based on input extension
     src_ext = Path(src_path).suffix.lower()
     if src_ext == ".fbx":
         import_line = f"bpy.ops.import_scene.fbx(filepath=r'{src_path}')"
@@ -179,7 +172,6 @@ def _blender_convert(src_path: str, dst_path: str, out_format: str) -> None:
 
     script = (
         "import bpy\n"
-        "# Delete default cube/objects\n"
         "bpy.ops.object.select_all(action='SELECT')\n"
         "bpy.ops.object.delete(use_global=False)\n"
         f"{import_line}\n"
@@ -197,26 +189,20 @@ def _blender_convert(src_path: str, dst_path: str, out_format: str) -> None:
         stderr_tail = (result.stderr or "")[-800:]
         raise RuntimeError(f"Blender conversion failed.\n{stderr_tail}")
 
-# ── Single-model conversion ───────────────────────────────────────────────────
-
 def _convert_model(src_path: str, out_format: str, dst_path: str) -> None:
-    """Convert a 3D model file to the specified format."""
     import trimesh
 
     src_ext = Path(src_path).suffix.lower()
 
-    # If target format needs Blender, use Blender pipeline
     if out_format in BLENDER_EXPORT_FORMATS:
         _blender_convert(src_path, dst_path, out_format)
         return
 
-    # Load the scene/mesh with trimesh
     try:
         scene = trimesh.load(src_path, force=None)
     except Exception as exc:
         raise RuntimeError(f"Failed to load model: {exc}")
 
-    # Export based on format
     try:
         if out_format in ("glb", "gltf"):
             if isinstance(scene, trimesh.Scene):
@@ -261,7 +247,6 @@ def _convert_model(src_path: str, out_format: str, dst_path: str) -> None:
 
 
 def _unique_path(path: str) -> str:
-    """Return a non-colliding path by appending a numeric suffix if needed."""
     if not os.path.exists(path):
         return path
     stem, ext = os.path.splitext(path)
@@ -272,13 +257,7 @@ def _unique_path(path: str) -> str:
     return path
 
 
-# ── Public executor ────────────────────────────────────────────────────────────
-
 def execute(input_data: dict) -> str:
-    """
-    Batch-convert 3D models.
-    Returns a JSON string (for agent compatibility).
-    """
     files: list = input_data.get("files", [])
     output_mode: str = input_data.get("outputMode", "copy")
     output_path: str = input_data.get("outputPath", "")

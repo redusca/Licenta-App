@@ -7,7 +7,7 @@ import {
   ChevronDown, ChevronRight, ChevronLeft,
   Plus, Trash2, AlertCircle, Eye, EyeOff,
   Paperclip, HardDrive, FileText, X, Upload,
-  ExternalLink, Sparkles, History,
+  ExternalLink, Sparkles, History, FolderOpen,
 } from 'lucide-react';
 import { ToolApprovalCard, PendingTool } from '../components/ToolApprovalModal';
 import { FolderPickerModal } from '../components/FolderPickerModal';
@@ -16,7 +16,34 @@ const AGENT = 'http://127.0.0.1:5000/api/agent';
 const TOOLS = 'http://127.0.0.1:5000/api/tools';
 const LS_HISTORY = 'chat_history';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Matches absolute Windows paths (e.g. C:\Users\...\file.png)
+const FILE_PATH_RE = /([A-Za-z]:[/\\][^\s"'<>*?|]+)/g;
+
+function openFile(path: string) {
+  const api = (window as any).electronAPI;
+  if (api?.openFile) {
+    api.openFile(path);
+  } else {
+    fetch(`${TOOLS}/open-file`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    }).catch(() => {});
+  }
+}
+
+function showInFolder(path: string) {
+  const api = (window as any).electronAPI;
+  if (api?.showInFolder) {
+    api.showInFolder(path);
+  } else {
+    fetch(`${TOOLS}/show-in-folder`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path }),
+    }).catch(() => {});
+  }
+}
 
 interface Attachment {
   id: string;
@@ -45,6 +72,7 @@ interface ChatEntry {
   kind: 'user' | 'assistant' | 'error';
   content: string;
   attachments?: Attachment[];
+  outputFiles?: string[];
 }
 
 interface HistoryChat {
@@ -55,8 +83,6 @@ interface HistoryChat {
   updatedAt: number;
   entries: ChatEntry[];
 }
-
-// ── localStorage helpers ──────────────────────────────────────────────────────
 
 function loadHistory(): HistoryChat[] {
   try {
@@ -90,8 +116,6 @@ function fmtDate(ts: number): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-// ── Avatar ────────────────────────────────────────────────────────────────────
-
 const Avatar: React.FC<{ kind: 'bot' | 'user' }> = ({ kind }) => {
   if (kind === 'bot') {
     return (
@@ -117,8 +141,6 @@ const Avatar: React.FC<{ kind: 'bot' | 'user' }> = ({ kind }) => {
   );
 };
 
-// ── Attachment chip ───────────────────────────────────────────────────────────
-
 const AttachmentChip: React.FC<{ a: Attachment; onRemove?: () => void }> = ({ a, onRemove }) => {
   const tone = a.type === 'drive' ? 'sky' : 'sage';
   return (
@@ -142,12 +164,44 @@ const AttachmentChip: React.FC<{ a: Attachment; onRemove?: () => void }> = ({ a,
   );
 };
 
-// ── Result renderer ────────────────────────────────────────────────────────────
-
 function looksLikeFolder(p: string): boolean {
   const last = p.replace(/[/\\]+$/, '').split(/[/\\]/).pop() ?? '';
   return !last.includes('.');
 }
+
+const FileLink: React.FC<{ path: string }> = ({ path }) => {
+  const name = path.replace(/\\/g, '/').split('/').pop() ?? path;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <button
+        onClick={() => openFile(path)}
+        title={`Open ${path}`}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 5,
+          fontSize: 11, fontFamily: 'var(--font-mono)',
+          color: 'var(--accent-ink)', background: 'var(--accent-soft)',
+          padding: '2px 7px', borderRadius: 5, maxWidth: 280,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          transition: 'filter .12s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.filter = 'brightness(1.1)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.filter = ''; }}
+      >
+        <FileText size={10} style={{ flexShrink: 0 }} />
+        {name}
+      </button>
+      <button
+        onClick={() => showInFolder(path)}
+        title="Show in folder"
+        style={{ padding: 3, color: 'var(--muted)', display: 'flex', alignItems: 'center' }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; }}
+      >
+        <FolderOpen size={11} />
+      </button>
+    </div>
+  );
+};
 
 const ResultView: React.FC<{ raw: string }> = ({ raw }) => {
   const navigate = useNavigate();
@@ -155,6 +209,7 @@ const ResultView: React.FC<{ raw: string }> = ({ raw }) => {
 
   let node: React.ReactNode;
   let drivePath: string | null = null;
+  let outputFiles: string[] = [];
 
   try {
     const parsed = JSON.parse(trimmed);
@@ -164,6 +219,14 @@ const ResultView: React.FC<{ raw: string }> = ({ raw }) => {
       drivePath = parsed.virtualDrivePath;
     } else if (parsed.outputPath && looksLikeFolder(parsed.outputPath)) {
       drivePath = parsed.outputPath;
+    }
+
+    if (Array.isArray(parsed.results)) {
+      outputFiles = (parsed.results as any[])
+        .filter(r => r.success && r.outputPath)
+        .map(r => r.outputPath as string);
+    } else if (parsed.outputPath && !looksLikeFolder(parsed.outputPath)) {
+      outputFiles = [parsed.outputPath];
     }
 
     if (Array.isArray(parsed.files)) {
@@ -205,6 +268,11 @@ const ResultView: React.FC<{ raw: string }> = ({ raw }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {node}
+      {outputFiles.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 2 }}>
+          {outputFiles.map((p, i) => <FileLink key={i} path={p} />)}
+        </div>
+      )}
       {drivePath && (
         <button
           onClick={() => navigate(`/files?path=${encodeURIComponent(drivePath!)}`)}
@@ -217,8 +285,6 @@ const ResultView: React.FC<{ raw: string }> = ({ raw }) => {
     </div>
   );
 };
-
-// ── Plan step row ─────────────────────────────────────────────────────────────
 
 const PlanStep: React.FC<{ step: LiveStep }> = ({ step }) => {
   const [open, setOpen] = useState(false);
@@ -285,8 +351,6 @@ const PlanStep: React.FC<{ step: LiveStep }> = ({ step }) => {
   );
 };
 
-// ── Run card ──────────────────────────────────────────────────────────────────
-
 const RunCard: React.FC<{ run: LiveRun; planOpen: boolean; onTogglePlan: () => void }> = ({
   run, planOpen, onTogglePlan,
 }) => {
@@ -349,7 +413,7 @@ const RunCard: React.FC<{ run: LiveRun; planOpen: boolean; onTogglePlan: () => v
           {run.synthesis && (
             <div style={{ marginTop: run.plan.length > 0 ? 14 : 0, fontSize: 14, color: 'var(--ink)', lineHeight: 1.6 }}>
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{run.synthesis}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as any}>{run.synthesis}</ReactMarkdown>
               </div>
               <span style={{ display: 'inline-block', width: 2, height: 16, background: 'var(--accent)', marginLeft: 2, verticalAlign: 'middle', animation: 'pulse-soft 1.2s ease-in-out infinite' }} />
             </div>
@@ -360,9 +424,84 @@ const RunCard: React.FC<{ run: LiveRun; planOpen: boolean; onTogglePlan: () => v
   );
 };
 
-// ── Assistant bubble ──────────────────────────────────────────────────────────
+function renderTextWithFilePaths(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+  FILE_PATH_RE.lastIndex = 0;
+  while ((match = FILE_PATH_RE.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    const p = match[1];
+    const name = p.replace(/\\/g, '/').split('/').pop() ?? p;
+    parts.push(
+      <button
+        key={match.index}
+        onClick={() => openFile(p)}
+        title={p}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          fontSize: 'inherit', fontFamily: 'var(--font-mono)',
+          color: 'var(--accent-ink)', background: 'var(--accent-soft)',
+          padding: '1px 6px', borderRadius: 4,
+          verticalAlign: 'baseline', cursor: 'pointer',
+          transition: 'filter .12s',
+        }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.filter = 'brightness(1.1)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.filter = ''; }}
+      >
+        <FileText size={11} style={{ flexShrink: 0 }} />
+        {name}
+      </button>
+    );
+    last = match.index + match[0].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
 
-const AssistantBubble: React.FC<{ content: string }> = ({ content }) => (
+const mdComponents = {
+  p: ({ children }: any) => (
+    <p>
+      {React.Children.map(children, child =>
+        typeof child === 'string' ? renderTextWithFilePaths(child) : child
+      )}
+    </p>
+  ),
+  li: ({ children }: any) => (
+    <li>
+      {React.Children.map(children, child =>
+        typeof child === 'string' ? renderTextWithFilePaths(child) : child
+      )}
+    </li>
+  ),
+  code: ({ inline, children }: any) => {
+    const text = String(children ?? '').trim();
+    if (inline && FILE_PATH_RE.test(text)) {
+      FILE_PATH_RE.lastIndex = 0;
+      const name = text.replace(/\\/g, '/').split('/').pop() ?? text;
+      return (
+        <button
+          onClick={() => openFile(text)}
+          title={text}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 'inherit', fontFamily: 'var(--font-mono)',
+            color: 'var(--accent-ink)', background: 'var(--accent-soft)',
+            padding: '1px 6px', borderRadius: 4,
+            verticalAlign: 'baseline', cursor: 'pointer',
+          }}
+        >
+          <FileText size={11} style={{ flexShrink: 0 }} />
+          {name}
+        </button>
+      );
+    }
+    FILE_PATH_RE.lastIndex = 0;
+    return <code>{children}</code>;
+  },
+};
+
+const AssistantBubble: React.FC<{ content: string; outputFiles?: string[] }> = ({ content, outputFiles }) => (
   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
     <Avatar kind="bot" />
     <div style={{ maxWidth: '80%', flex: 1 }}>
@@ -378,14 +517,22 @@ const AssistantBubble: React.FC<{ content: string }> = ({ content }) => (
           className="prose prose-sm dark:prose-invert max-w-none"
           style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--ink)' }}
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents as any}>{content}</ReactMarkdown>
         </div>
+        {outputFiles && outputFiles.length > 0 && (
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+              Files produced
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {outputFiles.map((p, i) => <FileLink key={i} path={p} />)}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   </div>
 );
-
-// ── User bubble ───────────────────────────────────────────────────────────────
 
 const UserBubble: React.FC<{ content: string; attachments?: Attachment[] }> = ({ content, attachments }) => (
   <div style={{ display: 'flex', gap: 12, flexDirection: 'row-reverse', alignItems: 'flex-start' }}>
@@ -408,8 +555,6 @@ const UserBubble: React.FC<{ content: string; attachments?: Attachment[] }> = ({
   </div>
 );
 
-// ── Error bubble ──────────────────────────────────────────────────────────────
-
 const ErrorBubble: React.FC<{ content: string }> = ({ content }) => (
   <div style={{
     display: 'flex', alignItems: 'flex-start', gap: 8,
@@ -422,8 +567,6 @@ const ErrorBubble: React.FC<{ content: string }> = ({ content }) => (
     <span>{content}</span>
   </div>
 );
-
-// ── History panel ─────────────────────────────────────────────────────────────
 
 interface HistoryPanelProps {
   history: HistoryChat[];
@@ -519,8 +662,6 @@ const HistoryPanel: React.FC<HistoryPanelProps> = ({ history, currentId, onSelec
   </aside>
 );
 
-// ── Main component ─────────────────────────────────────────────────────────────
-
 export const Chat: React.FC = () => {
   const [entries, setEntries] = useState<ChatEntry[]>([]);
   const [input, setInput] = useState('');
@@ -537,6 +678,7 @@ export const Chat: React.FC = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachPicker, setAttachPicker] = useState<'file' | 'drive' | null>(null);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [lastToolOutputPaths, setLastToolOutputPaths] = useState<string[]>([]);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -692,6 +834,19 @@ export const Chat: React.FC = () => {
             ),
           };
         });
+        if (evt.result) {
+          try {
+            const parsed = JSON.parse(evt.result);
+            if (Array.isArray(parsed.results)) {
+              const paths = (parsed.results as any[])
+                .filter(r => r.success && r.outputPath)
+                .map(r => r.outputPath as string);
+              if (paths.length > 0) setLastToolOutputPaths(paths);
+            } else if (parsed.outputPath) {
+              setLastToolOutputPaths([parsed.outputPath]);
+            }
+          } catch { /* not JSON */ }
+        }
         break;
       case 'tool_error':
         setLive(prev => {
@@ -708,11 +863,15 @@ export const Chat: React.FC = () => {
         setLive(prev => prev ? { ...prev, synthesis: prev.synthesis + (evt.content ?? '') } : null);
         break;
       case 'final':
-        setEntries(prev => [...prev, {
-          id: `a-${Date.now()}`,
-          kind: 'assistant',
-          content: evt.response ?? '',
-        }]);
+        setLastToolOutputPaths(prev => {
+          setEntries(e => [...e, {
+            id: `a-${Date.now()}`,
+            kind: 'assistant',
+            content: evt.response ?? '',
+            outputFiles: prev.length > 0 ? [...prev] : undefined,
+          }]);
+          return prev;
+        });
         setLive(null);
         break;
       case 'error':
@@ -857,6 +1016,7 @@ export const Chat: React.FC = () => {
     setLive(null);
     setPendingTool(null);
     setAttachments([]);
+    setLastToolOutputPaths([]);
     setChatId(null);
     setCurrentHistoryId(null);
     await initChat();
@@ -871,6 +1031,7 @@ export const Chat: React.FC = () => {
     setLive(null);
     setPendingTool(null);
     setAttachments([]);
+    setLastToolOutputPaths([]);
   };
 
   const deleteHistoryChat = (id: string) => {
@@ -911,7 +1072,6 @@ export const Chat: React.FC = () => {
     'Scan my drives for large files',
   ];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
@@ -970,7 +1130,6 @@ export const Chat: React.FC = () => {
           </button>
         </div>
 
-        {/* Init error */}
         {initError && (
           <div style={{
             margin: '12px 20px', padding: '12px 16px',
@@ -989,11 +1148,9 @@ export const Chat: React.FC = () => {
           </div>
         )}
 
-        {/* Conversation */}
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px 24px 8px' }}>
           <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-            {/* Empty state */}
             {entries.length === 0 && !live && (
               <div style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -1038,14 +1195,12 @@ export const Chat: React.FC = () => {
               </div>
             )}
 
-            {/* Conversation entries */}
             {entries.map(entry => {
               if (entry.kind === 'user')      return <UserBubble key={entry.id} content={entry.content} attachments={entry.attachments} />;
-              if (entry.kind === 'assistant') return <AssistantBubble key={entry.id} content={entry.content} />;
+              if (entry.kind === 'assistant') return <AssistantBubble key={entry.id} content={entry.content} outputFiles={entry.outputFiles} />;
               return <ErrorBubble key={entry.id} content={entry.content} />;
             })}
 
-            {/* Live agent run */}
             {live && (
               <RunCard
                 run={live}
@@ -1054,12 +1209,12 @@ export const Chat: React.FC = () => {
               />
             )}
 
-            {/* Tool approval card */}
             {pendingTool && (
               <ToolApprovalCard
                 tool={pendingTool}
                 onApprove={approveTool}
                 onReject={rejectTool}
+                lastToolOutputPaths={lastToolOutputPaths}
               />
             )}
 
@@ -1067,11 +1222,9 @@ export const Chat: React.FC = () => {
           </div>
         </div>
 
-        {/* Composer */}
         <div style={{ padding: '8px 24px 16px', flexShrink: 0 }}>
           <div style={{ maxWidth: 780, margin: '0 auto' }}>
 
-            {/* Attachment chips */}
             {attachments.length > 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                 {attachments.map(a => (
@@ -1115,7 +1268,6 @@ export const Chat: React.FC = () => {
                 display: 'flex', alignItems: 'center', gap: 4,
                 paddingTop: 8, borderTop: '1px solid var(--border)',
               }}>
-                {/* Attach button + dropdown */}
                 <div style={{ position: 'relative' }} ref={attachMenuRef}>
                   <button
                     onClick={() => setShowAttachMenu(v => !v)}
@@ -1189,7 +1341,6 @@ export const Chat: React.FC = () => {
           </div>
         </div>
 
-        {/* Hidden native file input */}
         <input
           ref={fileInputRef}
           type="file"
@@ -1198,7 +1349,6 @@ export const Chat: React.FC = () => {
           onChange={handleNativeFileSelect}
         />
 
-        {/* Folder / drive picker modals */}
         {attachPicker === 'file' && (
           <FolderPickerModal
             isOpen

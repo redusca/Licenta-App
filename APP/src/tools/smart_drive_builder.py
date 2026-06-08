@@ -30,11 +30,14 @@ DEFINITION = {
     "requires_approval": True,
     "input_instructions": (
         "driveName: name for the new virtual drive (string). "
-        "outputPath: the folder where the drive will be created — use ask_user(input_type='folder') to pick it. "
-        "action: 'shortcuts' (safe, non-destructive) or 'move' (relocate actual files). "
-        "files: list of {path, folder?, ai_description?} — 'folder' is an optional sub-folder "
-        "name inside the drive (omit for flat structure). "
-        "The user will see all files in a review modal and can adjust before confirming."
+        "outputPath: pass as empty string '' — the user picks the save folder in the approval card UI; do NOT call ask_user for outputPath. "
+        "action: 'shortcuts' (safe, non-destructive, recommended) or 'move' (relocate files). "
+        "files: THIS IS THE CRITICAL FIELD. You MUST populate it from the smart_drive_scan result. "
+        "Read the 'files' array from the scan result, filter items whose ai_description matches the user's intent "
+        "(e.g. for 'animal photos', include items where ai_description mentions animals, pets, wildlife, cats, dogs, etc.), "
+        "then build the files list: [{path: <item.path>, ai_description: <item.ai_description>, folder: ''}]. "
+        "NEVER pass an empty files list — if the scan returned files, you MUST include the matching ones here. "
+        "The user will review the files in the approval modal and can adjust before confirming."
     ),
     "output_description": (
         "JSON {success, drivePath, total, succeeded, failed, folders_created, results:[{path, folder, success, error?}]}"
@@ -73,7 +76,7 @@ DEFINITION = {
                 },
             },
         },
-        "required": ["driveName", "outputPath", "action", "files"],
+        "required": ["driveName", "action", "files"],
     },
 }
 

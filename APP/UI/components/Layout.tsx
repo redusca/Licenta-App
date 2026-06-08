@@ -3,7 +3,6 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
 import { Chat } from '../pages/Chat';
 
-// ─── Icon primitives ─────────────────────────────────────────────────────────
 const Svg = ({
   size = 18, children, style,
 }: { size?: number; children: React.ReactNode; style?: React.CSSProperties }) => (
@@ -22,14 +21,12 @@ const SunIcon     = (p: { size?: number }) => <Svg size={p.size}><circle cx="12"
 const MoonIcon    = (p: { size?: number }) => <Svg size={p.size}><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></Svg>;
 const ChevRight   = (p: { size?: number }) => <Svg size={p.size}><path d="m9 6 6 6-6 6"/></Svg>;
 
-// ─── Nav items ───────────────────────────────────────────────────────────────
 const NAV = [
   { path: '/files', label: 'My Drives', Icon: DriveIcon    },
   { path: '/chat',  label: 'Agent',     Icon: SparkleIcon  },
   { path: '/tools', label: 'Tools',     Icon: ToolsIcon    },
 ];
 
-// ─── Brand mark ──────────────────────────────────────────────────────────────
 function BrandMark() {
   return (
     <div style={{
@@ -47,7 +44,6 @@ function BrandMark() {
   );
 }
 
-// ─── Sidebar ─────────────────────────────────────────────────────────────────
 function Sidebar({ active }: { active: string }) {
   const [hover, setHover] = useState(false);
   const { theme, toggleTheme } = useTheme();
@@ -67,7 +63,6 @@ function Sidebar({ active }: { active: string }) {
         zIndex: 5,
       }}
     >
-      {/* Brand */}
       <div className="drag-region" style={{ padding: '16px 14px 12px', display: 'flex', alignItems: 'center', gap: 12 }}>
         <BrandMark />
         <div style={{
@@ -79,7 +74,6 @@ function Sidebar({ active }: { active: string }) {
         </div>
       </div>
 
-      {/* Nav */}
       <nav style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
         {NAV.map(({ path, label, Icon }) => {
           const isActive = active.startsWith(path);
@@ -119,7 +113,6 @@ function Sidebar({ active }: { active: string }) {
         })}
       </nav>
 
-      {/* Bottom: settings + theme */}
       <div style={{ padding: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <NavLink to="/settings" title="Settings" style={{ textDecoration: 'none' }}>
           <div
@@ -165,7 +158,6 @@ function Sidebar({ active }: { active: string }) {
   );
 }
 
-// ─── Window controls (frameless Electron) ─────────────────────────────────────
 const isElectron = typeof navigator !== 'undefined' && navigator.userAgent.includes('Electron');
 const eAPI = isElectron ? (window as any).electronAPI : null;
 
@@ -202,7 +194,6 @@ function WinControls() {
   );
 }
 
-// ─── Top bar ─────────────────────────────────────────────────────────────────
 function TopBar({ breadcrumbs, right }: {
   breadcrumbs: { label: string; path?: string }[];
   right?: React.ReactNode;
@@ -251,7 +242,6 @@ function TopBar({ breadcrumbs, right }: {
   );
 }
 
-// ─── Build breadcrumbs from route ─────────────────────────────────────────────
 function useBreadcrumbs(pathname: string) {
   const crumbs: { label: string; path?: string }[] = [];
 
@@ -275,7 +265,6 @@ function useBreadcrumbs(pathname: string) {
   return crumbs;
 }
 
-// ─── Main Layout ──────────────────────────────────────────────────────────────
 export const Layout: React.FC = () => {
   const location = useLocation();
   const breadcrumbs = useBreadcrumbs(location.pathname);
@@ -297,7 +286,6 @@ export const Layout: React.FC = () => {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
         <TopBar breadcrumbs={breadcrumbs} />
 
-        {/* Chat — always mounted, hidden via CSS when not at /chat */}
         <div style={{
           flex: isChat ? 1 : undefined,
           display: isChat ? 'flex' : 'none',
@@ -308,7 +296,6 @@ export const Layout: React.FC = () => {
           <Chat />
         </div>
 
-        {/* Other pages */}
         <div style={{
           flex: !isChat ? 1 : undefined,
           display: !isChat ? 'flex' : 'none',

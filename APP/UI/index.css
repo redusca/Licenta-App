@@ -183,6 +183,9 @@ input, textarea { font: inherit; color: inherit; }
 .btn-secondary:hover { background: var(--surface-2); border-color: var(--border-2); }
 .btn-ghost { color: var(--muted); }
 .btn-ghost:hover { background: var(--surface-2); color: var(--ink); }
+.btn-danger { background: var(--c-clay); color: #fff; }
+.btn-danger:hover { filter: brightness(1.1); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
 .chip {
   display: inline-flex;

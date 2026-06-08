@@ -26,7 +26,6 @@ from pathlib import Path
 from config import APP_VERSION
 from migrations import get_latest_schema_version
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 _CONFIG_FILENAME = ".drive_config.json"
@@ -34,8 +33,6 @@ _CONFIG_FILENAME = ".drive_config.json"
 SUPPORTED_PDF_EXTENSIONS = {".pdf"}
 SUPPORTED_DOC_EXTENSIONS = {".docx", ".doc"}
 SUPPORTED_ALL_EXTENSIONS = SUPPORTED_PDF_EXTENSIONS | SUPPORTED_DOC_EXTENSIONS
-
-# ── Agent tool definition ──────────────────────────────────────────────────────
 
 DEFINITION = {
     "name": "pdf_merger",
@@ -82,20 +79,24 @@ DEFINITION = {
         "required": ["action", "files"],
     },
     "input_instructions": (
-        "files: array of {path} — use ask_user(input_type='file') to pick PDF or DOCX files from virtual drives. "
+        "files: array of {path} — provide file paths directly if you already have them (e.g. from document_converter output). "
+        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
+        "CHAINING: if a previous tool returned a result, extract each item's outputPath "
+        "and pass them as [{\"path\": outputPath}, ...] — do NOT call ask_user again. "
         "action: 'merge' (combine PDFs), 'split' (extract page ranges), or 'convert' (PDF↔DOCX). "
-        "outputMode: 'replace' overwrites original, 'copy' places result alongside, 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives. "
+        "outputMode: 'copy' is recommended when chaining (keeps originals); "
+        "'replace' overwrites original; 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder. "
         "outputFilename: base name for merged/split output (no extension). "
         "pageRanges: for split action, comma-separated ranges like '1-3,5,7-9'. "
         "convertTo: 'pdf' or 'docx' for convert action."
     ),
     "output_description": (
-        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}. "
+        "CHAINING: each result's outputPath is the produced file — pass it directly as the 'path' "
+        "in the next tool's files array without calling ask_user."
     ),
 }
-
-# ── Tool-drives registry helpers ───────────────────────────────────────────────
 
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
@@ -148,7 +149,6 @@ def _ensure_virtual_drive(output_path: str) -> str:
 
 
 def _unique_path(path: str) -> str:
-    """Return a non-colliding path by appending a numeric suffix if needed."""
     if not os.path.exists(path):
         return path
     stem, ext = os.path.splitext(path)
@@ -158,10 +158,8 @@ def _unique_path(path: str) -> str:
     return f"{stem}_{counter}{ext}"
 
 
-# ── PDF operations ─────────────────────────────────────────────────────────────
 
 def _merge_pdfs(paths: list[str], output_path: str, add_bookmarks: bool = True) -> str:
-    """Merge multiple PDFs into one. Returns path to merged file."""
     from pypdf import PdfReader, PdfWriter
 
     writer = PdfWriter()
@@ -180,11 +178,6 @@ def _merge_pdfs(paths: list[str], output_path: str, add_bookmarks: bool = True) 
 
 
 def _split_pdf(src_path: str, page_ranges: str, output_dir: str, output_stem: str = "") -> list[str]:
-    """
-    Extract page ranges from a PDF.
-    page_ranges: comma-separated, e.g. "1-3,5,7-9"
-    Returns list of output file paths.
-    """
     from pypdf import PdfReader, PdfWriter
 
     reader = PdfReader(src_path)
@@ -196,7 +189,7 @@ def _split_pdf(src_path: str, page_ranges: str, output_dir: str, output_stem: st
 
     for i, (start, end) in enumerate(ranges):
         writer = PdfWriter()
-        for page_idx in range(start - 1, end):  # convert to 0-indexed
+        for page_idx in range(start - 1, end):  # 0-indexed
             writer.add_page(reader.pages[page_idx])
 
         out_name = f"{stem}_pages_{start}-{end}.pdf"
@@ -209,7 +202,6 @@ def _split_pdf(src_path: str, page_ranges: str, output_dir: str, output_stem: st
 
 
 def _reorder_pdf(src_path: str, page_order: list[int], output_path: str) -> str:
-    """Reorder pages of a single PDF. page_order is 1-indexed."""
     from pypdf import PdfReader, PdfWriter
 
     reader = PdfReader(src_path)
@@ -231,7 +223,6 @@ def _get_pdf_page_count(path: str) -> int:
 
 
 def _convert_pdf_to_docx(src_path: str, output_path: str) -> str:
-    """Convert PDF to DOCX using pdf2docx."""
     from pdf2docx import Converter
 
     cv = Converter(src_path)
@@ -241,14 +232,12 @@ def _convert_pdf_to_docx(src_path: str, output_path: str) -> str:
 
 
 def _convert_docx_to_pdf(src_path: str, output_path: str) -> str:
-    """Convert DOCX to PDF using docx2pdf (requires MS Word on Windows)."""
     from docx2pdf import convert
     convert(src_path, output_path)
     return output_path
 
 
 def _parse_page_ranges(range_str: str, total: int) -> list[tuple[int, int]]:
-    """Parse '1-3,5,7-9' into [(1,3),(5,5),(7,9)], clamped to total."""
     ranges: list[tuple[int, int]] = []
     for part in range_str.split(","):
         part = part.strip()
@@ -267,7 +256,6 @@ def _parse_page_ranges(range_str: str, total: int) -> list[tuple[int, int]]:
     return ranges
 
 
-# ── Single-item conversion processor ──────────────────────────────────────────
 
 def _process_convert_item(
     item: dict,
@@ -317,10 +305,8 @@ def _process_convert_item(
         return {"path": src, "success": False, "error": str(exc)}
 
 
-# ── Public API ─────────────────────────────────────────────────────────────────
 
 def execute(input_data: dict) -> str:
-    """Synchronous single-threaded execution."""
     return execute_parallel(input_data, max_workers=1)
 
 
@@ -348,7 +334,6 @@ def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
             })
         virtual_drive_path = _ensure_virtual_drive(output_path)
 
-    # ── MERGE ──────────────────────────────────────────────────────────────
     if action == "merge":
         paths = [f.get("path", "") for f in files]
         valid_paths = [p for p in paths if p and os.path.isfile(p) and Path(p).suffix.lower() == ".pdf"]
@@ -361,7 +346,7 @@ def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
             elif output_mode == "copy":
                 first_dir = os.path.dirname(valid_paths[0])
                 out = os.path.join(first_dir, f"{output_filename}.pdf")
-            else:  # replace — put alongside the first file
+            else:
                 first_dir = os.path.dirname(valid_paths[0])
                 out = os.path.join(first_dir, f"{output_filename}.pdf")
 
@@ -384,7 +369,6 @@ def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
             return json.dumps({"success": False, "error": f"{str(exc)}\\n{traceback.format_exc()}", "results": []})
 
 
-    # ── SPLIT ──────────────────────────────────────────────────────────────
     elif action == "split":
         if len(files) < 1:
             return json.dumps({"success": False, "error": "No file provided for split.", "results": []})
@@ -419,7 +403,6 @@ def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
             return json.dumps({"success": False, "error": f"{str(exc)}\\n{traceback.format_exc()}", "results": []})
 
 
-    # ── REORDER ────────────────────────────────────────────────────────────
     elif action == "reorder":
         if len(files) < 1:
             return json.dumps({"success": False, "error": "No file provided for reorder.", "results": []})
@@ -459,7 +442,6 @@ def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
         except Exception as exc:
             return json.dumps({"success": False, "error": str(exc), "results": []})
 
-    # ── CONVERT ────────────────────────────────────────────────────────────
     elif action == "convert":
         results: list = [None] * len(files)
         workers = 1 if output_mode == "replace" else min(max_workers, len(files))
@@ -492,7 +474,6 @@ def execute_parallel(input_data: dict, max_workers: int = 2) -> str:
 
         return json.dumps(response)
 
-    # ── PAGE INFO ──────────────────────────────────────────────────────────
     elif action == "page_info":
         results_list = []
         for f in files:

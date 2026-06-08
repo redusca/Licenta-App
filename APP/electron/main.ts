@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import fs from 'fs';
@@ -119,6 +119,17 @@ ipcMain.handle('dialog:selectFiles', async (_event, options?: { filters?: { name
 
 ipcMain.handle('drive:getAvailableRoots', () => {
   return getAvailableDriveRoots();
+});
+
+ipcMain.handle('shell:openPath', async (_event, filePath: string) => {
+  const normalized = filePath.replace(/\//g, '\\');
+  const err = await shell.openPath(normalized);
+  return err || null;
+});
+
+ipcMain.handle('shell:showItemInFolder', (_event, filePath: string) => {
+  const normalized = filePath.replace(/\//g, '\\');
+  shell.showItemInFolder(normalized);
 });
 
 function startPythonBackend() {

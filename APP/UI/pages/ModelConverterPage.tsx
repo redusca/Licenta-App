@@ -654,7 +654,7 @@ export const ModelConverterPage: React.FC = () => {
                     {/* Convert button */}
                     {files.length > 0 && (
                         <button type="button" onClick={convert} disabled={!canConvert}
-                            className="w-full flex items-center justify-center gap-2 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm shadow-lg shadow-cyan-900/20">
+                            className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px 14px' }}>
                             {converting ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin" />

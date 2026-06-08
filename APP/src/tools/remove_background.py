@@ -22,8 +22,6 @@ from config import APP_VERSION
 from migrations import get_latest_schema_version
 import requests
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
-# __file__ = APP/src/tools/image_converter.py → .parent x3 = APP/
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 
@@ -31,19 +29,12 @@ _CONFIG_FILENAME = ".drive_config.json"
 SUPPORTED_INPUT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 OUTPUT_FORMATS = {"png"}
 
-# ── Agent tool definition (used by /api/tools) ─────────────────────────────────
-
 def _ensure_model(model_name: str = "u2net") -> None:
-    """
-    Ensure the rembg model is downloaded to ~/.u2net to avoid
-    'fails to fetch' errors during execution due to timeouts or SSL issues.
-    """
     try:
         user_home = Path.home()
         rembg_home = user_home / ".u2net"
         model_path = rembg_home / f"{model_name}.onnx"
 
-        # Check if model exists and is not empty
         if model_path.exists() and model_path.stat().st_size > 0:
             return
 
@@ -51,7 +42,6 @@ def _ensure_model(model_name: str = "u2net") -> None:
         rembg_home.mkdir(parents=True, exist_ok=True)
 
         url = f"https://github.com/danielgatis/rembg/releases/download/v0.0.0/{model_name}.onnx"
-        # Use a generous timeout for large file
         response = requests.get(url, stream=True, timeout=60)
         response.raise_for_status()
 
@@ -61,7 +51,7 @@ def _ensure_model(model_name: str = "u2net") -> None:
         print(f"Downloaded {model_name} successfully.")
     except Exception as e:
         print(f"Warning: Failed to pre-download rembg model: {e}")
-        # We don't raise here, let rembg try its own download method as backup.
+        # rembg will try its own download as fallback
 
 DEFINITION = {
     "name": "remove_background",
@@ -70,13 +60,19 @@ DEFINITION = {
         "Supports three output modes: replace originals, copy alongside, or virtual drive."
     ),
     "input_instructions": (
-        "files: array of {path} — use ask_user(input_type='file') to pick each image from a virtual drive. "
+        "files: array of {path} — provide file paths directly if you already have them (e.g. from a prior tool's output). "
+        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
+        "CHAINING: if a previous tool (e.g. image_converter) returned a result, extract each item's outputPath "
+        "and pass them as [{\"path\": outputPath}, ...] — do NOT call ask_user again. "
         "Supported inputs: JPEG, PNG, WebP. Output is always PNG with transparent background. "
-        "outputMode: 'replace' overwrites original, 'copy' places result alongside (_nobg suffix), 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+        "outputMode: 'copy' is recommended when chaining (keeps originals); "
+        "'replace' overwrites original; 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder."
     ),
     "output_description": (
-        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}. "
+        "CHAINING: each result's outputPath is the produced PNG file — pass it directly as the 'path' "
+        "in the next tool's files array without calling ask_user."
     ),
     "parameters": {
         "type": "object",
@@ -109,7 +105,6 @@ DEFINITION = {
 }
 
 
-# ── Tool-drives registry helpers ───────────────────────────────────────────────
 
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
@@ -137,14 +132,8 @@ def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     _save_tool_drives(drives)
 
 
-# ── Virtual drive creation ─────────────────────────────────────────────────────
 
 def _ensure_virtual_drive(output_path: str) -> str:
-    """
-    Ensure the RemovedBackgrounds virtual drive exists inside output_path.
-    Creates the folder + .drive_config.json if missing.
-    Returns the full drive path.
-    """
     drive_name = "RemovedBackgrounds"
     drive_path = os.path.join(output_path, drive_name)
     os.makedirs(drive_path, exist_ok=True)
@@ -168,14 +157,12 @@ def _ensure_virtual_drive(output_path: str) -> str:
     return drive_path
 
 
-# ── Single-image conversion ────────────────────────────────────────────────────
 
 def _remove_background(
     src_path: str,
     dst_path: str,
     preserve_metadata: bool = True,
 ) -> None:
-    """Open src_path, pass to rembg remove, save at dst_path."""
     try:
         from PIL import Image
     except ImportError:
@@ -207,7 +194,6 @@ def _remove_background(
 
 
 def _unique_path(path: str) -> str:
-    """Return a non-colliding path by appending a numeric suffix if needed."""
     if not os.path.exists(path):
         return path
     stem, ext = os.path.splitext(path)
@@ -218,14 +204,7 @@ def _unique_path(path: str) -> str:
     return path
 
 
-# ── Public executor ────────────────────────────────────────────────────────────
-
 def execute(input: dict) -> str:
-    """
-    Batch-remove backgrounds.  Called by POST /api/tools/execute and
-    POST /api/tools/remove-background/run.
-    Returns a JSON string (for agent compatibility).
-    """
     _ensure_model()
     files: list = input.get("files", [])
     output_mode: str = input.get("outputMode", "copy")
@@ -295,7 +274,6 @@ def execute(input: dict) -> str:
     return json.dumps(response)
 
 
-# ── Single item processing (used by parallel executor) ───────────────────────
 
 def _process_single_item(
     item: dict,
@@ -303,7 +281,6 @@ def _process_single_item(
     virtual_drive_path: str | None,
     preserve_metadata: bool,
 ) -> dict:
-    """Remove background of a single file and return its result dict."""
     src = item.get("path", "")
 
     if not src or not os.path.isfile(src):
@@ -337,10 +314,6 @@ def _process_single_item(
         return {"path": src, "success": False, "error": str(exc)}
 
 def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
-    """
-    Parallel batch-remove. Uses a thread pool.
-    Returns a JSON string with results in original order.
-    """
     _ensure_model()
     files: list = input_data.get("files", [])
     output_mode: str = input_data.get("outputMode", "copy")
@@ -360,13 +333,11 @@ def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
             })
         virtual_drive_path = _ensure_virtual_drive(output_path)
 
-    # For replace mode, run sequentially to avoid race conditions on same files
     if output_mode == "replace":
         workers = 1
     else:
         workers = min(max_workers, len(files))
 
-    # Map future → index to preserve order
     results: list = [None] * len(files)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         future_to_idx = {

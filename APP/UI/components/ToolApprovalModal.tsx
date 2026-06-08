@@ -1,26 +1,3 @@
-/**
- * ToolApprovalCard — inline chat card shown when the planning agent wants to
- * run a tool requiring approval, or asks the user a question via ask_user.
- *
- * Renders as a chat bubble (no modal overlay) inside the message stream.
- *
- * Field rendering:
- *   ask_user / output   → 3-button picker: Copy (same folder) / Folder / Drive
- *   ask_user / folder   → folder browser
- *   ask_user / file     → file browser
- *   ask_user / drive    → drive letter dropdown
- *   ask_user / yesno    → Yes / No buttons
- *   ask_user / text     → free-text input
- *   driveLetter         → drive letter dropdown
- *   *folder* / *dir*    → folder browser
- *   *file* / *path*     → file browser
- *   files array         → dynamic rows with per-row file pickers
- *   string array        → tag chip input
- *   enum schema         → <select>
- *   boolean schema      → Yes / No
- *   number schema       → number input
- *   everything else     → plain text input
- */
 import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle, Check, X, Wrench, Info,
@@ -31,8 +8,6 @@ import {
 import { FolderPickerModal } from './FolderPickerModal';
 
 const FLASK = 'http://127.0.0.1:5000';
-
-// ── Public types ──────────────────────────────────────────────────────────────
 
 export interface PendingTool {
   id: string;
@@ -60,9 +35,8 @@ interface Props {
   tool: PendingTool;
   onApprove: (id: string, input: Record<string, any>) => void;
   onReject: (id: string) => void;
+  lastToolOutputPaths?: string[];
 }
-
-// ── Field kind inference ──────────────────────────────────────────────────────
 
 type FieldKind =
   | 'hidden'
@@ -126,8 +100,6 @@ function valueToString(v: any): string {
   return String(v);
 }
 
-// ── Tag list ──────────────────────────────────────────────────────────────────
-
 const TagListInput: React.FC<{
   value: string[];
   onChange: (v: string[]) => void;
@@ -164,15 +136,13 @@ const TagListInput: React.FC<{
           placeholder="e.g. .jpg, .png — press Enter to add"
           className="flex-1 text-sm bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
         />
-        <button type="button" onClick={add} className="shrink-0 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm transition-colors">
+        <button type="button" onClick={add} className="btn btn-primary" style={{ padding: '8px 12px' }}>
           <Plus className="w-4 h-4" />
         </button>
       </div>
     </div>
   );
 };
-
-// ── File list ─────────────────────────────────────────────────────────────────
 
 const SUB_FIELD_META: Record<string, { label: string; type: 'text' | 'number' | 'select'; options?: string[] }> = {
   outputFormat:  { label: 'Output format', type: 'select', options: ['jpeg','png','webp','bmp','tiff','gif','obj','stl','ply','glb','gltf','fbx','dae','mp4','mp3','wav','flac','ogg','aac','pdf','docx'] },
@@ -245,8 +215,6 @@ const FileListInput: React.FC<{
     </div>
   );
 };
-
-// ── Options picker (list of choices + free-text Other) ───────────────────────
 
 const OptionsInput: React.FC<{
   value: string;
@@ -321,8 +289,6 @@ const OptionsInput: React.FC<{
   );
 };
 
-// ── Output picker (Copy / Folder / Drive) ─────────────────────────────────────
-
 const OutputInput: React.FC<{
   value: string;
   onChange: (v: string) => void;
@@ -378,8 +344,6 @@ const OutputInput: React.FC<{
     </div>
   );
 };
-
-// ── Field renderer ────────────────────────────────────────────────────────────
 
 interface FieldProps {
   fieldKey: string;
@@ -518,8 +482,6 @@ const FieldInput: React.FC<FieldProps> = ({
       );
   }
 };
-
-// ── Smart Drive Build — rich file review card ─────────────────────────────────
 
 interface SmartDriveFile {
   path: string;
@@ -692,14 +654,8 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
                     />
                     <button
                       type="button"
-                      onClick={async () => {
-                        try {
-                          const res = await fetch(`${FLASK}/api/tools/pick-folder`);
-                          const data = await res.json();
-                          if (data.path) setOutputPath(data.path);
-                        } catch { /* ignore */ }
-                      }}
-                      title="Open Windows folder picker"
+                      onClick={() => setShowPicker('output')}
+                      title="Browse for save location"
                       className="shrink-0 flex items-center gap-1 px-2.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs transition-colors"
                     >
                       <FolderOpen className="w-3.5 h-3.5" />
@@ -840,14 +796,14 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
               <button
                 onClick={handleConfirm}
                 disabled={selectedCount === 0 || !outputPath || !driveName}
-                className="flex-1 flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium py-2 px-3 rounded-xl transition-colors"
+                className="btn btn-primary flex-1 justify-center"
               >
                 <Check className="w-4 h-4" />
                 Create drive ({selectedCount} files)
               </button>
               <button
                 onClick={() => onReject(tool.id)}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium py-2 px-3 rounded-xl transition-colors"
+                className="btn btn-secondary flex-1 justify-center"
               >
                 <X className="w-4 h-4" /> Cancel
               </button>
@@ -888,9 +844,7 @@ const SmartDriveBuildApproval: React.FC<Props> = ({ tool, onApprove, onReject })
 };
 
 
-// ── Inline approval card ──────────────────────────────────────────────────────
-
-const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject }) => {
+const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject, lastToolOutputPaths }) => {
   const [fields, setFields] = useState<Record<string, any>>({});
   const [drives, setDrives] = useState<string[]>([]);
   const [picker, setPicker] = useState<{ key: string; mode: 'folder' | 'file'; itemIndex?: number } | null>(null);
@@ -899,7 +853,25 @@ const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject }) => 
   const paramProps = tool.definition.parameters?.properties ?? {};
 
   useEffect(() => {
-    setFields({ ...tool.input });
+    const base = { ...tool.input };
+    if (!isAskUser && lastToolOutputPaths && lastToolOutputPaths.length > 0) {
+      const currentFiles: any[] = Array.isArray(base.files) ? base.files : [];
+      const realPathRe = /^([A-Za-z]:[/\\]|\\\\|\/[^/])/;
+      const pathIter = lastToolOutputPaths[Symbol.iterator]();
+      const resolved = currentFiles.map(f => {
+        if (!f?.path || realPathRe.test(f.path)) return f;
+        const next = pathIter.next();
+        return next.done ? f : { ...f, path: next.value };
+      });
+      const anyPlaceholders = currentFiles.some(f => f?.path && !realPathRe.test(f.path));
+      const noValidPaths = currentFiles.length === 0 || currentFiles.every(f => !f?.path || !f.path.trim());
+      if (anyPlaceholders || noValidPaths) {
+        base.files = noValidPaths
+          ? lastToolOutputPaths.map(p => ({ path: p }))
+          : resolved;
+      }
+    }
+    setFields(base);
     fetch(`${FLASK}/api/tools/space-analyzer/drives`)
       .then(r => r.json())
       .then(d => setDrives(d.drives || []))
@@ -962,26 +934,8 @@ const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject }) => 
                 </p>
               )}
 
-              {!isAskUser && tool.definition.description && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                  {tool.definition.description}
-                </p>
-              )}
-
-              {!isAskUser && tool.definition.input_instructions && (
-                <div className="flex gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl text-xs text-slate-600 dark:text-slate-400">
-                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-500" />
-                  <span>{tool.definition.input_instructions}</span>
-                </div>
-              )}
-
               {fieldEntries.length > 0 && (
                 <div className="space-y-4">
-                  {!isAskUser && (
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
-                      Review &amp; adjust inputs
-                    </p>
-                  )}
                   {fieldEntries.map(([key, value]) => {
                     const schema = paramProps[key];
                     const kind = inferKind(key, schema, isAskUser, askUserInputType);
@@ -996,9 +950,6 @@ const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject }) => 
                       <div key={key}>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
                           {label}
-                          {schema?.description && !isAskUser && (
-                            <span className="ml-1.5 font-normal text-xs text-slate-400">{schema.description}</span>
-                          )}
                         </label>
                         <FieldInput
                           fieldKey={key}
@@ -1025,14 +976,14 @@ const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject }) => 
             <div className="flex gap-2 px-4 py-3 border-t border-slate-100 dark:border-slate-700/60">
               <button
                 onClick={() => onApprove(tool.id, { ...fields })}
-                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 px-3 rounded-xl transition-colors"
+                className="btn btn-primary flex-1 justify-center"
               >
                 <Check className="w-4 h-4" />
                 {isAskUser ? 'Submit' : 'Run tool'}
               </button>
               <button
                 onClick={() => onReject(tool.id)}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium py-2 px-3 rounded-xl transition-colors"
+                className="btn btn-secondary flex-1 justify-center"
               >
                 <X className="w-4 h-4" />
                 {isAskUser ? 'Skip' : 'Cancel'}
@@ -1055,12 +1006,9 @@ const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject }) => 
   );
 };
 
-export const ToolApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject }) => {
+export const ToolApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject, lastToolOutputPaths }) => {
   if (tool.tool === 'smart_drive_build') {
     return <SmartDriveBuildApproval tool={tool} onApprove={onApprove} onReject={onReject} />;
   }
-  return <GenericApprovalCard tool={tool} onApprove={onApprove} onReject={onReject} />;
+  return <GenericApprovalCard tool={tool} onApprove={onApprove} onReject={onReject} lastToolOutputPaths={lastToolOutputPaths} />;
 };
-
-// Backward-compat alias
-export const ToolApprovalModal = ToolApprovalCard;

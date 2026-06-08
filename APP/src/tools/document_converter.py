@@ -30,14 +30,12 @@ from pathlib import Path
 from config import APP_VERSION
 from migrations import get_latest_schema_version
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 _CONFIG_FILENAME = ".drive_config.json"
 
 SUPPORTED_INPUT_EXTENSIONS = {".pdf", ".docx", ".doc", ".txt", ".html", ".htm", ".md", ".markdown"}
 
-# Which formats each input type can convert to
 CONVERSION_MAP: dict[str, list[str]] = {
     ".pdf":      ["docx", "txt", "html", "png"],
     ".docx":     ["pdf", "txt", "html"],
@@ -48,8 +46,6 @@ CONVERSION_MAP: dict[str, list[str]] = {
     ".md":       ["pdf", "html", "docx"],
     ".markdown": ["pdf", "html", "docx"],
 }
-
-# ── Agent tool definition ──────────────────────────────────────────────────────
 
 DEFINITION = {
     "name": "document_converter",
@@ -78,19 +74,23 @@ DEFINITION = {
         "required": ["files", "outputMode"],
     },
     "input_instructions": (
-        "files: array of {path, outputFormat} — use ask_user(input_type='file') to pick each document from a virtual drive. "
+        "files: array of {path, outputFormat} — provide file paths directly if you already have them (e.g. from a prior tool's output). "
+        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
+        "CHAINING: if a previous tool returned a result, extract each item's outputPath "
+        "and pass them as [{\"path\": outputPath, \"outputFormat\": \"pdf\"}, ...] — do NOT call ask_user again. "
         "Supported inputs: PDF, DOCX, DOC, TXT, HTML, Markdown. "
         "outputFormat per file: 'pdf', 'docx', 'txt', 'html', or 'png' (PDF pages as images). "
-        "outputMode: 'replace' places result alongside with new extension, 'copy' adds _converted suffix, 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+        "outputMode: 'copy' is recommended when chaining (keeps originals); "
+        "'replace' places result alongside with new extension; 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder."
     ),
     "output_description": (
         "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, pages?, error?}], virtualDrivePath?} "
-        "— PDF→PNG produces a ZIP when the source has multiple pages."
+        "— PDF→PNG produces a ZIP when the source has multiple pages. "
+        "CHAINING: each result's outputPath is the produced file — pass it directly as the 'path' "
+        "in the next tool's files array without calling ask_user."
     ),
 }
-
-# ── Tool-drives registry helpers ───────────────────────────────────────────────
 
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
@@ -143,7 +143,6 @@ def _ensure_virtual_drive(output_path: str) -> str:
 
 
 def _unique_path(path: str) -> str:
-    """Return a non-colliding path by appending a numeric suffix if needed."""
     if not os.path.exists(path):
         return path
     stem, ext = os.path.splitext(path)
@@ -153,7 +152,6 @@ def _unique_path(path: str) -> str:
     return f"{stem}_{counter}{ext}"
 
 
-# ── Conversion functions ──────────────────────────────────────────────────────
 
 def _pdf_to_docx(src: str, dst: str) -> str:
     from pdf2docx import Converter
@@ -182,7 +180,6 @@ def _pdf_to_txt(src: str, dst: str) -> str:
 
 
 def _pdf_to_html(src: str, dst: str) -> str:
-    """Convert PDF to HTML by extracting text and wrapping in styled HTML."""
     from pypdf import PdfReader
     reader = PdfReader(src)
     stem = Path(src).stem
@@ -223,7 +220,6 @@ def _pdf_to_html(src: str, dst: str) -> str:
 
 
 def _pdf_to_png(src: str, dst_dir: str, stem: str) -> list[str]:
-    """Render each PDF page as a PNG image. Returns list of output paths."""
     try:
         import fitz  # PyMuPDF
     except ImportError:
@@ -243,7 +239,6 @@ def _pdf_to_png(src: str, dst_dir: str, stem: str) -> list[str]:
 
 
 def _docx_to_txt(src: str, dst: str) -> str:
-    """Extract plain text from DOCX."""
     try:
         from docx import Document
     except ImportError:
@@ -259,7 +254,6 @@ def _docx_to_txt(src: str, dst: str) -> str:
 
 
 def _docx_to_html(src: str, dst: str) -> str:
-    """Convert DOCX to HTML using mammoth."""
     try:
         import mammoth
     except ImportError:
@@ -290,7 +284,6 @@ def _docx_to_html(src: str, dst: str) -> str:
 
 
 def _txt_to_pdf(src: str, dst: str) -> str:
-    """Convert plain text to PDF using reportlab."""
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import cm
@@ -324,7 +317,6 @@ def _txt_to_pdf(src: str, dst: str) -> str:
 
 
 def _txt_to_docx(src: str, dst: str) -> str:
-    """Convert plain text to DOCX."""
     try:
         from docx import Document
     except ImportError:
@@ -342,7 +334,6 @@ def _txt_to_docx(src: str, dst: str) -> str:
 
 
 def _html_to_pdf(src: str, dst: str) -> str:
-    """Convert HTML to PDF using weasyprint or fallback to basic reportlab."""
     try:
         from weasyprint import HTML
         HTML(filename=src).write_pdf(dst)
@@ -350,13 +341,10 @@ def _html_to_pdf(src: str, dst: str) -> str:
     except ImportError:
         pass
 
-    # Fallback: strip tags and convert as text
     with open(src, "r", encoding="utf-8", errors="replace") as f:
         raw_html = f.read()
-    text = re.sub(r'<[^>]+>', '', raw_html)
-    text = text.strip()
+    text = re.sub(r'<[^>]+>', '', raw_html).strip()
 
-    # Write text to temp file and use txt_to_pdf
     tmp_txt = dst + ".tmp.txt"
     try:
         with open(tmp_txt, "w", encoding="utf-8") as f:
@@ -369,7 +357,6 @@ def _html_to_pdf(src: str, dst: str) -> str:
 
 
 def _html_to_docx(src: str, dst: str) -> str:
-    """Convert HTML to DOCX by extracting text and creating a Word document."""
     try:
         from docx import Document
     except ImportError:
@@ -380,15 +367,10 @@ def _html_to_docx(src: str, dst: str) -> str:
     with open(src, "r", encoding="utf-8", errors="replace") as f:
         raw_html = f.read()
 
-    # Basic HTML → text with paragraph splitting
-    # Remove scripts and styles
     cleaned = re.sub(r'<(script|style)[^>]*>.*?</\1>', '', raw_html, flags=re.DOTALL | re.IGNORECASE)
-    # Replace <br>, <p>, </p>, <div>, etc. with newlines
     cleaned = re.sub(r'<br\s*/?\s*>', '\n', cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r'</?(p|div|h[1-6]|li|tr)[^>]*>', '\n', cleaned, flags=re.IGNORECASE)
-    # Strip remaining tags
     text = re.sub(r'<[^>]+>', '', cleaned)
-    # Clean up excess whitespace
     text = re.sub(r'\n{3,}', '\n\n', text).strip()
 
     doc = Document()
@@ -401,7 +383,6 @@ def _html_to_docx(src: str, dst: str) -> str:
 
 
 def _md_to_html(src: str, dst: str) -> str:
-    """Convert Markdown to HTML."""
     try:
         import markdown
     except ImportError:
@@ -439,7 +420,6 @@ def _md_to_html(src: str, dst: str) -> str:
 
 
 def _md_to_pdf(src: str, dst: str) -> str:
-    """Convert Markdown → HTML → PDF."""
     tmp_html = dst + ".tmp.html"
     try:
         _md_to_html(src, tmp_html)
@@ -451,7 +431,6 @@ def _md_to_pdf(src: str, dst: str) -> str:
 
 
 def _md_to_docx(src: str, dst: str) -> str:
-    """Convert Markdown → HTML → DOCX."""
     tmp_html = dst + ".tmp.html"
     try:
         _md_to_html(src, tmp_html)
@@ -462,10 +441,8 @@ def _md_to_docx(src: str, dst: str) -> str:
     return dst
 
 
-# ── Conversion router ─────────────────────────────────────────────────────────
 
 def _get_converter(src_ext: str, target_fmt: str):
-    """Return (converter_fn, output_ext) or raise ValueError."""
     src_ext = src_ext.lower()
     target_fmt = target_fmt.lower()
 
@@ -473,7 +450,7 @@ def _get_converter(src_ext: str, target_fmt: str):
         (".pdf", "docx"):     (_pdf_to_docx, ".docx"),
         (".pdf", "txt"):      (_pdf_to_txt, ".txt"),
         (".pdf", "html"):     (_pdf_to_html, ".html"),
-        (".pdf", "png"):      (None, ".png"),  # special multi-output
+        (".pdf", "png"):      (None, ".png"),
         (".docx", "pdf"):     (_docx_to_pdf, ".pdf"),
         (".docx", "txt"):     (_docx_to_txt, ".txt"),
         (".docx", "html"):    (_docx_to_html, ".html"),
@@ -500,7 +477,6 @@ def _get_converter(src_ext: str, target_fmt: str):
     return _CONVERTERS[key]
 
 
-# ── Single-item processor ─────────────────────────────────────────────────────
 
 def _process_single_item(
     item: dict,
@@ -526,7 +502,6 @@ def _process_single_item(
     try:
         converter_fn, out_ext = _get_converter(src_ext, target_fmt)
 
-        # Special case: PDF → PNG (multi-output → zip if multiple pages)
         if src_ext == ".pdf" and target_fmt == "png":
             if output_mode == "virtual_drive" and virtual_drive_path:
                 out_dir = virtual_drive_path
@@ -537,7 +512,6 @@ def _process_single_item(
 
             outputs = _pdf_to_png(src, out_dir, stem)
 
-            # Single page → just return the single PNG
             if len(outputs) <= 1:
                 return {
                     "path": src,
@@ -546,13 +520,11 @@ def _process_single_item(
                     "pages": len(outputs),
                 }
 
-            # Multiple pages → bundle into a ZIP and remove individual PNGs
             import zipfile
             zip_path = _unique_path(os.path.join(out_dir, f"{stem}_pages.zip"))
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                 for png_path in outputs:
                     zf.write(png_path, os.path.basename(png_path))
-            # Clean up individual PNGs
             for png_path in outputs:
                 try:
                     os.remove(png_path)
@@ -566,7 +538,6 @@ def _process_single_item(
                 "pages": len(outputs),
             }
 
-        # Determine output path
         if output_mode == "replace":
             final = os.path.join(os.path.dirname(src), f"{stem}{out_ext}")
             final = _unique_path(final)

@@ -1,4 +1,3 @@
-# Trigger reload for vtracer
 from flask import Flask, jsonify
 from flask_cors import CORS
 import sys
@@ -9,7 +8,7 @@ from API.tools_routes import tools_bp
 from API.agent_routes import agent_bp
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for development
+CORS(app)
 
 app.register_blueprint(drive_bp, url_prefix='/api/drive')
 app.register_blueprint(tools_bp, url_prefix='/api/tools')

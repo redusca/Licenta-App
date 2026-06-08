@@ -21,16 +21,12 @@ from pathlib import Path
 from config import APP_VERSION
 from migrations import get_latest_schema_version
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
-# __file__ = APP/src/tools/image_converter.py → .parent x3 = APP/
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 
 _CONFIG_FILENAME = ".drive_config.json"
 SUPPORTED_INPUT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
 OUTPUT_FORMATS = {"jpeg", "jpg", "png", "webp", "bmp", "tiff", "gif"}
-
-# ── Agent tool definition (used by /api/tools) ─────────────────────────────────
 
 DEFINITION = {
     "name": "image_converter",
@@ -39,13 +35,19 @@ DEFINITION = {
         "Supports three output modes: replace originals, copy alongside, or virtual drive."
     ),
     "input_instructions": (
-        "files: array of {path, outputFormat} — use ask_user(input_type='file') to pick each file from a virtual drive. "
+        "files: array of {path, outputFormat} — provide file paths directly if you already have them (e.g. from a prior tool's output). "
+        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
+        "CHAINING: if a previous tool returned a result, extract each item's outputPath "
+        "and pass them as [{\"path\": outputPath, \"outputFormat\": \"png\"}, ...] — do NOT call ask_user again. "
         "outputFormat per file: 'jpeg', 'png', 'webp', 'bmp', 'tiff', or 'gif'. "
-        "outputMode: 'replace' overwrites the original, 'copy' places result alongside, 'virtual_drive' saves into a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives."
+        "outputMode: 'copy' is recommended when chaining (keeps originals); "
+        "'replace' overwrites original; 'virtual_drive' saves into a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder."
     ),
     "output_description": (
-        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}"
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}. "
+        "CHAINING: each result's outputPath is the produced file — pass it directly as the 'path' "
+        "in the next tool's files array without calling ask_user."
     ),
     "parameters": {
         "type": "object",
@@ -78,7 +80,6 @@ DEFINITION = {
 }
 
 
-# ── Tool-drives registry helpers ───────────────────────────────────────────────
 
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
@@ -106,14 +107,8 @@ def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     _save_tool_drives(drives)
 
 
-# ── Virtual drive creation ─────────────────────────────────────────────────────
 
 def _ensure_virtual_drive(output_path: str) -> str:
-    """
-    Ensure the ImageConversionResults virtual drive exists inside output_path.
-    Creates the folder + .drive_config.json if missing.
-    Returns the full drive path.
-    """
     drive_name = "ImageConversionResults"
     drive_path = os.path.join(output_path, drive_name)
     os.makedirs(drive_path, exist_ok=True)
@@ -137,7 +132,6 @@ def _ensure_virtual_drive(output_path: str) -> str:
     return drive_path
 
 
-# ── Single-image conversion ────────────────────────────────────────────────────
 
 def _convert_image(
     src_path: str,
@@ -146,7 +140,6 @@ def _convert_image(
     quality: int = 85,
     preserve_metadata: bool = True,
 ) -> None:
-    """Open src_path, convert to out_format, save at dst_path."""
     try:
         from PIL import Image
     except ImportError:
@@ -182,7 +175,6 @@ def _convert_image(
 
 
 def _unique_path(path: str) -> str:
-    """Return a non-colliding path by appending a numeric suffix if needed."""
     if not os.path.exists(path):
         return path
     stem, ext = os.path.splitext(path)
@@ -193,14 +185,7 @@ def _unique_path(path: str) -> str:
     return path
 
 
-# ── Public executor ────────────────────────────────────────────────────────────
-
 def execute(input: dict) -> str:
-    """
-    Batch-convert images.  Called by POST /api/tools/execute and
-    POST /api/tools/image-converter/run.
-    Returns a JSON string (for agent compatibility).
-    """
     files: list = input.get("files", [])
     output_mode: str = input.get("outputMode", "copy")
     output_path: str = input.get("outputPath", "")
@@ -247,7 +232,6 @@ def execute(input: dict) -> str:
 
             elif output_mode == "copy":
                 candidate = os.path.join(os.path.dirname(src), f"{stem}.{ext}")
-                # Don't overwrite the source if extension matches
                 if os.path.normcase(candidate) == os.path.normcase(src):
                     candidate = f"{os.path.join(os.path.dirname(src), stem)}_copy.{ext}"
                 final = _unique_path(candidate)
@@ -277,7 +261,6 @@ def execute(input: dict) -> str:
     return json.dumps(response)
 
 
-# ── Single item processing (used by parallel executor) ───────────────────────
 
 def _process_single_item(
     item: dict,
@@ -286,7 +269,6 @@ def _process_single_item(
     quality: int,
     preserve_metadata: bool,
 ) -> dict:
-    """Convert a single file and return its result dict."""
     src = item.get("path", "")
     raw_fmt = item.get("outputFormat", "").lower().lstrip(".")
 
@@ -327,10 +309,6 @@ def _process_single_item(
 
 
 def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
-    """
-    Parallel batch-convert. Uses a thread pool for IO-bound Pillow work.
-    Returns a JSON string with results in original order.
-    """
     files: list = input_data.get("files", [])
     output_mode: str = input_data.get("outputMode", "copy")
     output_path: str = input_data.get("outputPath", "")
@@ -350,13 +328,11 @@ def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
             })
         virtual_drive_path = _ensure_virtual_drive(output_path)
 
-    # For replace mode, run sequentially to avoid race conditions on same files
     if output_mode == "replace":
         workers = 1
     else:
         workers = min(max_workers, len(files))
 
-    # Map future → index to preserve order
     results: list = [None] * len(files)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         future_to_idx = {

@@ -2,14 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Film, ChevronRight, HardDrive, FolderOpen,
-    X, CheckCircle, AlertCircle, FileVideo,
+    Monitor, X, CheckCircle, AlertCircle, FileVideo,
     Check, Minus, Play, Loader2,
 } from 'lucide-react';
+import { FolderPickerModal } from '../components/FolderPickerModal';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
-const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.mov', '.avi', '.webm']);
 const RESOLUTIONS = ['original', '1080p', '720p', '480p', '360p'];
 const CODECS = ['h264', 'h265'];
 
@@ -27,11 +27,6 @@ interface FileResult {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function isVideoFile(name: string): boolean {
-    const ext = '.' + (name.split('.').pop() ?? '').toLowerCase();
-    return VIDEO_EXTENSIONS.has(ext);
-}
-
 function fmtSize(bytes: number): string {
     if (!bytes) return '0 B';
     if (bytes < 1024) return `${bytes} B`;
@@ -46,7 +41,7 @@ export const VideoCompressorPage: React.FC = () => {
     const navigate = useNavigate();
     const [files, setFiles] = useState<FileItem[]>([]);
     const [selected, setSelected] = useState<Set<string>>(new Set());
-    
+
     // Global format defaults
     const [globalCodec, setGlobalCodec] = useState('h264');
     const [globalCrf, setGlobalCrf] = useState(28);
@@ -59,13 +54,10 @@ export const VideoCompressorPage: React.FC = () => {
     const [results, setResults] = useState<any | null>(null);
     const [convError, setConvError] = useState<string | null>(null);
     const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(new Map());
+    const [showAppExplorer, setShowAppExplorer] = useState(false);
 
     useEffect(() => {
-        Promise.all([
-            fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({})),
-        ]).then(([cfgData]) => {
-            setOutputPath(cfgData.output_path || '');
-        });
+        fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).then(d => setOutputPath(d.output_path || '')).catch(() => {});
     }, []);
 
     const addFiles = useCallback((newFiles: FileItem[]) => {
@@ -80,36 +72,16 @@ export const VideoCompressorPage: React.FC = () => {
         });
     }, []);
 
-    const browseFiles = async () => {
+    const browseWindows = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
-            filters: [{ name: 'Videos', extensions: ['mp4', 'mkv', 'mov', 'avi', 'webm'] }],
+            filters: [{ name: 'Videos', extensions: ['mp4', 'avi', 'mkv', 'mov', 'wmv', 'flv', 'webm', 'm4v'] }],
         });
         if (!paths || paths.length === 0) return;
-        const newFiles: FileItem[] = paths.map((p: string) => ({
-            path: p,
-            name: p.split(/[\\/]/).pop() || p,
-            size: 0,
-            codec: globalCodec,
-            crf: globalCrf,
-            maxResolution: globalResolution,
-            stripAudio: globalStripAudio,
-        }));
-        addFiles(newFiles);
+        addFiles(paths.map((p: string) => ({ path: p, name: p.split(/[\\/]/).pop() || p, size: 0, codec: globalCodec, crf: globalCrf, maxResolution: globalResolution, stripAudio: globalStripAudio })));
     };
 
-    const browseFolder = async () => {
-        const dir = await (window as any).electronAPI?.selectDirectory?.();
-        if (!dir) return;
-        try {
-            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(dir)}`);
-            const data = await res.json();
-            const videoFiles: FileItem[] = (data.files || [])
-                .filter((f: any) => !f.is_dir && isVideoFile(f.name))
-                .map((f: any) => ({ path: f.path, name: f.name, size: f.size || 0, codec: globalCodec, crf: globalCrf, maxResolution: globalResolution, stripAudio: globalStripAudio }));
-            addFiles(videoFiles);
-        } catch {
-            setConvError('Failed to list files in that location.');
-        }
+    const handleAppExplorerSelect = (paths: string[]) => {
+        addFiles(paths.map(p => ({ path: p, name: p.split(/[\\/]/).pop() || p, size: 0, codec: globalCodec, crf: globalCrf, maxResolution: globalResolution, stripAudio: globalStripAudio })));
     };
 
     const toggleSelect = (path: string) => setSelected(prev => {
@@ -252,22 +224,20 @@ export const VideoCompressorPage: React.FC = () => {
                             )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                            <button type="button" onClick={browseFiles}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-medium transition-colors">
-                                <FileVideo className="w-4 h-4" />
-                                Browse Files
-                            </button>
-                            <button type="button" onClick={browseFolder}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors">
+                            <button type="button" onClick={() => setShowAppExplorer(true)} className="btn btn-primary">
                                 <FolderOpen className="w-4 h-4" />
-                                Browse Folder
+                                App Explorer
+                            </button>
+                            <button type="button" onClick={browseWindows} className="btn btn-secondary">
+                                <Monitor className="w-4 h-4" />
+                                Windows
                             </button>
                         </div>
                         {files.length === 0 && (
                             <div className="flex flex-col items-center gap-3 py-12 mt-4 border-2 border-dashed border-slate-700 rounded-xl text-center">
                                 <Film className="w-10 h-10 text-slate-600" />
                                 <p className="text-sm text-slate-500">No files added yet.</p>
-                                <p className="text-xs text-slate-600">Use the buttons above to browse for video files.</p>
+                                <p className="text-xs text-slate-600">Use App Explorer to browse drives and folders, or Windows to open a native dialog.</p>
                             </div>
                         )}
                     </div>
@@ -355,7 +325,7 @@ export const VideoCompressorPage: React.FC = () => {
                     {/* Global compress settings */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
                         <p className="text-sm font-semibold text-slate-300 mb-4">Compression Settings</p>
-                        
+
                         <div className="space-y-4 text-sm">
                             <div>
                                 <label className="block text-xs text-slate-500 mb-1">Codec</label>
@@ -387,7 +357,7 @@ export const VideoCompressorPage: React.FC = () => {
                                 <input type="checkbox" checked={globalStripAudio} onChange={e => setGlobalStripAudio(e.target.checked)} className="accent-rose-500" />
                                 <span className="text-sm text-slate-300">Strip Audio Track</span>
                             </label>
-                            
+
                             <button type="button" onClick={applyGlobalSettings} disabled={files.length === 0}
                                 className="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 text-sm transition-colors disabled:opacity-50">
                                 Apply to all files
@@ -423,7 +393,7 @@ export const VideoCompressorPage: React.FC = () => {
                     {/* Convert button */}
                     {files.length > 0 && (
                         <button type="button" onClick={convert} disabled={!canConvert}
-                            className="w-full flex items-center justify-center gap-2 py-3 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm shadow-lg shadow-rose-900/20">
+                            className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px 14px' }}>
                             {converting ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -472,6 +442,18 @@ export const VideoCompressorPage: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {showAppExplorer && (
+                <FolderPickerModal
+                    isOpen
+                    mode="file"
+                    multiSelect
+                    title="Select video files"
+                    onClose={() => setShowAppExplorer(false)}
+                    onSelect={path => { handleAppExplorerSelect([path]); setShowAppExplorer(false); }}
+                    onSelectMultiple={paths => { handleAppExplorerSelect(paths); setShowAppExplorer(false); }}
+                />
+            )}
         </div>
     );
 };

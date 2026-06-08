@@ -425,16 +425,13 @@ export const AudioTranscriberPage: React.FC = () => {
                             )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                            <button onClick={browseFiles} disabled={running}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-40 text-white font-medium transition-colors">
+                            <button onClick={browseFiles} disabled={running} className="btn btn-primary">
                                 <FileAudio className="w-4 h-4" />Browse File
                             </button>
-                            <button onClick={browseFolder} disabled={running}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-colors">
+                            <button onClick={browseFolder} disabled={running} className="btn btn-secondary">
                                 <FolderOpen className="w-4 h-4" />Browse Folder
                             </button>
-                            <button onClick={() => setShowBrowser(true)} disabled={loadingDrives || running}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 disabled:opacity-40 transition-colors">
+                            <button onClick={() => setShowBrowser(true)} disabled={loadingDrives || running} className="btn btn-secondary">
                                 <HardDrive className="w-4 h-4" />From Virtual Drive
                             </button>
                         </div>
@@ -610,7 +607,7 @@ export const AudioTranscriberPage: React.FC = () => {
 
                     {/* Run button */}
                     <button onClick={transcribe} disabled={!canRun}
-                        className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 hover:bg-purple-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm shadow-lg shadow-purple-900/20">
+                        className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px 14px' }}>
                         {running ? (
                             <>
                                 <Mic className="w-4 h-4 animate-pulse" />

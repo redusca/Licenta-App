@@ -2,16 +2,15 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, FileText, ChevronRight, HardDrive, FolderOpen,
-    X, CheckCircle, AlertCircle, FileUp,
+    Monitor, X, CheckCircle, AlertCircle, FileUp,
     Check, Minus, Play, Loader2, Scissors, Merge, ArrowRightLeft,
     GripVertical, ChevronDown, ChevronUp, FileDown, ExternalLink,
 } from 'lucide-react';
+import { FolderPickerModal } from '../components/FolderPickerModal';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
-const PDF_EXTENSIONS = new Set(['.pdf']);
-const DOC_EXTENSIONS = new Set(['.pdf', '.docx', '.doc']);
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -27,15 +26,6 @@ interface FileResult {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function isPdfFile(name: string): boolean {
-    const ext = '.' + (name.split('.').pop() ?? '').toLowerCase();
-    return PDF_EXTENSIONS.has(ext);
-}
-function isDocFile(name: string): boolean {
-    const ext = '.' + (name.split('.').pop() ?? '').toLowerCase();
-    return DOC_EXTENSIONS.has(ext);
-}
 
 function fmtSize(bytes: number): string {
     if (!bytes) return '0 B';
@@ -78,14 +68,14 @@ export const PdfMergerPage: React.FC = () => {
     const [results, setResults] = useState<any | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(new Map());
+    const [showAppExplorer, setShowAppExplorer] = useState(false);
 
     // Drag state for reorder
     const [dragIdx, setDragIdx] = useState<number | null>(null);
     const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
     useEffect(() => {
-        fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({}))
-            .then(cfg => { setOutputPath(cfg.output_path || ''); });
+        fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).then(d => setOutputPath(d.output_path || '')).catch(() => {});
     }, []);
 
     // ── File management ──────────────────────────────────────────────────────
@@ -120,7 +110,7 @@ export const PdfMergerPage: React.FC = () => {
         } catch { /* ignore */ }
     };
 
-    const browseFiles = async () => {
+    const browseWindows = async () => {
         const exts = activeTab === 'convert'
             ? ['pdf', 'docx', 'doc']
             : ['pdf'];
@@ -138,22 +128,15 @@ export const PdfMergerPage: React.FC = () => {
         if (pdfPaths.length > 0) fetchPageCounts(pdfPaths);
     };
 
-    const browseFolder = async () => {
-        const dir = await (window as any).electronAPI?.selectDirectory?.();
-        if (!dir) return;
-        try {
-            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(dir)}`);
-            const data = await res.json();
-            const checker = activeTab === 'convert' ? isDocFile : isPdfFile;
-            const docFiles: FileItem[] = (data.files || [])
-                .filter((f: any) => !f.is_dir && checker(f.name))
-                .map((f: any) => ({ path: f.path, name: f.name, size: f.size || 0 }));
-            addFiles(docFiles);
-            const pdfPaths = docFiles.filter(f => f.name.toLowerCase().endsWith('.pdf')).map(f => f.path);
-            if (pdfPaths.length > 0) fetchPageCounts(pdfPaths);
-        } catch {
-            setError('Failed to list files in that location.');
-        }
+    const handleAppExplorerSelect = (paths: string[]) => {
+        const newFiles: FileItem[] = paths.map(p => ({
+            path: p,
+            name: p.split(/[\\/]/).pop() || p,
+            size: 0,
+        }));
+        addFiles(newFiles);
+        const pdfPaths = paths.filter(p => p.toLowerCase().endsWith('.pdf'));
+        if (pdfPaths.length > 0) fetchPageCounts(pdfPaths);
     };
 
     const toggleSelect = (path: string) => setSelected(prev => {
@@ -373,15 +356,13 @@ export const PdfMergerPage: React.FC = () => {
                             )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                            <button type="button" onClick={browseFiles}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors">
-                                <FileUp className="w-4 h-4" />
-                                Browse Files
-                            </button>
-                            <button type="button" onClick={browseFolder}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors">
+                            <button type="button" onClick={() => setShowAppExplorer(true)} className="btn btn-primary">
                                 <FolderOpen className="w-4 h-4" />
-                                Browse Folder
+                                App Explorer
+                            </button>
+                            <button type="button" onClick={browseWindows} className="btn btn-secondary">
+                                <Monitor className="w-4 h-4" />
+                                Windows
                             </button>
                         </div>
 
@@ -391,10 +372,10 @@ export const PdfMergerPage: React.FC = () => {
                                 <p className="text-sm text-slate-500">No files added yet.</p>
                                 <p className="text-xs text-slate-600">
                                     {activeTab === 'convert'
-                                        ? 'Add PDF or DOCX files to convert between formats.'
+                                        ? 'Use App Explorer to browse drives and folders, or Windows to open a native dialog.'
                                         : activeTab === 'split'
-                                            ? 'Add a PDF file to extract pages from.'
-                                            : 'Add two or more PDF files to merge. Drag to reorder.'}
+                                            ? 'Use App Explorer to browse drives and folders, or Windows to open a native dialog.'
+                                            : 'Use App Explorer to browse drives and folders, or Windows to open a native dialog.'}
                                 </p>
                             </div>
                         )}
@@ -649,7 +630,7 @@ export const PdfMergerPage: React.FC = () => {
                     {/* Execute button */}
                     {files.length > 0 && (
                         <button type="button" onClick={execute} disabled={!canExecute}
-                            className="w-full flex items-center justify-center gap-2 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm shadow-lg shadow-amber-900/20">
+                            className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px 14px' }}>
                             {processing ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -693,7 +674,7 @@ export const PdfMergerPage: React.FC = () => {
                                     {results.results.filter((r: FileResult) => r.success && r.outputPath).map((r: FileResult, i: number) => (
                                         <div key={i} className="flex items-center gap-2">
                                             <p className="text-xs text-green-400 truncate flex-1">
-                                                \u2192 {r.outputPath!.split(/[\\/]/).pop()}
+                                                → {r.outputPath!.split(/[\\/]/).pop()}
                                             </p>
                                             <button
                                                 type="button"
@@ -721,6 +702,18 @@ export const PdfMergerPage: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {showAppExplorer && (
+                <FolderPickerModal
+                    isOpen
+                    mode="file"
+                    multiSelect
+                    title="Select PDF files"
+                    onClose={() => setShowAppExplorer(false)}
+                    onSelect={path => { handleAppExplorerSelect([path]); setShowAppExplorer(false); }}
+                    onSelectMultiple={paths => { handleAppExplorerSelect(paths); setShowAppExplorer(false); }}
+                />
+            )}
         </div>
     );
 };

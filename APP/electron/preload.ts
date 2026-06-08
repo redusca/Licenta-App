@@ -14,4 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('device:changed', listener);
   },
   getAvailableRoots: () => ipcRenderer.invoke('drive:getAvailableRoots'),
+  openFile: (filePath: string) => ipcRenderer.invoke('shell:openPath', filePath),
+  showInFolder: (filePath: string) => ipcRenderer.invoke('shell:showItemInFolder', filePath),
 });

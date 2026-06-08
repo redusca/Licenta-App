@@ -3,8 +3,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, FileText, ChevronRight, HardDrive, FolderOpen,
     X, CheckCircle, AlertCircle, FileUp,
-    Check, Minus, Play, Loader2, ExternalLink,
+    Check, Minus, Play, Loader2, ExternalLink, Monitor,
 } from 'lucide-react';
+import { FolderPickerModal } from '../components/FolderPickerModal';
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
 const DOC_EXTENSIONS = new Set(['.pdf', '.docx', '.doc', '.txt', '.html', '.htm', '.md', '.markdown']);
@@ -76,6 +77,7 @@ export const DocumentConverterPage: React.FC = () => {
     const [results, setResults] = useState<any | null>(null);
     const [convError, setConvError] = useState<string | null>(null);
     const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(new Map());
+    const [showAppExplorer, setShowAppExplorer] = useState(false);
 
     useEffect(() => {
         fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({}))
@@ -94,7 +96,7 @@ export const DocumentConverterPage: React.FC = () => {
         });
     }, []);
 
-    const browseFiles = async () => {
+    const browseWindows = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
             filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'doc', 'txt', 'html', 'htm', 'md', 'markdown'] }],
         });
@@ -106,19 +108,11 @@ export const DocumentConverterPage: React.FC = () => {
         addFiles(newFiles);
     };
 
-    const browseFolder = async () => {
-        const dir = await (window as any).electronAPI?.selectDirectory?.();
-        if (!dir) return;
-        try {
-            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(dir)}`);
-            const data = await res.json();
-            const docFiles: FileItem[] = (data.files || [])
-                .filter((f: any) => !f.is_dir && isDocFile(f.name))
-                .map((f: any) => ({ path: f.path, name: f.name, size: f.size || 0, outputFormat: getDefaultFormat(f.name) }));
-            addFiles(docFiles);
-        } catch {
-            setConvError('Failed to list files in that location.');
-        }
+    const handleAppExplorerSelect = (paths: string[]) => {
+        addFiles(paths.map(p => {
+            const name = p.split(/[\\/]/).pop() || p;
+            return { path: p, name, size: 0, outputFormat: getDefaultFormat(name) };
+        }));
     };
 
     const toggleSelect = (path: string) => setSelected(prev => {
@@ -266,15 +260,13 @@ export const DocumentConverterPage: React.FC = () => {
                             )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                            <button type="button" onClick={browseFiles}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors">
-                                <FileUp className="w-4 h-4" />
-                                Browse Files
-                            </button>
-                            <button type="button" onClick={browseFolder}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors">
+                            <button type="button" onClick={() => setShowAppExplorer(true)} className="btn btn-primary">
                                 <FolderOpen className="w-4 h-4" />
-                                Browse Folder
+                                App Explorer
+                            </button>
+                            <button type="button" onClick={browseWindows} className="btn btn-secondary">
+                                <Monitor className="w-4 h-4" />
+                                Windows
                             </button>
                         </div>
 
@@ -428,7 +420,7 @@ export const DocumentConverterPage: React.FC = () => {
                     {/* Convert button */}
                     {files.length > 0 && (
                         <button type="button" onClick={convert} disabled={!canConvert}
-                            className="w-full flex items-center justify-center gap-2 py-3 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm shadow-lg shadow-amber-900/20">
+                            className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px 14px' }}>
                             {converting ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -494,6 +486,18 @@ export const DocumentConverterPage: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {showAppExplorer && (
+                <FolderPickerModal
+                    isOpen
+                    mode="file"
+                    multiSelect
+                    title="Select documents"
+                    onClose={() => setShowAppExplorer(false)}
+                    onSelect={path => { handleAppExplorerSelect([path]); setShowAppExplorer(false); }}
+                    onSelectMultiple={paths => { handleAppExplorerSelect(paths); setShowAppExplorer(false); }}
+                />
+            )}
         </div>
     );
 };

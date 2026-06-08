@@ -289,27 +289,36 @@ export const Files: React.FC = () => {
     }, [currentPath]);
 
     const loadKnownDrives = async () => {
+        // Always fetch from backend — it is the authoritative source (agent-created drives
+        // land there directly). Merge with localStorage so manual user additions are kept.
+        let localDrives: DriveConfig[] = [];
         const stored = localStorage.getItem('knownDrives');
         if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                setKnownDrives(parsed);
-                return;
-            } catch(e) { console.error(e) }
+            try { localDrives = JSON.parse(stored); } catch { /* ignore */ }
         }
 
-        // localStorage is empty or corrupt — try to restore from backend
         try {
             const res = await fetch(`${API_URL}/registry`);
             const data = await res.json();
-            if (data.drives && data.drives.length > 0) {
-                console.log(`[registry] Restored ${data.drives.length} drive(s) from backend backup.`);
-                localStorage.setItem('knownDrives', JSON.stringify(data.drives));
-                setKnownDrives(data.drives);
+            if (Array.isArray(data.drives)) {
+                // Merge: backend drives + any local drives not already in backend
+                const seen = new Set(data.drives.map((d: DriveConfig) =>
+                    (d.path || '').toLowerCase().replace(/\\/g, '/')
+                ));
+                const localOnly = localDrives.filter(d =>
+                    !seen.has((d.path || '').toLowerCase().replace(/\\/g, '/'))
+                );
+                const merged = [...data.drives, ...localOnly];
+                localStorage.setItem('knownDrives', JSON.stringify(merged));
+                setKnownDrives(merged);
+                return;
             }
         } catch(e) {
-            console.warn('[registry] Could not restore from backend:', e);
+            console.warn('[registry] Could not load from backend:', e);
         }
+
+        // Backend unreachable — fall back to localStorage only
+        if (localDrives.length > 0) setKnownDrives(localDrives);
     };
 
     const loadToolDrives = async () => {
@@ -807,8 +816,8 @@ export const Files: React.FC = () => {
                             onKeyDown={e => e.key === 'Enter' && confirmRenameDrive()}
                         />
                         <div className="flex justify-end gap-2">
-                            <button onClick={() => setRenamingDrive(null)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">Cancel</button>
-                            <button onClick={confirmRenameDrive} disabled={driveRenameLoading || !driveRenameValue.trim()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 shadow-sm transition-colors flex items-center gap-2">
+                            <button onClick={() => setRenamingDrive(null)} className="btn btn-secondary">Cancel</button>
+                            <button onClick={confirmRenameDrive} disabled={driveRenameLoading || !driveRenameValue.trim()} className="btn btn-primary">
                                 {driveRenameLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                                 Rename
                             </button>
@@ -914,8 +923,8 @@ export const Files: React.FC = () => {
                             </>
                         )}
                         <div className="p-4 flex justify-end gap-3">
-                            <button onClick={() => { setDeletingDrive(null); setDriveTree(null); setPreDeleteMove(false); }} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-                            <button onClick={confirmDeleteDrive} disabled={preDeleteMoving} className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white rounded-lg text-sm font-semibold shadow-sm transition-colors flex items-center gap-2">
+                            <button onClick={() => { setDeletingDrive(null); setDriveTree(null); setPreDeleteMove(false); }} className="btn btn-secondary">Cancel</button>
+                            <button onClick={confirmDeleteDrive} disabled={preDeleteMoving} className="btn btn-danger">
                                 {preDeleteMoving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                                 {preDeleteMove ? 'Move & Delete Drive' : 'Delete Drive'}
                             </button>
@@ -983,8 +992,8 @@ export const Files: React.FC = () => {
                             )}
                         </div>
                         <div className="px-6 pb-6 flex justify-end gap-3">
-                            <button onClick={() => setShowMoveModal(false)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-                            <button onClick={confirmMoveItems} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm transition-colors flex items-center gap-2">
+                            <button onClick={() => setShowMoveModal(false)} className="btn btn-secondary">Cancel</button>
+                            <button onClick={confirmMoveItems} className="btn btn-primary">
                                 <MoveRight className="w-4 h-4" /> Move Here
                             </button>
                         </div>
@@ -1027,8 +1036,8 @@ export const Files: React.FC = () => {
                         </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
-                        <button onClick={() => setIsCreating(false)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-sm font-medium transition-colors">Cancel</button>
-                        <button onClick={handleCreateDrive} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium shadow-sm transition-all">Create Drive</button>
+                        <button onClick={() => setIsCreating(false)} className="btn btn-secondary">Cancel</button>
+                        <button onClick={handleCreateDrive} className="btn btn-primary">Create Drive</button>
                     </div>
                 </div>
             </div>
@@ -1046,7 +1055,7 @@ export const Files: React.FC = () => {
                         <h2 className="text-3xl font-bold mb-3 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600">Virtual Drives</h2>
                         <p className="text-slate-500 max-w-md mx-auto">Manage your files with smart virtual drives. Select a drive to get started or create a new one.</p>
                     </div>
-                    <button onClick={() => setIsCreating(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-semibold text-lg hover:shadow-lg hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                    <button onClick={() => setIsCreating(true)} className="btn btn-primary">
                         <Plus className="w-5 h-5" /> Create First Drive
                     </button>
                 </div>
@@ -1349,7 +1358,7 @@ export const Files: React.FC = () => {
                 </div>
                 <button
                     onClick={() => { setCurrentDrive(null); setCurrentPath(null); setFiles([]); setEjectedError(false); }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-semibold transition-all hover:shadow-lg"
+                    className="btn btn-primary"
                 >
                     Back to Drives
                 </button>
@@ -1770,8 +1779,8 @@ export const Files: React.FC = () => {
                         <h3 className="text-lg font-bold mb-4">Rename Item</h3>
                         <input value={newName} onChange={(e) => setNewName(e.target.value)} className="w-full p-3 border border-slate-200 dark:border-slate-700 rounded-lg mb-4 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-blue-500 outline-none transition-all" autoFocus onKeyDown={(e) => e.key === 'Enter' && renameItem()} />
                         <div className="flex justify-end gap-2">
-                            <button onClick={() => setRenamingItem(null)} className="px-4 py-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">Cancel</button>
-                            <button onClick={renameItem} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm transition-colors">Rename</button>
+                            <button onClick={() => setRenamingItem(null)} className="btn btn-secondary">Cancel</button>
+                            <button onClick={renameItem} className="btn btn-primary">Rename</button>
                         </div>
                     </div>
                 </div>

@@ -24,14 +24,11 @@ from pathlib import Path
 from config import APP_VERSION
 from migrations import get_latest_schema_version
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
 _DATA_DIR = Path(__file__).parent.parent.parent / "data"
 _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 _CONFIG_FILENAME = ".drive_config.json"
 
 SUPPORTED_INPUT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
-
-# ── Agent tool definition (used by /api/tools) ─────────────────────────────────
 
 DEFINITION = {
     "name": "image_to_svg",
@@ -40,14 +37,20 @@ DEFINITION = {
         "Supports three output modes: replace originals, copy alongside, or virtual drive."
     ),
     "input_instructions": (
-        "files: array of {path} — use ask_user(input_type='file') to pick each raster image from a virtual drive. "
+        "files: array of {path} — provide file paths directly if you already have them (e.g. from a prior tool's output). "
+        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
+        "CHAINING: if a previous tool (e.g. remove_background, image_converter) returned a result, extract each item's outputPath "
+        "and pass them as [{\"path\": outputPath}, ...] — do NOT call ask_user again. "
         "Supported inputs: JPEG, PNG, WebP, BMP. Output is always SVG. "
-        "outputMode: 'replace' removes original, 'copy' places SVG alongside, 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder from the app's virtual drives. "
+        "outputMode: 'copy' is recommended when chaining (keeps originals); "
+        "'replace' removes original; 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder. "
         "colormode: 'color' (default) or 'binary' (black-and-white)."
     ),
     "output_description": (
-        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, svgContent?, error?}], virtualDrivePath?}"
+        "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, svgContent?, error?}], virtualDrivePath?}. "
+        "CHAINING: each result's outputPath is the produced SVG file — pass it directly as the 'path' "
+        "in the next tool's files array without calling ask_user."
     ),
     "parameters": {
         "type": "object",
@@ -90,7 +93,6 @@ DEFINITION = {
 }
 
 
-# ── Tool-drives registry helpers ───────────────────────────────────────────────
 
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
@@ -118,14 +120,8 @@ def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     _save_tool_drives(drives)
 
 
-# ── Virtual drive creation ─────────────────────────────────────────────────────
 
 def _ensure_virtual_drive(output_path: str) -> str:
-    """
-    Ensure the SVGVectorResults virtual drive exists inside output_path.
-    Creates the folder + .drive_config.json if missing.
-    Returns the full drive path.
-    """
     drive_name = "SVGVectorResults"
     drive_path = os.path.join(output_path, drive_name)
     os.makedirs(drive_path, exist_ok=True)
@@ -149,7 +145,6 @@ def _ensure_virtual_drive(output_path: str) -> str:
     return drive_path
 
 
-# ── Single-image conversion ────────────────────────────────────────────────────
 
 def _vectorize_image(
     src_path: str,
@@ -159,10 +154,6 @@ def _vectorize_image(
     filter_speckle: int = 4,
     color_precision: int = 6,
 ) -> str:
-    """
-    Convert src_path raster to SVG at dst_path using vtracer.
-    Returns the SVG content as a string.
-    """
     try:
         import vtracer
     except ImportError:
@@ -187,7 +178,6 @@ def _vectorize_image(
         path_precision=8,
     )
 
-    # Read the generated SVG so we can return it
     with open(dst_path, "r", encoding="utf-8") as f:
         svg_str = f.read()
 
@@ -195,7 +185,6 @@ def _vectorize_image(
 
 
 def _unique_path(path: str) -> str:
-    """Return a non-colliding path by appending a numeric suffix if needed."""
     if not os.path.exists(path):
         return path
     stem, ext = os.path.splitext(path)
@@ -206,7 +195,6 @@ def _unique_path(path: str) -> str:
     return path
 
 
-# ── Shared item processor ──────────────────────────────────────────────────────
 
 def _process_single_item(
     item: dict,
@@ -217,7 +205,6 @@ def _process_single_item(
     filter_speckle: int,
     color_precision: int,
 ) -> dict:
-    """Vectorize a single file and return its result dict."""
     src = item.get("path", "")
 
     if not src or not os.path.isfile(src):
@@ -263,14 +250,8 @@ def _process_single_item(
         return {"path": src, "success": False, "error": str(exc)}
 
 
-# ── Public executor ────────────────────────────────────────────────────────────
 
 def execute(input: dict) -> str:
-    """
-    Batch-vectorize images.  Called by POST /api/tools/execute and
-    POST /api/tools/image-to-svg/run.
-    Returns a JSON string (for agent compatibility).
-    """
     files: list = input.get("files", [])
     output_mode: str = input.get("outputMode", "copy")
     output_path: str = input.get("outputPath", "")
@@ -315,10 +296,6 @@ def execute(input: dict) -> str:
 
 
 def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
-    """
-    Parallel batch-vectorize. Uses a thread pool for IO-bound work.
-    Returns a JSON string with results in original order.
-    """
     files: list = input_data.get("files", [])
     output_mode: str = input_data.get("outputMode", "copy")
     output_path: str = input_data.get("outputPath", "")
@@ -340,7 +317,6 @@ def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
             })
         virtual_drive_path = _ensure_virtual_drive(output_path)
 
-    # replace mode: sequential to avoid race conditions
     workers = 1 if output_mode == "replace" else min(max_workers, len(files))
 
     results: list = [None] * len(files)
