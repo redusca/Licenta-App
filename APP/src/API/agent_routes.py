@@ -12,10 +12,6 @@ Stores the user's agent connection config in data/agent_config.json.
   GET    /api/agent/chat/info    — return active chat_id (or null)
   DELETE /api/agent/chat/delete  — delete active chat + reset local state
   POST   /api/agent/chat/stream  — SSE proxy: forward message to planning agent
-
-── Legacy (kept for backward compat) ─────────────────────────────────────────
-  POST   /api/agent/chat         — non-streaming legacy ReAct proxy
-  POST   /api/agent/reset        — reset legacy session
 """
 from __future__ import annotations
 
@@ -87,7 +83,7 @@ def _build_tool_list() -> list[dict]:
     try:
         from API.tools_routes import _TOOLS
         defs: list[dict] = []
-        for _name, mod in _TOOLS.items():
+        for mod in _TOOLS.values():
             defn = dict(getattr(mod, "DEFINITION", {}))
             defn["callback_url"] = _TOOL_CALLBACK_URL
             defs.append(defn)
@@ -293,62 +289,3 @@ def stream_chat():
             "Connection": "keep-alive",
         },
     )
-
-
-# ── Legacy routes (non-streaming ReAct / Gemini pool) ─────────────────────────
-
-def _chat_url(cfg: dict) -> str:
-    if cfg["mode"] == "server_proxy":
-        return cfg["server_url"].rstrip("/") + "/api/agent/chat"
-    return cfg["container_url"].rstrip("/") + "/api/agent/chat"
-
-
-def _reset_url(cfg: dict) -> str:
-    if cfg["mode"] == "server_proxy":
-        return cfg["server_url"].rstrip("/") + "/api/agent/session"
-    return cfg["container_url"].rstrip("/") + "/api/agent/session"
-
-
-@agent_bp.post("/chat")
-def chat():
-    data = request.get_json(force=True) or {}
-    message: str = data.get("message", "")
-    tools: list = data.get("tools", [])
-    if not message:
-        return jsonify({"error": "message is required"}), 400
-
-    cfg = _load_config()
-    if not cfg.get("api_key"):
-        return jsonify({"error": "API key not configured."}), 400
-
-    url = _chat_url(cfg)
-    try:
-        resp = requests.post(
-            url,
-            headers=_agent_headers(cfg),
-            json={"message": message, "tools": tools},
-            timeout=120,
-        )
-        resp.raise_for_status()
-        return jsonify(resp.json())
-    except requests.HTTPError as exc:
-        status = exc.response.status_code if exc.response is not None else 502
-        detail = exc.response.text[:300] if exc.response is not None else str(exc)
-        return jsonify({"error": f"Agent request failed ({status}): {detail}"}), 502
-    except requests.RequestException as exc:
-        return jsonify({"error": f"Agent request failed: {exc}"}), 502
-
-
-@agent_bp.post("/reset")
-def reset_session():
-    cfg = _load_config()
-    if not cfg.get("api_key"):
-        return jsonify({"error": "API key not configured"}), 400
-    url = _reset_url(cfg)
-    try:
-        resp = requests.delete(url, headers=_agent_headers(cfg), timeout=10)
-        if resp.status_code not in (204, 200, 404):
-            resp.raise_for_status()
-    except requests.RequestException as exc:
-        logger.warning("Session reset failed: %s", exc)
-    return jsonify({"ok": True})
