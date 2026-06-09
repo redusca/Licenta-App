@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Sparkles, ChevronRight, FolderOpen,
     RefreshCw, CheckCircle, AlertCircle, FileImage,
-    Download, Cpu, ZapOff, Zap, Monitor,
+    Download, Cpu, ZapOff, Zap, Files, FolderSearch,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 
@@ -123,12 +123,25 @@ export const ImageEnhancerPage: React.FC = () => {
         setResult(null); setError(null); setProgress(null);
     }, []);
 
-    const browseWindows = async () => {
+    const browseFiles = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
             filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp'] }],
         });
         if (!paths?.length) return;
         pickFile(paths[0], paths[0].split(/[\\/]/).pop() || paths[0], 0);
+    };
+
+    const browseFolder = async () => {
+        const dir = await (window as any).electronAPI?.selectDirectory?.();
+        if (!dir) return;
+        try {
+            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(dir)}`);
+            const data = await res.json();
+            const exts = new Set(['jpg', 'jpeg', 'png', 'webp']);
+            const entries: { name: string; path: string; size: number; is_dir: boolean }[] = data.entries ?? [];
+            const first = entries.find(e => !e.is_dir && exts.has((e.name.split('.').pop() ?? '').toLowerCase()));
+            if (first) pickFile(first.path, first.name, first.size);
+        } catch { /* ignore */ }
     };
 
     const enhance = async () => {
@@ -258,8 +271,11 @@ export const ImageEnhancerPage: React.FC = () => {
                             <button onClick={() => setShowAppExplorer(true)} disabled={running} className="btn btn-primary">
                                 <FolderOpen className="w-4 h-4" />App Explorer
                             </button>
-                            <button onClick={browseWindows} disabled={running} className="btn btn-secondary">
-                                <Monitor className="w-4 h-4" />Windows
+                            <button onClick={browseFiles} disabled={running} className="btn btn-secondary">
+                                <Files className="w-4 h-4" />Select File
+                            </button>
+                            <button onClick={browseFolder} disabled={running} className="btn btn-secondary">
+                                <FolderSearch className="w-4 h-4" />Select Folder
                             </button>
                         </div>
 

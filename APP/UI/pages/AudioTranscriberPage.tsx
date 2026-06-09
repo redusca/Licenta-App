@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, Mic, ChevronRight, HardDrive, FolderOpen,
-    RefreshCw, X, CheckCircle, AlertCircle, FileAudio,
-    Folder, ChevronLeft, Copy, Download, Cpu, ZapOff, Zap, Check,
+    ArrowLeft, Mic, ChevronRight, FolderOpen, Files, FolderSearch,
+    CheckCircle, AlertCircle, FileAudio,
+    Copy, Download, Cpu, ZapOff, Zap, Check, RefreshCw,
 } from 'lucide-react';
+import { FolderPickerModal } from '../components/FolderPickerModal';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -23,8 +24,6 @@ const LANGUAGES = [
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface DriveEntry { name: string; path: string; config?: { name: string } }
-interface DirItem { name: string; path: string; is_dir: boolean; size: number }
 type OutputMode = 'none' | 'copy' | 'virtual_drive';
 interface GatewayModel { name: string; is_loaded: boolean; device: string; task: string }
 
@@ -113,124 +112,12 @@ function MetricRow({ label, value }: { label: string; value: string }) {
     );
 }
 
-// ── Drive folder browser modal ───────────────────────────────────────────────
-
-function FolderBrowser({
-    drives,
-    onPickFile,
-    onClose,
-}: {
-    drives: DriveEntry[];
-    onPickFile: (path: string, name: string, size: number) => void;
-    onClose: () => void;
-}) {
-    const [currentDrive, setCurrentDrive] = useState<DriveEntry | null>(null);
-    const [currentPath, setCurrentPath] = useState('');
-    const [entries, setEntries] = useState<DirItem[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    const loadPath = async (path: string) => {
-        setLoading(true);
-        try {
-            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(path)}`);
-            const data = await res.json();
-            setEntries((data.files || [])
-                .filter((f: any) => f.is_dir || isAudioFile(f.name))
-                .map((f: any) => ({ name: f.name, path: f.path, is_dir: f.is_dir, size: f.size || 0 })));
-            setCurrentPath(path);
-        } catch { setEntries([]); } finally { setLoading(false); }
-    };
-
-    const navigateUp = () => {
-        if (!currentPath || !currentDrive) return;
-        const parent = currentPath.replace(/[\\/][^\\/]+$/, '');
-        const driveRoot = currentDrive.path.replace(/[\\/]+$/, '');
-        const np = parent.replace(/[\\/]+$/, '');
-        if (np && np !== currentPath.replace(/[\\/]+$/, '') && np.length >= driveRoot.length) loadPath(parent);
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center gap-3">
-                        {currentDrive && currentPath.replace(/[\\/]+$/, '') !== currentDrive.path.replace(/[\\/]+$/, '') && (
-                            <button onClick={navigateUp} className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                        )}
-                        <h3 className="text-base font-semibold">
-                            {currentDrive ? (currentDrive.config?.name ?? currentDrive.name) : 'Select a Drive'}
-                        </h3>
-                        {currentPath && <span className="text-xs text-slate-500 font-mono truncate max-w-xs">{currentPath}</span>}
-                    </div>
-                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 min-h-0">
-                    {!currentDrive ? (
-                        <div className="space-y-1">
-                            {drives.length === 0
-                                ? <p className="text-sm text-slate-500 text-center py-8">No virtual drives found.</p>
-                                : drives.map((d, i) => (
-                                    <button key={i} onClick={() => { setCurrentDrive(d); loadPath(d.path); }}
-                                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left hover:bg-slate-800 transition-colors">
-                                        <HardDrive className="w-5 h-5 text-blue-400 shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium truncate">{d.config?.name ?? d.name}</p>
-                                            <p className="text-xs text-slate-500 truncate">{d.path}</p>
-                                        </div>
-                                        <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-                                    </button>
-                                ))}
-                        </div>
-                    ) : loading ? (
-                        <div className="flex items-center justify-center py-12 text-slate-500">
-                            <RefreshCw className="w-5 h-5 animate-spin mr-2" />Loading...
-                        </div>
-                    ) : entries.length === 0 ? (
-                        <p className="text-sm text-slate-500 text-center py-12">No audio files or folders here.</p>
-                    ) : (
-                        <div className="space-y-0.5">
-                            {entries.map(entry => entry.is_dir ? (
-                                <button key={entry.path} onClick={() => loadPath(entry.path)}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left hover:bg-slate-800 transition-colors">
-                                    <Folder className="w-4 h-4 text-amber-400 shrink-0" />
-                                    <span className="text-sm truncate flex-1">{entry.name}</span>
-                                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                </button>
-                            ) : (
-                                <button key={entry.path}
-                                    onClick={() => { onPickFile(entry.path, entry.name, entry.size); onClose(); }}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left hover:bg-purple-500/10 transition-colors">
-                                    <FileAudio className="w-4 h-4 text-purple-400 shrink-0" />
-                                    <span className="text-sm truncate flex-1 min-w-0">{entry.name}</span>
-                                    <span className="text-xs text-slate-500 shrink-0">{fmtSize(entry.size)}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                <div className="flex justify-end px-6 py-4 border-t border-slate-200 dark:border-slate-800">
-                    <button onClick={onClose}
-                        className="text-sm px-4 py-2 rounded-lg border border-slate-600 text-slate-500 hover:text-slate-300 transition-colors">
-                        Cancel
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // ── Main page component ──────────────────────────────────────────────────────
 
 export const AudioTranscriberPage: React.FC = () => {
     const navigate = useNavigate();
-    const [drives, setDrives] = useState<DriveEntry[]>([]);
     const [outputPath, setOutputPath] = useState('');
-    const [loadingDrives, setLoadingDrives] = useState(true);
-    const [showBrowser, setShowBrowser] = useState(false);
+    const [showAppExplorer, setShowAppExplorer] = useState(false);
 
     const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null);
     const [language, setLanguage] = useState('auto');
@@ -248,23 +135,25 @@ export const AudioTranscriberPage: React.FC = () => {
     const [gatewayOnline, setGatewayOnline] = useState<boolean | null>(null);
 
     useEffect(() => {
-        setLoadingDrives(true);
         Promise.all([
-            fetch(`${FLASK_BASE}/api/drive/registry`).then(r => r.json()).catch(() => ({ drives: [] })),
             fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({})),
             fetch(`${FLASK_BASE}/api/tools/ai-gateway/status`).then(r => r.json()).catch(() => null),
-        ]).then(([regData, cfgData, gwData]) => {
-            setDrives(Array.isArray(regData.drives) ? regData.drives : []);
+        ]).then(([cfgData, gwData]) => {
             setOutputPath(cfgData.output_path || '');
             if (gwData?.status === 'ok') { setGatewayOnline(true); setGatewayModels(gwData.models || []); }
             else setGatewayOnline(false);
-        }).finally(() => setLoadingDrives(false));
+        });
     }, []);
 
     const pickFile = useCallback((path: string, name: string, size: number) => {
         setSelectedFile({ path, name, size });
         setResult(null); setError(null); setProgress(null);
     }, []);
+
+    const handleAppExplorerSelect = useCallback((paths: string[]) => {
+        if (!paths.length) return;
+        pickFile(paths[0], paths[0].split(/[\\/]/).pop() || paths[0], 0);
+    }, [pickFile]);
 
     const browseFiles = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
@@ -425,14 +314,14 @@ export const AudioTranscriberPage: React.FC = () => {
                             )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                            <button onClick={browseFiles} disabled={running} className="btn btn-primary">
-                                <FileAudio className="w-4 h-4" />Browse File
+                            <button type="button" onClick={() => setShowAppExplorer(true)} disabled={running} className="btn btn-primary">
+                                <FolderOpen className="w-4 h-4" />App Explorer
+                            </button>
+                            <button onClick={browseFiles} disabled={running} className="btn btn-secondary">
+                                <Files className="w-4 h-4" />Select Files
                             </button>
                             <button onClick={browseFolder} disabled={running} className="btn btn-secondary">
-                                <FolderOpen className="w-4 h-4" />Browse Folder
-                            </button>
-                            <button onClick={() => setShowBrowser(true)} disabled={loadingDrives || running} className="btn btn-secondary">
-                                <HardDrive className="w-4 h-4" />From Virtual Drive
+                                <FolderSearch className="w-4 h-4" />Select Folder
                             </button>
                         </div>
 
@@ -651,9 +540,12 @@ export const AudioTranscriberPage: React.FC = () => {
                 </div>
             </div>
 
-            {showBrowser && (
-                <FolderBrowser drives={drives} onPickFile={pickFile} onClose={() => setShowBrowser(false)} />
-            )}
+            <FolderPickerModal
+                isOpen={showAppExplorer}
+                mode="file"
+                onSelect={(path) => { handleAppExplorerSelect([path]); setShowAppExplorer(false); }}
+                onClose={() => setShowAppExplorer(false)}
+            />
         </div>
     );
 };

@@ -71,36 +71,6 @@ const FEATURES = [
   },
 ]
 
-const ARCH = `
-┌──────────────────────────────────────────────────────────┐
-│                  Licenta Server  :8000                   │
-│                                                          │
-│  ┌─────────────┐  ┌─────────────────┐  ┌─────────────┐  │
-│  │  Auth       │  │  AI Gateway     │  │  Agent API  │  │
-│  │  /auth/*    │  │  /ai/*          │  │  /agent/*   │  │
-│  │  JWT+Supabase│  │  Swin2SR        │  │  LangGraph  │  │
-│  └─────────────┘  │  Whisper        │  │  AgentPool  │  │
-│                   │  Gemini         │  │  5 workers  │  │
-│                   │  VideoSubtitle  │  └──────┬──────┘  │
-│                   └─────────────────┘         │         │
-│                                               ▼         │
-│                                         Redis Queue     │
-└──────────────────────────────────────────────────────────┘
-         │ tool callbacks          │ SSE streaming
-         ▼                         ▼
-   FileO Desktop App          Browser Client
-`
-
-function InlineCode({ children }: { children: string }) {
-  return (
-    <code style={{
-      fontFamily: 'var(--font-mono)', fontSize: 12, padding: '1px 5px',
-      borderRadius: 4, background: 'var(--surface-2)', color: 'var(--accent-ink)',
-      border: '1px solid var(--border)',
-    }}>{children}</code>
-  )
-}
-
 export default function Home() {
   return (
     <main className="page-body">
@@ -150,18 +120,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Architecture diagram */}
-      <section className="arch-section">
-        <p className="section-label">Architecture</p>
-        <div className="arch-box">
-          <pre>{ARCH}</pre>
-        </div>
-        <p style={{ marginTop: 16, fontSize: 13, color: 'var(--muted)' }}>
-          Three API blueprints: <InlineCode>/auth</InlineCode>, <InlineCode>/ai</InlineCode>, and <InlineCode>/agent</InlineCode>.
-          {' '}Redis for task queuing, Supabase PostgreSQL for persistence.{' '}
-          See the <Link to="/wiki" style={{ color: 'var(--accent-ink)' }}>Wiki</Link> for full API reference.
-        </p>
-      </section>
     </main>
   )
 }

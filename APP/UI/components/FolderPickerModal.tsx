@@ -2,9 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ArrowLeft, ArrowRight, ArrowUp, ChevronRight,
-  Folder, FileText, HardDrive, Monitor,
+  Folder, FileText, HardDrive,
   Image, Music, Film, FileCode,
-  X, Check, Loader2, Download,
+  X, Check, Loader2,
   LayoutGrid, List as ListIcon, Search, Minus,
 } from 'lucide-react';
 
@@ -86,16 +86,6 @@ const SidebarItem: React.FC<{
   </button>
 );
 
-function quickIcon(name: string): React.ReactNode {
-  const n = name.toLowerCase();
-  if (n.includes('desktop'))  return <Monitor  className="w-3.5 h-3.5 text-slate-500" />;
-  if (n.includes('download')) return <Download className="w-3.5 h-3.5 text-green-500" />;
-  if (n.includes('picture') || n.includes('photo')) return <Image className="w-3.5 h-3.5 text-blue-400" />;
-  if (n.includes('document')) return <FileText className="w-3.5 h-3.5 text-amber-500" />;
-  if (n.includes('music'))    return <Music    className="w-3.5 h-3.5 text-purple-400" />;
-  if (n.includes('video'))    return <Film     className="w-3.5 h-3.5 text-pink-400" />;
-  return <Folder className="w-3.5 h-3.5 text-slate-400" />;
-}
 
 function EntryIcon({ name, isDir, size = 'sm' }: { name: string; isDir: boolean; size?: 'sm' | 'lg' }) {
   const cls = size === 'lg' ? 'w-10 h-10' : 'w-4 h-4';
@@ -143,8 +133,6 @@ export const FolderPickerModal: React.FC<Props> = ({
   const [addrEdit,     setAddrEdit]     = useState(false);
   const [addrInput,    setAddrInput]    = useState('');
   const [drives,       setDrives]       = useState<Drive[]>([]);
-  const [pcDrives,     setPcDrives]     = useState<string[]>([]);
-  const [quickAccess,  setQuickAccess]  = useState<Record<string, string>>({});
   const [searchQuery,  setSearchQuery]  = useState('');
 
   const addrRef = useRef<HTMLInputElement>(null);
@@ -227,15 +215,6 @@ export const FolderPickerModal: React.FC<Props> = ({
       })
       .catch(() => setDrives(local));
 
-    fetch(`${FLASK}/api/tools/space-analyzer/drives`)
-      .then(r => r.json())
-      .then(d => setPcDrives(d.drives || []))
-      .catch(() => setPcDrives([]));
-
-    fetch(`${FLASK}/api/tools/user-folders`)
-      .then(r => r.json())
-      .then(d => setQuickAccess(d))
-      .catch(() => setQuickAccess({}));
   }, [isOpen]);
 
   const displayEntries = searchQuery
@@ -435,34 +414,12 @@ export const FolderPickerModal: React.FC<Props> = ({
           {/* Sidebar */}
           <div className="w-56 shrink-0 border-r border-slate-200 dark:border-slate-700 overflow-y-auto bg-slate-50/60 dark:bg-slate-800/30 py-3 space-y-4">
 
-            {Object.keys(quickAccess).length > 0 && (
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 px-4 pb-1.5">Quick Access</p>
-                <div className="px-2 space-y-0.5">
-                  {Object.entries(quickAccess).map(([name, path]) => (
-                    <SidebarItem key={path} label={name} icon={quickIcon(name)} active={current === path} onClick={() => goTo(path)} />
-                  ))}
-                </div>
-              </div>
-            )}
-
             {drives.length > 0 && (
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 px-4 pb-1.5">Virtual Drives</p>
                 <div className="px-2 space-y-0.5">
                   {drives.map(d => (
                     <SidebarItem key={d.path} label={d.name || d.path} icon={<HardDrive className="w-3.5 h-3.5 text-blue-500" />} active={current === d.path} onClick={() => goTo(d.path)} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {pcDrives.length > 0 && (
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 px-4 pb-1.5">This PC</p>
-                <div className="px-2 space-y-0.5">
-                  {pcDrives.map(d => (
-                    <SidebarItem key={d} label={`${d}: Local Disk`} icon={<Monitor className="w-3.5 h-3.5 text-slate-500" />} active={current === `${d}:\\`} onClick={() => goTo(`${d}:\\`)} />
                   ))}
                 </div>
               </div>
@@ -490,25 +447,9 @@ export const FolderPickerModal: React.FC<Props> = ({
                     </div>
                   </>
                 )}
-                {pcDrives.length > 0 && (
-                  <>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">This PC</p>
-                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
-                      {pcDrives.map(d => (
-                        <button key={d} onClick={() => goTo(`${d}:\\`)} className="flex flex-col items-center gap-2 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center group">
-                          <Monitor className="w-9 h-9 text-slate-500 group-hover:text-slate-600 transition-colors" />
-                          <div>
-                            <p className="text-xs font-medium text-slate-700 dark:text-slate-200">{d}: Local Disk</p>
-                            <p className="text-[10px] text-slate-400 font-mono">{d}:\</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-                {drives.length === 0 && pcDrives.length === 0 && (
+                {drives.length === 0 && (
                   <div className="flex flex-col items-center justify-center gap-2 text-slate-400 py-20">
-                    <Monitor className="w-10 h-10 opacity-30" />
+                    <HardDrive className="w-10 h-10 opacity-30" />
                     <p className="text-sm">No drives found</p>
                   </div>
                 )}

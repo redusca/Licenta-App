@@ -66,6 +66,7 @@ _PLAN_SYSTEM = """\
 You are the AI assistant built into a desktop file-management application.
 You help users manage files, virtual drives, and media using the tools listed below.
 You do NOT have internet access. Answer only from the tool list and conversation history.
+Always respond in English regardless of the language used in the user's message.
 
 IMPORTANT — choose the simplest approach that works:
 
@@ -172,6 +173,7 @@ _EXECUTOR_SYSTEM = """\
 You are the AI assistant built into a desktop file-management application.
 You help users manage files, virtual drives, and media. You do NOT have internet access.
 Only answer from the information below — never invent external services or URLs.
+Always respond in English.
 
 Overall task: {task}
 
@@ -190,6 +192,7 @@ Answer in plain text or markdown.
 _SYNTHESIZER_SYSTEM = """\
 You are the AI assistant built into a desktop file-management application.
 You help users manage files, virtual drives, and media. You do NOT have internet access.
+Always respond in English.
 
 The user asked: {task}
 
@@ -543,13 +546,13 @@ async def _call_tool(tool: dict, input_data: dict) -> str:
 # ---------------------------------------------------------------------------
 
 def _step_label(step_id: int, total: int, desc: str) -> str:
-    return f"Pasul {step_id}/{total}: {desc}"
+    return f"Step {step_id}/{total}: {desc}"
 
 
 def _input_preview(input_data: dict, max_len: int = 80) -> str:
     """Short one-line summary of tool input arguments."""
     if not input_data:
-        return "(fără parametri)"
+        return "(no parameters)"
     parts = [f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in input_data.items()]
     preview = ", ".join(parts)
     return preview if len(preview) <= max_len else preview[:max_len] + "…"
@@ -586,25 +589,25 @@ async def run_planning_agent(
     # ── 1. Planning ─────────────────────────────────────────────────────────
     yield {
         "type": "status",
-        "message": "Analizez cererea și creez planul de execuție…",
+        "message": "Analyzing request and creating execution plan…",
     }
     try:
         steps = await _plan(message, tools, history)
     except Exception as exc:
         logger.exception("Planning failed")
-        yield {"type": "error", "message": f"Eroare la planificare: {exc}"}
+        yield {"type": "error", "message": f"Planning error: {exc}"}
         return
 
     if not steps:
-        yield {"type": "error", "message": "Agentul nu a putut genera un plan valid."}
+        yield {"type": "error", "message": "Agent could not generate a valid plan."}
         return
 
     total = len(steps)
     tool_steps  = sum(1 for s in steps if s.get("type") == "tool")
     llm_steps   = total - tool_steps
     plan_summary = (
-        f"Plan gata: {total} {'pas' if total == 1 else 'pași'}"
-        + (f" ({tool_steps} tool{'uri' if tool_steps != 1 else ''}" if tool_steps else "")
+        f"Plan ready: {total} {'step' if total == 1 else 'steps'}"
+        + (f" ({tool_steps} tool{'s' if tool_steps != 1 else ''}" if tool_steps else "")
         + (f", {llm_steps} LLM" if llm_steps and tool_steps else
            f" ({llm_steps} LLM" if llm_steps else "")
         + (")" if tool_steps or llm_steps else "")
@@ -667,7 +670,7 @@ async def run_planning_agent(
                                 "step_id": step_id,
                                 "tool": "ask_user",
                                 "input": auto_ask_input,
-                                "message": "Cer folderul sursă pentru scanare…",
+                                "message": "Requesting source folder for scan…",
                             }
                             ask_result = await _call_tool(ask_tool, auto_ask_input)
                             yield {
@@ -675,7 +678,7 @@ async def run_planning_agent(
                                 "step_id": step_id,
                                 "tool": "ask_user",
                                 "result": ask_result,
-                                "message": f"Folder ales: {ask_result[:80]}",
+                                "message": f"Folder selected: {ask_result[:80]}",
                             }
                             if (
                                 not ask_result.startswith("[Error]")
@@ -697,13 +700,13 @@ async def run_planning_agent(
             # ── end injection B ───────────────────────────────────────────────
 
             if tool_obj is None:
-                err = f"Tool '{tool_name}' nu a fost găsit în lista de tool-uri."
+                err = f"Tool '{tool_name}' not found in tool list."
                 yield {
                     "type": "tool_error",
                     "step_id": step_id,
                     "tool": tool_name,
                     "error": err,
-                    "message": f"Eroare: {err}",
+                    "message": f"Error: {err}",
                 }
                 result = f"[Error] {err}"
             else:
@@ -712,7 +715,7 @@ async def run_planning_agent(
                     "step_id": step_id,
                     "tool": tool_name,
                     "input": tool_input,
-                    "message": f"Apelez tool: {tool_name}({_input_preview(tool_input)})",
+                    "message": f"Calling tool: {tool_name}({_input_preview(tool_input)})",
                 }
                 result = await _call_tool(tool_obj, tool_input)
                 is_error = result.startswith("[Error]")
@@ -722,9 +725,9 @@ async def run_planning_agent(
                     "tool": tool_name,
                     "result": result,
                     "message": (
-                        f"Eroare de la {tool_name}: {result[8:80]}"
+                        f"Error from {tool_name}: {result[8:80]}"
                         if is_error
-                        else f"Tool {tool_name} a returnat un rezultat"
+                        else f"Tool {tool_name} returned a result"
                     ),
                 }
 
@@ -780,7 +783,7 @@ async def run_planning_agent(
             yield {
                 "type": "llm_start",
                 "step_id": step_id,
-                "message": f"Mă gândesc: {step_desc}…",
+                "message": f"Thinking: {step_desc}…",
             }
             chunks: list[str] = []
             try:
@@ -791,20 +794,20 @@ async def run_planning_agent(
             except Exception as exc:
                 logger.exception("LLM step %d failed", step_id)
                 result = f"[Error] LLM step failed: {exc}"
-                yield {"type": "error", "message": f"Eroare la pasul LLM {step_id}: {exc}"}
+                yield {"type": "error", "message": f"Error in LLM step {step_id}: {exc}"}
 
         step_results.append({"id": step_id, "description": step_desc, "result": result})
         yield {
             "type": "step_done",
             "step_id": step_id,
             "result": result,
-            "message": f"Pasul {step_id} finalizat",
+            "message": f"Step {step_id} complete",
         }
 
     # ── 3. Synthesize ────────────────────────────────────────────────────────
     yield {
         "type": "status",
-        "message": f"Am completat toți cei {total} pași. Formulez răspunsul final…",
+        "message": f"Completed all {total} steps. Writing final answer…",
     }
     final_chunks: list[str] = []
     try:
@@ -813,9 +816,9 @@ async def run_planning_agent(
             final_chunks.append(chunk)
     except Exception as exc:
         logger.exception("Synthesis failed")
-        yield {"type": "error", "message": f"Eroare la sinteza finală: {exc}"}
+        yield {"type": "error", "message": f"Error in final synthesis: {exc}"}
         return
 
     final_response = "".join(final_chunks)
     add_message(api_key, chat_id, "assistant", final_response)
-    yield {"type": "final", "response": final_response, "message": "Răspuns complet"}
+    yield {"type": "final", "response": final_response, "message": "Response complete"}

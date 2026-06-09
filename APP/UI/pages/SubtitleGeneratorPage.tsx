@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, ChevronRight, HardDrive, FolderOpen,
-    RefreshCw, X, CheckCircle, AlertCircle, Film,
-    Folder, ChevronLeft, Copy, Download, Cpu, ZapOff, Zap, Check,
+    ArrowLeft, ChevronRight, FolderOpen, Files, FolderSearch,
+    RefreshCw, CheckCircle, AlertCircle, Film,
+    Copy, Download, Cpu, ZapOff, Zap, Check,
     Languages, FileText,
 } from 'lucide-react';
+import { FolderPickerModal } from '../components/FolderPickerModal';
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.wmv', '.m4v', '.mpeg', '.mpg']);
@@ -48,8 +49,6 @@ const TRANSLATE_LANGUAGES = [
     { value: 'pl', label: 'Polish' },
 ];
 
-interface DriveEntry { name: string; path: string; config?: { name: string } }
-interface DirItem { name: string; path: string; is_dir: boolean; size: number }
 type OutputMode = 'copy' | 'virtual_drive';
 interface GatewayModel { name: string; is_loaded: boolean; device: string; task: string }
 interface Progress { stage: string; message: string; pct: number }
@@ -134,141 +133,11 @@ function MetricRow({ label, value, last }: { label: string; value: string; last?
     );
 }
 
-// ── Folder browser modal ──────────────────────────────────────────────────────
-function FolderBrowser({
-    drives, onPickFile, onClose,
-}: {
-    drives: DriveEntry[];
-    onPickFile: (path: string, name: string, size: number) => void;
-    onClose: () => void;
-}) {
-    const [currentDrive, setCurrentDrive] = useState<DriveEntry | null>(null);
-    const [currentPath, setCurrentPath] = useState('');
-    const [entries, setEntries] = useState<DirItem[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    const loadPath = async (path: string) => {
-        setLoading(true);
-        try {
-            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(path)}`);
-            const data = await res.json();
-            setEntries((data.files || [])
-                .filter((f: any) => f.is_dir || isVideoFile(f.name))
-                .map((f: any) => ({ name: f.name, path: f.path, is_dir: f.is_dir, size: f.size || 0 })));
-            setCurrentPath(path);
-        } catch { setEntries([]); } finally { setLoading(false); }
-    };
-
-    const navigateUp = () => {
-        if (!currentPath || !currentDrive) return;
-        const parent = currentPath.replace(/[\\/][^\\/]+$/, '');
-        const driveRoot = currentDrive.path.replace(/[\\/]+$/, '');
-        const np = parent.replace(/[\\/]+$/, '');
-        if (np && np !== currentPath.replace(/[\\/]+$/, '') && np.length >= driveRoot.length) loadPath(parent);
-    };
-
-    return (
-        <div style={{
-            position: 'fixed', inset: 0, zIndex: 50,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'oklch(0 0 0 / 0.5)', backdropFilter: 'blur(4px)',
-        }}>
-            <div style={{
-                ...card, padding: 0,
-                width: '100%', maxWidth: 640, maxHeight: '80vh',
-                display: 'flex', flexDirection: 'column',
-                boxShadow: 'var(--shadow-lg)',
-            }}>
-                {/* Header */}
-                <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '16px 20px', borderBottom: '1px solid var(--border)',
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {currentDrive && currentPath.replace(/[\\/]+$/, '') !== currentDrive.path.replace(/[\\/]+$/, '') && (
-                            <button onClick={navigateUp} className="btn btn-ghost" style={{ padding: 6 }}>
-                                <ChevronLeft style={{ width: 16, height: 16 }} />
-                            </button>
-                        )}
-                        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
-                            {currentDrive ? (currentDrive.config?.name ?? currentDrive.name) : 'Select a Drive'}
-                        </h3>
-                        {currentPath && (
-                            <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240, whiteSpace: 'nowrap' }}>
-                                {currentPath}
-                            </span>
-                        )}
-                    </div>
-                    <button onClick={onClose} className="btn btn-ghost" style={{ padding: 6 }}>
-                        <X style={{ width: 16, height: 16 }} />
-                    </button>
-                </div>
-
-                {/* Content */}
-                <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
-                    {!currentDrive ? (
-                        drives.length === 0 ? (
-                            <p style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)', fontSize: 13 }}>No virtual drives found.</p>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                {drives.map((d, i) => (
-                                    <button key={i} onClick={() => { setCurrentDrive(d); loadPath(d.path); }}
-                                        className="btn btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', gap: 12, padding: '10px 12px', textAlign: 'left' }}>
-                                        <HardDrive style={{ width: 18, height: 18, color: 'var(--c-sky)', flexShrink: 0 }} />
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.config?.name ?? d.name}</p>
-                                            <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.path}</p>
-                                        </div>
-                                        <ChevronRight style={{ width: 14, height: 14, color: 'var(--muted)', flexShrink: 0 }} />
-                                    </button>
-                                ))}
-                            </div>
-                        )
-                    ) : loading ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--muted)', gap: 8 }}>
-                            <RefreshCw style={{ width: 18, height: 18 }} className="spin" />
-                            <span style={{ fontSize: 13 }}>Loading...</span>
-                        </div>
-                    ) : entries.length === 0 ? (
-                        <p style={{ textAlign: 'center', padding: '48px 0', color: 'var(--muted)', fontSize: 13 }}>No video files or folders here.</p>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            {entries.map(entry => entry.is_dir ? (
-                                <button key={entry.path} onClick={() => loadPath(entry.path)}
-                                    className="btn btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', gap: 10, padding: '8px 12px' }}>
-                                    <Folder style={{ width: 15, height: 15, color: 'var(--c-ochre)', flexShrink: 0 }} />
-                                    <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{entry.name}</span>
-                                    <ChevronRight style={{ width: 13, height: 13, color: 'var(--muted)', flexShrink: 0 }} />
-                                </button>
-                            ) : (
-                                <button key={entry.path}
-                                    onClick={() => { onPickFile(entry.path, entry.name, entry.size); onClose(); }}
-                                    className="btn btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', gap: 10, padding: '8px 12px' }}>
-                                    <Film style={{ width: 15, height: 15, color: 'var(--c-clay)', flexShrink: 0 }} />
-                                    <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{entry.name}</span>
-                                    <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{fmtSize(entry.size)}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button onClick={onClose} className="btn btn-secondary" style={{ fontSize: 13 }}>Cancel</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 export const SubtitleGeneratorPage: React.FC = () => {
     const navigate = useNavigate();
-    const [drives, setDrives] = useState<DriveEntry[]>([]);
     const [outputPath, setOutputPath] = useState('');
-    const [loadingDrives, setLoadingDrives] = useState(true);
-    const [showBrowser, setShowBrowser] = useState(false);
+    const [showAppExplorer, setShowAppExplorer] = useState(false);
 
     const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null);
     const [sourceLanguage, setSourceLanguage] = useState('auto');
@@ -285,23 +154,25 @@ export const SubtitleGeneratorPage: React.FC = () => {
     const [gatewayOnline, setGatewayOnline] = useState<boolean | null>(null);
 
     useEffect(() => {
-        setLoadingDrives(true);
         Promise.all([
-            fetch(`${FLASK_BASE}/api/drive/registry`).then(r => r.json()).catch(() => ({ drives: [] })),
             fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({})),
             fetch(`${FLASK_BASE}/api/tools/ai-gateway/status`).then(r => r.json()).catch(() => null),
-        ]).then(([regData, cfgData, gwData]) => {
-            setDrives(Array.isArray(regData.drives) ? regData.drives : []);
+        ]).then(([cfgData, gwData]) => {
             setOutputPath(cfgData.output_path || '');
             if (gwData?.status === 'ok') { setGatewayOnline(true); setGatewayModels(gwData.models || []); }
             else setGatewayOnline(false);
-        }).finally(() => setLoadingDrives(false));
+        });
     }, []);
 
     const pickFile = useCallback((path: string, name: string, size: number) => {
         setSelectedFile({ path, name, size });
         setResult(null); setError(null); setProgress(null);
     }, []);
+
+    const handleAppExplorerSelect = useCallback((paths: string[]) => {
+        if (!paths.length) return;
+        pickFile(paths[0], paths[0].split(/[\\/]/).pop() || paths[0], 0);
+    }, [pickFile]);
 
     const browseFiles = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
@@ -444,16 +315,14 @@ export const SubtitleGeneratorPage: React.FC = () => {
                         </div>
 
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button onClick={browseFiles} disabled={running} className="btn"
-                                style={{ background: 'var(--c-clay)', color: 'white', fontSize: 13, opacity: running ? 0.5 : 1 }}>
-                                <Film style={{ width: 14, height: 14 }} />Browse File
+                            <button type="button" onClick={() => setShowAppExplorer(true)} disabled={running} className="btn btn-primary" style={{ fontSize: 13 }}>
+                                <FolderOpen style={{ width: 14, height: 14 }} />App Explorer
+                            </button>
+                            <button onClick={browseFiles} disabled={running} className="btn btn-secondary" style={{ fontSize: 13, opacity: running ? 0.5 : 1 }}>
+                                <Files style={{ width: 14, height: 14 }} />Select Files
                             </button>
                             <button onClick={browseFolder} disabled={running} className="btn btn-secondary" style={{ fontSize: 13, opacity: running ? 0.5 : 1 }}>
-                                <FolderOpen style={{ width: 14, height: 14 }} />Browse Folder
-                            </button>
-                            <button onClick={() => setShowBrowser(true)} disabled={loadingDrives || running}
-                                className="btn btn-secondary" style={{ fontSize: 13, opacity: (loadingDrives || running) ? 0.5 : 1 }}>
-                                <HardDrive style={{ width: 14, height: 14 }} />From Virtual Drive
+                                <FolderSearch style={{ width: 14, height: 14 }} />Select Folder
                             </button>
                         </div>
 
@@ -716,9 +585,12 @@ export const SubtitleGeneratorPage: React.FC = () => {
                 </div>
             </div>
 
-            {showBrowser && (
-                <FolderBrowser drives={drives} onPickFile={pickFile} onClose={() => setShowBrowser(false)} />
-            )}
+            <FolderPickerModal
+                isOpen={showAppExplorer}
+                mode="file"
+                onSelect={(path) => { handleAppExplorerSelect([path]); setShowAppExplorer(false); }}
+                onClose={() => setShowAppExplorer(false)}
+            />
         </div>
     );
 };

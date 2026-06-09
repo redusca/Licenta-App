@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, ChevronRight, HardDrive, FolderOpen,
-    Monitor, X, CheckCircle, AlertCircle, FileImage,
+    Files, FolderSearch, X, CheckCircle, AlertCircle, FileImage,
     Check, Minus, Play, Loader2,
     Copy, PenTool, ChevronDown, ChevronUp, Code2,
 } from 'lucide-react';
@@ -176,17 +176,26 @@ export const ImageToSvgPage: React.FC = () => {
         });
     }, []);
 
-    const browseWindows = async () => {
+    const browseFiles = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
             filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
         });
         if (!paths || paths.length === 0) return;
-        const newFiles: FileItem[] = paths.map((p: string) => ({
-            path: p,
-            name: p.split(/[\\\/]/).pop() || p,
-            size: 0,
-        }));
-        addFiles(newFiles);
+        addFiles(paths.map((p: string) => ({ path: p, name: p.split(/[\\\/]/).pop() || p, size: 0 })));
+    };
+
+    const browseFolder = async () => {
+        const dir = await (window as any).electronAPI?.selectDirectory?.();
+        if (!dir) return;
+        try {
+            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(dir)}`);
+            const data = await res.json();
+            const entries: { name: string; path: string; size: number; is_dir: boolean }[] = data.entries ?? [];
+            const newFiles = entries
+                .filter(e => !e.is_dir && IMAGE_EXTENSIONS.has('.' + (e.name.split('.').pop() ?? '').toLowerCase()))
+                .map(e => ({ path: e.path, name: e.name, size: e.size }));
+            if (newFiles.length > 0) addFiles(newFiles);
+        } catch { /* ignore */ }
     };
 
     const handleAppExplorerSelect = (paths: string[]) => {
@@ -328,18 +337,17 @@ export const ImageToSvgPage: React.FC = () => {
                             )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                            <button type="button" onClick={browseFiles} className="btn btn-primary">
-                                <FileImage className="w-4 h-4" />
-                                Browse Files
+                            <button type="button" onClick={() => setShowAppExplorer(true)} className="btn btn-primary">
+                                <FolderOpen className="w-4 h-4" />
+                                App Explorer
+                            </button>
+                            <button type="button" onClick={browseFiles} className="btn btn-secondary">
+                                <Files className="w-4 h-4" />
+                                Select Files
                             </button>
                             <button type="button" onClick={browseFolder} className="btn btn-secondary">
-                                <FolderOpen className="w-4 h-4" />
-                                Browse Folder
-                            </button>
-                            <button type="button" onClick={() => setShowBrowser(true)} disabled={loadingDrives}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-40">
-                                <HardDrive className="w-4 h-4" />
-                                From Virtual Drive
+                                <FolderSearch className="w-4 h-4" />
+                                Select Folder
                             </button>
                         </div>
 
@@ -596,12 +604,15 @@ export const ImageToSvgPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Drive browser modal */}
-            {showBrowser && (
-                <FolderBrowser
-                    drives={drives}
-                    onPickFiles={addFiles}
-                    onClose={() => setShowBrowser(false)}
+            {showAppExplorer && (
+                <FolderPickerModal
+                    isOpen
+                    mode="file"
+                    multiSelect
+                    title="Select image files"
+                    onClose={() => setShowAppExplorer(false)}
+                    onSelect={path => { handleAppExplorerSelect([path]); setShowAppExplorer(false); }}
+                    onSelectMultiple={paths => { handleAppExplorerSelect(paths); setShowAppExplorer(false); }}
                 />
             )}
         </div>

@@ -1,17 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, ChevronRight, BarChart2, FolderOpen, HardDrive,
-    RefreshCw, X, CheckCircle, AlertCircle, FileText,
-    Folder, ChevronLeft, Cpu, Zap, ZapOff, Brain, Hash,
+    ArrowLeft, ChevronRight, BarChart2, FolderOpen, Files, FolderSearch,
+    RefreshCw, CheckCircle, AlertCircle, FileText,
+    Cpu, Zap, ZapOff, Brain, Hash,
     Clock, BookOpen, AlignLeft, Tag, Search,
 } from 'lucide-react';
+import { FolderPickerModal } from '../components/FolderPickerModal';
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
 const DOC_EXTENSIONS = new Set(['.pdf', '.docx', '.txt', '.md', '.html', '.htm']);
-
-interface DriveEntry { name: string; path: string; config?: { name: string } }
-interface DirItem { name: string; path: string; is_dir: boolean; size: number }
 
 interface DocStats {
     word_count: number;
@@ -106,135 +104,10 @@ function FleschBar({ score }: { score: number }) {
     );
 }
 
-// ── Folder browser modal ──────────────────────────────────────────────────────
-function FolderBrowser({
-    drives, onPickFile, onClose,
-}: {
-    drives: DriveEntry[];
-    onPickFile: (path: string, name: string, size: number) => void;
-    onClose: () => void;
-}) {
-    const [currentDrive, setCurrentDrive] = useState<DriveEntry | null>(null);
-    const [currentPath, setCurrentPath] = useState('');
-    const [entries, setEntries] = useState<DirItem[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    const loadPath = async (path: string) => {
-        setLoading(true);
-        try {
-            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(path)}`);
-            const data = await res.json();
-            setEntries((data.files || [])
-                .filter((f: any) => f.is_dir || isDocFile(f.name))
-                .map((f: any) => ({ name: f.name, path: f.path, is_dir: f.is_dir, size: f.size || 0 })));
-            setCurrentPath(path);
-        } catch { setEntries([]); } finally { setLoading(false); }
-    };
-
-    const navigateUp = () => {
-        if (!currentPath || !currentDrive) return;
-        const parent = currentPath.replace(/[\\/][^\\/]+$/, '');
-        const driveRoot = currentDrive.path.replace(/[\\/]+$/, '');
-        const np = parent.replace(/[\\/]+$/, '');
-        if (np && np !== currentPath.replace(/[\\/]+$/, '') && np.length >= driveRoot.length) loadPath(parent);
-    };
-
-    return (
-        <div style={{
-            position: 'fixed', inset: 0, zIndex: 50,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'oklch(0 0 0 / 0.5)', backdropFilter: 'blur(4px)',
-        }}>
-            <div style={{
-                ...card, padding: 0,
-                width: '100%', maxWidth: 640, maxHeight: '80vh',
-                display: 'flex', flexDirection: 'column',
-                boxShadow: 'var(--shadow-lg)',
-            }}>
-                <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '16px 20px', borderBottom: '1px solid var(--border)',
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        {currentDrive && currentPath.replace(/[\\/]+$/, '') !== currentDrive.path.replace(/[\\/]+$/, '') && (
-                            <button onClick={navigateUp} className="btn btn-ghost" style={{ padding: 6 }}>
-                                <ChevronLeft style={{ width: 16, height: 16 }} />
-                            </button>
-                        )}
-                        <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>
-                            {currentDrive ? (currentDrive.config?.name ?? currentDrive.name) : 'Select a Drive'}
-                        </h3>
-                        {currentPath && (
-                            <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240, whiteSpace: 'nowrap' }}>
-                                {currentPath}
-                            </span>
-                        )}
-                    </div>
-                    <button onClick={onClose} className="btn btn-ghost" style={{ padding: 6 }}>
-                        <X style={{ width: 16, height: 16 }} />
-                    </button>
-                </div>
-                <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
-                    {!currentDrive ? (
-                        drives.length === 0 ? (
-                            <p style={{ textAlign: 'center', padding: '32px 0', color: 'var(--muted)', fontSize: 13 }}>No virtual drives found.</p>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                                {drives.map((d, i) => (
-                                    <button key={i} onClick={() => { setCurrentDrive(d); loadPath(d.path); }}
-                                        className="btn btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', gap: 12, padding: '10px 12px', textAlign: 'left' }}>
-                                        <HardDrive style={{ width: 18, height: 18, color: 'var(--c-sky)', flexShrink: 0 }} />
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.config?.name ?? d.name}</p>
-                                            <p style={{ margin: 0, fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.path}</p>
-                                        </div>
-                                        <ChevronRight style={{ width: 14, height: 14, color: 'var(--muted)', flexShrink: 0 }} />
-                                    </button>
-                                ))}
-                            </div>
-                        )
-                    ) : loading ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 0', color: 'var(--muted)', gap: 8 }}>
-                            <RefreshCw style={{ width: 18, height: 18 }} className="spin" />
-                            <span style={{ fontSize: 13 }}>Loading...</span>
-                        </div>
-                    ) : entries.length === 0 ? (
-                        <p style={{ textAlign: 'center', padding: '48px 0', color: 'var(--muted)', fontSize: 13 }}>No documents or folders here.</p>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            {entries.map(entry => entry.is_dir ? (
-                                <button key={entry.path} onClick={() => loadPath(entry.path)}
-                                    className="btn btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', gap: 10, padding: '8px 12px' }}>
-                                    <Folder style={{ width: 15, height: 15, color: 'var(--c-ochre)', flexShrink: 0 }} />
-                                    <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{entry.name}</span>
-                                    <ChevronRight style={{ width: 13, height: 13, color: 'var(--muted)', flexShrink: 0 }} />
-                                </button>
-                            ) : (
-                                <button key={entry.path}
-                                    onClick={() => { onPickFile(entry.path, entry.name, entry.size); onClose(); }}
-                                    className="btn btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', gap: 10, padding: '8px 12px' }}>
-                                    <FileText style={{ width: 15, height: 15, color: ACCENT, flexShrink: 0 }} />
-                                    <span style={{ flex: 1, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>{entry.name}</span>
-                                    <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>{fmtSize(entry.size)}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button onClick={onClose} className="btn btn-secondary" style={{ fontSize: 13 }}>Cancel</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 export const DocumentAnalyticsPage: React.FC = () => {
     const navigate = useNavigate();
-    const [drives, setDrives] = useState<DriveEntry[]>([]);
-    const [loadingDrives, setLoadingDrives] = useState(true);
-    const [showBrowser, setShowBrowser] = useState(false);
+    const [showAppExplorer, setShowAppExplorer] = useState(false);
     const [gatewayOnline, setGatewayOnline] = useState<boolean | null>(null);
     const [llmConfigured, setLlmConfigured] = useState<boolean | null>(null);
 
@@ -246,22 +119,24 @@ export const DocumentAnalyticsPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        setLoadingDrives(true);
         Promise.all([
-            fetch(`${FLASK_BASE}/api/drive/registry`).then(r => r.json()).catch(() => ({ drives: [] })),
             fetch(`${FLASK_BASE}/api/tools/ai-gateway/status`).then(r => r.json()).catch(() => null),
             fetch('http://localhost:8000/api/ai/llm/status').then(r => r.json()).catch(() => null),
-        ]).then(([regData, gwData, llmData]) => {
-            setDrives(Array.isArray(regData.drives) ? regData.drives : []);
+        ]).then(([gwData, llmData]) => {
             setGatewayOnline(gwData?.status === 'ok');
             setLlmConfigured(llmData?.configured ?? null);
-        }).finally(() => setLoadingDrives(false));
+        });
     }, []);
 
     const pickFile = useCallback((path: string, name: string, size: number) => {
         setSelectedFile({ path, name, size });
         setResult(null); setError(null);
     }, []);
+
+    const handleAppExplorerSelect = useCallback((paths: string[]) => {
+        if (!paths.length) return;
+        pickFile(paths[0], paths[0].split(/[\\/]/).pop() || paths[0], 0);
+    }, [pickFile]);
 
     const browseFiles = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
@@ -301,12 +176,6 @@ export const DocumentAnalyticsPage: React.FC = () => {
 
     const canRun = !!selectedFile && !analyzing;
 
-    const selectStyle: React.CSSProperties = {
-        width: '100%', fontSize: 13, padding: '8px 12px',
-        borderRadius: 'var(--r-control)', outline: 'none',
-        background: 'var(--surface-2)', border: '1px solid var(--border)',
-        color: 'var(--ink)', appearance: 'auto',
-    };
 
     return (
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -360,16 +229,14 @@ export const DocumentAnalyticsPage: React.FC = () => {
                             )}
                         </div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button onClick={browseFiles} disabled={analyzing} className="btn"
-                                style={{ background: ACCENT, color: 'white', fontSize: 13, opacity: analyzing ? 0.5 : 1 }}>
-                                <FileText style={{ width: 14, height: 14 }} />Browse File
+                            <button type="button" onClick={() => setShowAppExplorer(true)} disabled={analyzing} className="btn btn-primary" style={{ fontSize: 13 }}>
+                                <FolderOpen style={{ width: 14, height: 14 }} />App Explorer
+                            </button>
+                            <button onClick={browseFiles} disabled={analyzing} className="btn btn-secondary" style={{ fontSize: 13, opacity: analyzing ? 0.5 : 1 }}>
+                                <Files style={{ width: 14, height: 14 }} />Select Files
                             </button>
                             <button onClick={browseFolder} disabled={analyzing} className="btn btn-secondary" style={{ fontSize: 13, opacity: analyzing ? 0.5 : 1 }}>
-                                <FolderOpen style={{ width: 14, height: 14 }} />Browse Folder
-                            </button>
-                            <button onClick={() => setShowBrowser(true)} disabled={loadingDrives || analyzing}
-                                className="btn btn-secondary" style={{ fontSize: 13, opacity: (loadingDrives || analyzing) ? 0.5 : 1 }}>
-                                <HardDrive style={{ width: 14, height: 14 }} />From Virtual Drive
+                                <FolderSearch style={{ width: 14, height: 14 }} />Select Folder
                             </button>
                         </div>
 
@@ -448,7 +315,7 @@ export const DocumentAnalyticsPage: React.FC = () => {
                                         { label: 'Unique words', value: fmtNum(result.stats.unique_words), icon: Search },
                                         { label: 'Est. pages', value: result.stats.estimated_pages.toFixed(1), icon: BookOpen },
                                         { label: 'Reading time', value: result.stats.reading_time_min < 1 ? `${Math.round(result.stats.reading_time_min * 60)} sec` : `${result.stats.reading_time_min.toFixed(1)} min`, icon: Clock },
-                                    ].map(({ label, value, icon: Icon }) => (
+                                    ].map(({ label, value }) => (
                                         <div key={label} style={{
                                             padding: '12px 14px', borderRadius: 'var(--r-control)',
                                             background: 'var(--surface-2)', border: '1px solid var(--border)',
@@ -690,9 +557,12 @@ export const DocumentAnalyticsPage: React.FC = () => {
                 </div>
             </div>
 
-            {showBrowser && (
-                <FolderBrowser drives={drives} onPickFile={pickFile} onClose={() => setShowBrowser(false)} />
-            )}
+            <FolderPickerModal
+                isOpen={showAppExplorer}
+                mode="file"
+                onSelect={(path) => { handleAppExplorerSelect([path]); setShowAppExplorer(false); }}
+                onClose={() => setShowAppExplorer(false)}
+            />
         </div>
     );
 };

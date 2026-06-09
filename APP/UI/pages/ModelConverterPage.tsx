@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, Box, ChevronRight, HardDrive, FolderOpen,
-    RefreshCw, X, CheckCircle, AlertCircle, FileBox,
-    Folder, ChevronLeft, Check, Minus, Play, Loader2, ExternalLink,
+    ArrowLeft, Box, ChevronRight, HardDrive, FolderOpen, Files, FolderSearch,
+    X, CheckCircle, AlertCircle,
+    Check, Minus, Play, Loader2, ExternalLink,
 } from 'lucide-react';
+import { FolderPickerModal } from '../components/FolderPickerModal';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -14,9 +15,7 @@ const OUTPUT_FORMATS = ['obj', 'fbx', 'glb', 'gltf', 'stl', 'ply', 'dae'];
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-interface DriveEntry { name: string; path: string; config?: { name: string } }
 interface FileItem { path: string; name: string; size: number; outputFormat: string }
-interface DirItem { name: string; path: string; is_dir: boolean; size: number }
 type OutputMode = 'replace' | 'copy' | 'virtual_drive';
 type FileStatus = 'pending' | 'converting' | 'done' | 'failed';
 interface FileResult {
@@ -46,235 +45,25 @@ function fmtLabel(fmt: string): string {
     return fmt.toUpperCase();
 }
 
-// ── Drive folder browser modal ───────────────────────────────────────────────
-
-function FolderBrowser({
-    drives,
-    onPickFiles,
-    onClose,
-    globalFormat,
-}: {
-    drives: DriveEntry[];
-    onPickFiles: (files: FileItem[]) => void;
-    onClose: () => void;
-    globalFormat: string;
-}) {
-    const [currentDrive, setCurrentDrive] = useState<DriveEntry | null>(null);
-    const [currentPath, setCurrentPath] = useState('');
-    const [entries, setEntries] = useState<DirItem[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [selected, setSelected] = useState<Set<string>>(new Set());
-
-    const loadPath = async (path: string) => {
-        setLoading(true);
-        try {
-            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(path)}`);
-            const data = await res.json();
-            const items: DirItem[] = (data.files || [])
-                .filter((f: any) => f.is_dir || isModelFile(f.name))
-                .map((f: any) => ({ name: f.name, path: f.path, is_dir: f.is_dir, size: f.size || 0 }));
-            setEntries(items);
-            setCurrentPath(path);
-            setSelected(new Set());
-        } catch {
-            setEntries([]);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const selectDrive = (d: DriveEntry) => {
-        setCurrentDrive(d);
-        loadPath(d.path);
-    };
-
-    const navigateUp = () => {
-        if (!currentPath || !currentDrive) return;
-        const parent = currentPath.replace(/[\\/][^\\/]+$/, '');
-        const driveRoot = currentDrive.path.replace(/[\\/]+$/, '');
-        const normalizedParent = parent.replace(/[\\/]+$/, '');
-        if (normalizedParent && normalizedParent !== currentPath.replace(/[\\/]+$/, '') && normalizedParent.length >= driveRoot.length) {
-            loadPath(parent);
-        }
-    };
-
-    const openFolder = (path: string) => loadPath(path);
-
-    const toggleFile = (path: string) => {
-        setSelected(prev => {
-            const next = new Set(prev);
-            next.has(path) ? next.delete(path) : next.add(path);
-            return next;
-        });
-    };
-
-    const modelEntries = entries.filter(e => !e.is_dir);
-    const allModelsSelected = modelEntries.length > 0 && modelEntries.every(e => selected.has(e.path));
-    const someModelsSelected = modelEntries.some(e => selected.has(e.path));
-
-    const toggleAll = () => {
-        if (allModelsSelected) {
-            setSelected(new Set());
-        } else {
-            setSelected(new Set(modelEntries.map(e => e.path)));
-        }
-    };
-
-    const confirmSelection = () => {
-        const picked: FileItem[] = entries
-            .filter(e => !e.is_dir && selected.has(e.path))
-            .map(e => ({ path: e.path, name: e.name, size: e.size, outputFormat: globalFormat }));
-        onPickFiles(picked);
-        onClose();
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center gap-3">
-                        {currentDrive && currentPath.replace(/[\\/]+$/, '') !== currentDrive.path.replace(/[\\/]+$/, '') && (
-                            <button type="button" onClick={navigateUp}
-                                className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                        )}
-                        <h3 className="text-base font-semibold">
-                            {currentDrive
-                                ? (currentDrive.config?.name ?? currentDrive.name)
-                                : 'Select a Drive'}
-                        </h3>
-                        {currentPath && (
-                            <span className="text-xs text-slate-500 font-mono truncate max-w-xs" title={currentPath}>
-                                {currentPath}
-                            </span>
-                        )}
-                    </div>
-                    <button type="button" onClick={onClose}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-
-                {/* Body */}
-                <div className="flex-1 overflow-y-auto p-4 min-h-0">
-                    {!currentDrive ? (
-                        <div className="space-y-1">
-                            {drives.length === 0 ? (
-                                <p className="text-sm text-slate-500 text-center py-8">No virtual drives found.</p>
-                            ) : drives.map((d, i) => (
-                                <button key={i} onClick={() => selectDrive(d)}
-                                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                    <HardDrive className="w-5 h-5 text-cyan-400 shrink-0" />
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{d.config?.name ?? d.name ?? d.path}</p>
-                                        <p className="text-xs text-slate-500 truncate">{d.path}</p>
-                                    </div>
-                                    <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-                                </button>
-                            ))}
-                        </div>
-                    ) : loading ? (
-                        <div className="flex items-center justify-center py-12 text-slate-500">
-                            <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-                            Loading...
-                        </div>
-                    ) : entries.length === 0 ? (
-                        <p className="text-sm text-slate-500 text-center py-12">No 3D models or folders here.</p>
-                    ) : (
-                        <div className="space-y-0.5">
-                            {modelEntries.length > 0 && (
-                                <div className="flex items-center gap-3 px-4 py-2 mb-1 border-b border-slate-200 dark:border-slate-800">
-                                    <button type="button" onClick={toggleAll}
-                                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${allModelsSelected
-                                            ? 'bg-cyan-500 border-cyan-500 text-white'
-                                            : someModelsSelected
-                                                ? 'bg-cyan-500/30 border-cyan-400 text-white'
-                                                : 'border-slate-400 hover:border-slate-300'
-                                            }`}>
-                                        {allModelsSelected ? <Check className="w-3 h-3" /> : someModelsSelected ? <Minus className="w-3 h-3" /> : null}
-                                    </button>
-                                    <span className="text-xs text-slate-500">{modelEntries.length} model{modelEntries.length !== 1 ? 's' : ''} — {selected.size} selected</span>
-                                </div>
-                            )}
-                            {entries.map(entry => entry.is_dir ? (
-                                <button key={entry.path} onClick={() => openFolder(entry.path)}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-left hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                                    <Folder className="w-4 h-4 text-amber-400 shrink-0" />
-                                    <span className="text-sm truncate flex-1">{entry.name}</span>
-                                    <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                </button>
-                            ) : (
-                                <label key={entry.path}
-                                    className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer">
-                                    <button
-                                        onClick={() => toggleFile(entry.path)}
-                                        className={`w-5 h-5 rounded border flex items-center justify-center transition-colors shrink-0 ${selected.has(entry.path)
-                                            ? 'bg-cyan-500 border-cyan-500 text-white'
-                                            : 'border-slate-400 hover:border-slate-300'
-                                            }`}>
-                                        {selected.has(entry.path) && <Check className="w-3 h-3" />}
-                                    </button>
-                                    <Box className="w-4 h-4 text-cyan-400 shrink-0" />
-                                    <span className="text-sm truncate flex-1 min-w-0">{entry.name}</span>
-                                    <span className="text-xs text-slate-500 shrink-0">{fmtSize(entry.size)}</span>
-                                </label>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Footer */}
-                {currentDrive && (
-                    <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 dark:border-slate-800">
-                        <span className="text-xs text-slate-500">
-                            {selected.size} file{selected.size !== 1 ? 's' : ''} selected
-                        </span>
-                        <div className="flex gap-2">
-                            <button type="button" onClick={onClose}
-                                className="text-sm px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 text-slate-500 hover:text-slate-300 transition-colors">
-                                Cancel
-                            </button>
-                            <button type="button" onClick={confirmSelection} disabled={selected.size === 0}
-                                className="text-sm px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-medium transition-colors">
-                                Add {selected.size} file{selected.size !== 1 ? 's' : ''}
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
 // ── Main page component ──────────────────────────────────────────────────────
 
 export const ModelConverterPage: React.FC = () => {
     const navigate = useNavigate();
-    const [drives, setDrives] = useState<DriveEntry[]>([]);
     const [files, setFiles] = useState<FileItem[]>([]);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [globalFormat, setGlobalFormat] = useState('glb');
     const [outputMode, setOutputMode] = useState<OutputMode>('copy');
     const [outputPath, setOutputPath] = useState('');
-    const [loadingDrives, setLoadingDrives] = useState(true);
     const [converting, setConverting] = useState(false);
     const [results, setResults] = useState<any | null>(null);
     const [convError, setConvError] = useState<string | null>(null);
-    const [showBrowser, setShowBrowser] = useState(false);
+    const [showAppExplorer, setShowAppExplorer] = useState(false);
     const [fileStatuses, setFileStatuses] = useState<Map<string, FileStatus>>(new Map());
 
-    // Load drives + output path
+    // Load output path
     useEffect(() => {
-        setLoadingDrives(true);
-        Promise.all([
-            fetch(`${FLASK_BASE}/api/drive/registry`).then(r => r.json()).catch(() => ({ drives: [] })),
-            fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({})),
-        ]).then(([regData, cfgData]) => {
-            setDrives(Array.isArray(regData.drives) ? regData.drives : []);
-            setOutputPath(cfgData.output_path || '');
-        }).finally(() => setLoadingDrives(false));
+        fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({}))
+            .then(cfgData => setOutputPath(cfgData.output_path || ''));
     }, []);
 
     const addFiles = useCallback((newFiles: FileItem[]) => {
@@ -288,6 +77,16 @@ export const ModelConverterPage: React.FC = () => {
             return next;
         });
     }, []);
+
+    const handleAppExplorerSelect = (paths: string[]) => {
+        const newFiles: FileItem[] = paths.map(p => ({
+            path: p,
+            name: p.split(/[\\/]/).pop() || p,
+            size: 0,
+            outputFormat: globalFormat,
+        }));
+        addFiles(newFiles);
+    };
 
     // Browse local files with native file picker
     const browseFiles = async () => {
@@ -466,20 +265,17 @@ export const ModelConverterPage: React.FC = () => {
                             )}
                         </div>
                         <div className="flex gap-2 flex-wrap">
-                            <button type="button" onClick={browseFiles}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors">
-                                <FileBox className="w-4 h-4" />
-                                Browse Files
-                            </button>
-                            <button type="button" onClick={browseFolder}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors">
+                            <button type="button" onClick={() => setShowAppExplorer(true)} className="btn btn-primary">
                                 <FolderOpen className="w-4 h-4" />
-                                Browse Folder
+                                App Explorer
                             </button>
-                            <button type="button" onClick={() => setShowBrowser(true)} disabled={loadingDrives}
-                                className="flex items-center gap-2 text-sm px-4 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 transition-colors disabled:opacity-40">
-                                <HardDrive className="w-4 h-4" />
-                                From Virtual Drive
+                            <button type="button" onClick={browseFiles} className="btn btn-secondary">
+                                <Files className="w-4 h-4" />
+                                Select Files
+                            </button>
+                            <button type="button" onClick={browseFolder} className="btn btn-secondary">
+                                <FolderSearch className="w-4 h-4" />
+                                Select Folder
                             </button>
                         </div>
 
@@ -724,15 +520,14 @@ export const ModelConverterPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Drive browser modal */}
-            {showBrowser && (
-                <FolderBrowser
-                    drives={drives}
-                    onPickFiles={addFiles}
-                    onClose={() => setShowBrowser(false)}
-                    globalFormat={globalFormat}
-                />
-            )}
+            <FolderPickerModal
+                isOpen={showAppExplorer}
+                multiSelect
+                mode="file"
+                onSelect={(path) => { handleAppExplorerSelect([path]); setShowAppExplorer(false); }}
+                onSelectMultiple={(paths) => { handleAppExplorerSelect(paths); setShowAppExplorer(false); }}
+                onClose={() => setShowAppExplorer(false)}
+            />
         </div>
     );
 };

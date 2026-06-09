@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Box, ChevronRight, Image as ImageIcon, FileBox, AlertCircle, Loader2, X, HardDrive, FolderOpen, File as FileIcon } from 'lucide-react';
+import { ArrowLeft, Box, ChevronRight, Image as ImageIcon, FileBox, AlertCircle, Loader2, X, FolderOpen, Files, FolderSearch } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment, ContactShadows, Html } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,7 +9,7 @@ import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
-import { DrivePickerModal } from '../components/DrivePickerModal';
+import { FolderPickerModal } from '../components/FolderPickerModal';
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
 const MODEL_EXTS = ['obj', 'gltf', 'glb', 'fbx', 'stl', 'blend'];
@@ -448,7 +448,7 @@ export const ThreeDVisualizerPage: React.FC = () => {
     const [folderFiles, setFolderFiles] = useState<FolderFile[]>([]);
     const [modelPath, setModelPath] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
-    const [isDriveOpen, setIsDriveOpen] = useState(false);
+    const [showAppExplorer, setShowAppExplorer] = useState(false);
 
     // Derived lists
     const modelFiles = useMemo(() => folderFiles.filter(f => !f.is_dir && MODEL_EXTS.includes(getExt(f.name))), [folderFiles]);
@@ -606,26 +606,17 @@ export const ThreeDVisualizerPage: React.FC = () => {
                                     </div>
                                 ) : (
                                     <>
-                                        <button type="button" onClick={selectFolder}
-                                            className="w-full py-4 border-2 border-dashed border-slate-700 hover:border-cyan-500 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors bg-slate-800/30 hover:bg-cyan-500/5">
-                                            <FolderOpen className="w-6 h-6" />
-                                            <span className="text-sm font-medium">Select Model Folder</span>
-                                            <span className="text-xs text-slate-500">Model + textures auto-detected</span>
+                                        <button type="button" onClick={() => setShowAppExplorer(true)} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
+                                            <FolderOpen className="w-4 h-4" />
+                                            <span className="text-sm font-medium">App Explorer</span>
                                         </button>
-                                        <div className="flex items-center gap-2 my-1">
-                                            <div className="flex-1 border-t border-slate-800" />
-                                            <span className="text-xs text-slate-600 uppercase">or</span>
-                                            <div className="flex-1 border-t border-slate-800" />
-                                        </div>
-                                        <button type="button" onClick={selectSingleModel}
-                                            className="w-full py-3 border border-slate-700 hover:border-cyan-500 rounded-xl flex items-center justify-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors hover:bg-cyan-500/5">
-                                            <FileIcon className="w-4 h-4" />
-                                            <span className="text-sm font-medium">Select Model File</span>
+                                        <button type="button" onClick={selectSingleModel} className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+                                            <Files className="w-4 h-4" />
+                                            <span className="text-sm font-medium">Select Files</span>
                                         </button>
-                                        <button type="button" onClick={() => setIsDriveOpen(true)}
-                                            className="w-full py-3 border border-slate-700 hover:border-cyan-500 rounded-xl flex items-center justify-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors hover:bg-cyan-500/5">
-                                            <HardDrive className="w-4 h-4" />
-                                            <span className="text-sm font-medium">Browse My Drive</span>
+                                        <button type="button" onClick={selectFolder} className="btn btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+                                            <FolderSearch className="w-4 h-4" />
+                                            <span className="text-sm font-medium">Select Folder</span>
                                         </button>
                                     </>
                                 )}
@@ -714,12 +705,10 @@ export const ThreeDVisualizerPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* Drive Picker — navigates folders, selects a model file */}
-            <DrivePickerModal
-                isOpen={isDriveOpen}
-                onClose={() => setIsDriveOpen(false)}
+            <FolderPickerModal
+                isOpen={showAppExplorer}
+                mode="file"
                 onSelect={(path) => {
-                    // If user selected a model file, load its parent folder
                     const ext = getExt(path);
                     if (MODEL_EXTS.includes(ext)) {
                         const lastSlash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
@@ -731,9 +720,9 @@ export const ThreeDVisualizerPage: React.FC = () => {
                             .then(data => setFolderFiles((data.files || []) as FolderFile[]))
                             .catch(() => setFolderFiles([]));
                     }
+                    setShowAppExplorer(false);
                 }}
-                filters={MODEL_EXTS}
-                title="Select 3D Model from Drives"
+                onClose={() => setShowAppExplorer(false)}
             />
         </div>
     );

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 
 const GITHUB_REPO = 'redusca/Licenta-App'
-const RELEASES_API = '/api/releases'
+const RELEASES_API = `https://api.github.com/repos/${GITHUB_REPO}/releases`
 
 interface GhAsset {
   name: string
@@ -70,10 +70,10 @@ export default function Downloads() {
   return (
     <main className="page-body dl-page">
       <h1 style={{ fontSize: 30, fontWeight: 700, color: 'var(--ink)', margin: '0 0 8px' }}>
-        Download FileO
+        Download Server
       </h1>
       <p style={{ margin: '0 0 36px', fontSize: 15, color: 'var(--muted)' }}>
-        Desktop client for Windows. Bundles the FileO app and the local Flask server.
+        Windows installer for the AI backend server. Bundles the Electron app and the local Flask server.
       </p>
 
       {/* Main download card */}
@@ -124,8 +124,6 @@ export default function Downloads() {
         ) : winAsset ? (
           <a
             href={winAsset.browser_download_url}
-            target="_blank"
-            rel="noreferrer"
             className="btn btn-primary btn-lg"
             style={{ display: 'inline-flex', alignItems: 'center', gap: 7, textDecoration: 'none' }}
           >

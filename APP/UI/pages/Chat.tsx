@@ -171,6 +171,7 @@ function looksLikeFolder(p: string): boolean {
 
 const FileLink: React.FC<{ path: string }> = ({ path }) => {
   const name = path.replace(/\\/g, '/').split('/').pop() ?? path;
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
       <button
@@ -192,12 +193,12 @@ const FileLink: React.FC<{ path: string }> = ({ path }) => {
       </button>
       <button
         onClick={() => showInFolder(path)}
-        title="Show in folder"
-        style={{ padding: 3, color: 'var(--muted)', display: 'flex', alignItems: 'center' }}
-        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; }}
-        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; }}
+        title="Show in File Explorer"
+        style={{ padding: 5, color: 'var(--muted)', display: 'flex', alignItems: 'center', borderRadius: 4 }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
       >
-        <FolderOpen size={11} />
+        <FolderOpen size={13} />
       </button>
     </div>
   );

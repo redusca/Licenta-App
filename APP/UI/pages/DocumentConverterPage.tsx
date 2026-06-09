@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, FileText, ChevronRight, HardDrive, FolderOpen,
     X, CheckCircle, AlertCircle, FileUp,
-    Check, Minus, Play, Loader2, ExternalLink, Monitor,
+    Check, Minus, Play, Loader2, ExternalLink, Files, FolderSearch,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 
@@ -96,7 +96,7 @@ export const DocumentConverterPage: React.FC = () => {
         });
     }, []);
 
-    const browseWindows = async () => {
+    const browseFiles = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
             filters: [{ name: 'Documents', extensions: ['pdf', 'docx', 'doc', 'txt', 'html', 'htm', 'md', 'markdown'] }],
         });
@@ -106,6 +106,21 @@ export const DocumentConverterPage: React.FC = () => {
             return { path: p, name, size: 0, outputFormat: getDefaultFormat(name) };
         });
         addFiles(newFiles);
+    };
+
+    const browseFolder = async () => {
+        const dir = await (window as any).electronAPI?.selectDirectory?.();
+        if (!dir) return;
+        try {
+            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(dir)}`);
+            const data = await res.json();
+            const exts = new Set(['pdf', 'docx', 'doc', 'txt', 'html', 'htm', 'md', 'markdown']);
+            const entries: { name: string; path: string; size: number; is_dir: boolean }[] = data.entries ?? [];
+            const newFiles: FileItem[] = entries
+                .filter(e => !e.is_dir && exts.has((e.name.split('.').pop() ?? '').toLowerCase()))
+                .map(e => ({ path: e.path, name: e.name, size: e.size, outputFormat: getDefaultFormat(e.name) }));
+            if (newFiles.length > 0) addFiles(newFiles);
+        } catch { /* ignore */ }
     };
 
     const handleAppExplorerSelect = (paths: string[]) => {
@@ -264,9 +279,13 @@ export const DocumentConverterPage: React.FC = () => {
                                 <FolderOpen className="w-4 h-4" />
                                 App Explorer
                             </button>
-                            <button type="button" onClick={browseWindows} className="btn btn-secondary">
-                                <Monitor className="w-4 h-4" />
-                                Windows
+                            <button type="button" onClick={browseFiles} className="btn btn-secondary">
+                                <Files className="w-4 h-4" />
+                                Select Files
+                            </button>
+                            <button type="button" onClick={browseFolder} className="btn btn-secondary">
+                                <FolderSearch className="w-4 h-4" />
+                                Select Folder
                             </button>
                         </div>
 

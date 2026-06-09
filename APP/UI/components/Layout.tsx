@@ -103,7 +103,7 @@ function Sidebar({ active }: { active: string }) {
                   }
                 }}
               >
-                <span style={{ flexShrink: 0, display: 'inline-flex' }}><Icon size={19} /></span>
+                <span style={{ flexShrink: 0, display: 'inline-flex' }}><Icon size={20} /></span>
                 <span style={{ flex: 1, opacity: hover ? 1 : 0, transition: 'opacity .15s', whiteSpace: 'nowrap' }}>
                   {label}
                 </span>
@@ -131,7 +131,7 @@ function Sidebar({ active }: { active: string }) {
               (e.currentTarget as HTMLElement).style.color = s ? 'var(--accent-ink)' : 'var(--muted)';
             }}
           >
-            <SettingsIcon size={19} />
+            <span style={{ flexShrink: 0, display: 'inline-flex' }}><SettingsIcon size={20} /></span>
             <span style={{ opacity: hover ? 1 : 0, transition: 'opacity .15s', whiteSpace: 'nowrap' }}>Settings</span>
           </div>
         </NavLink>
@@ -148,7 +148,7 @@ function Sidebar({ active }: { active: string }) {
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; (e.currentTarget as HTMLElement).style.color = 'var(--ink)'; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--muted)'; }}
         >
-          {theme === 'light' ? <MoonIcon size={19} /> : <SunIcon size={19} />}
+          <span style={{ flexShrink: 0, display: 'inline-flex' }}>{theme === 'light' ? <MoonIcon size={20} /> : <SunIcon size={20} />}</span>
           <span style={{ opacity: hover ? 1 : 0, transition: 'opacity .15s', whiteSpace: 'nowrap' }}>
             {theme === 'light' ? 'Dark mode' : 'Light mode'}
           </span>

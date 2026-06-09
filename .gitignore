@@ -266,3 +266,5 @@ APP/data/agent_config.json
 /test_modele_ai/dataset
 /design
 *.tex
+.claude/settings.local.json
+/diagrams

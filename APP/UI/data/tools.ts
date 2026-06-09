@@ -12,9 +12,7 @@ export type CategoryKey =
     | 'video'
     | 'documents'
     | '3d'
-    | 'database'
-    | 'programming'
-    | 'test';
+    | 'computer_tools';
 
 export interface ToolField {
     /** Machine-readable key sent to the agent */

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, Music, ChevronRight, FolderOpen, Monitor,
+    ArrowLeft, Music, ChevronRight, FolderOpen, Files, FolderSearch,
     X, CheckCircle, AlertCircle, FileAudio,
     Check, Minus, Play, Loader2,
 } from 'lucide-react';
@@ -66,12 +66,27 @@ export const AudioConverterPage: React.FC = () => {
         });
     }, []);
 
-    const browseWindows = async () => {
+    const browseFiles = async () => {
         const paths = await (window as any).electronAPI?.selectFiles?.({
             filters: [{ name: 'Audio', extensions: ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'wma', 'mka'] }],
         });
         if (!paths || paths.length === 0) return;
         addFiles(paths.map((p: string) => ({ path: p, name: p.split(/[\\/]/).pop() || p, size: 0, outputFormat: globalFormat })));
+    };
+
+    const browseFolder = async () => {
+        const dir = await (window as any).electronAPI?.selectDirectory?.();
+        if (!dir) return;
+        try {
+            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(dir)}`);
+            const data = await res.json();
+            const exts = new Set(['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'wma', 'mka']);
+            const entries: { name: string; path: string; size: number; is_dir: boolean }[] = data.entries ?? [];
+            const newFiles = entries
+                .filter(e => !e.is_dir && exts.has((e.name.split('.').pop() ?? '').toLowerCase()))
+                .map(e => ({ path: e.path, name: e.name, size: e.size, outputFormat: globalFormat }));
+            if (newFiles.length > 0) addFiles(newFiles);
+        } catch { /* ignore */ }
     };
 
     const handleAppExplorerSelect = (paths: string[]) => {
@@ -227,9 +242,13 @@ export const AudioConverterPage: React.FC = () => {
                                 <FolderOpen className="w-4 h-4" />
                                 App Explorer
                             </button>
-                            <button type="button" onClick={browseWindows} className="btn btn-secondary">
-                                <Monitor className="w-4 h-4" />
-                                Windows
+                            <button type="button" onClick={browseFiles} className="btn btn-secondary">
+                                <Files className="w-4 h-4" />
+                                Select Files
+                            </button>
+                            <button type="button" onClick={browseFolder} className="btn btn-secondary">
+                                <FolderSearch className="w-4 h-4" />
+                                Select Folder
                             </button>
                         </div>
 

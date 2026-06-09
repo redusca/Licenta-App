@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, FileText, ChevronRight, HardDrive, FolderOpen,
-    Monitor, X, CheckCircle, AlertCircle, FileUp,
+    Files, FolderSearch, X, CheckCircle, AlertCircle, FileUp,
     Check, Minus, Play, Loader2, Scissors, Merge, ArrowRightLeft,
     GripVertical, ChevronDown, ChevronUp, FileDown, ExternalLink,
 } from 'lucide-react';
@@ -110,22 +110,37 @@ export const PdfMergerPage: React.FC = () => {
         } catch { /* ignore */ }
     };
 
-    const browseWindows = async () => {
-        const exts = activeTab === 'convert'
-            ? ['pdf', 'docx', 'doc']
-            : ['pdf'];
+    const browseFiles = async () => {
+        const exts = activeTab === 'convert' ? ['pdf', 'docx', 'doc'] : ['pdf'];
         const paths = await (window as any).electronAPI?.selectFiles?.({
             filters: [{ name: 'Documents', extensions: exts }],
         });
         if (!paths || paths.length === 0) return;
         const newFiles: FileItem[] = paths.map((p: string) => ({
-            path: p,
-            name: p.split(/[\\/]/).pop() || p,
-            size: 0,
+            path: p, name: p.split(/[\\/]/).pop() || p, size: 0,
         }));
         addFiles(newFiles);
         const pdfPaths = paths.filter((p: string) => p.toLowerCase().endsWith('.pdf'));
         if (pdfPaths.length > 0) fetchPageCounts(pdfPaths);
+    };
+
+    const browseFolder = async () => {
+        const dir = await (window as any).electronAPI?.selectDirectory?.();
+        if (!dir) return;
+        try {
+            const res = await fetch(`${FLASK_BASE}/api/drive/list?path=${encodeURIComponent(dir)}`);
+            const data = await res.json();
+            const exts = new Set(activeTab === 'convert' ? ['pdf', 'docx', 'doc'] : ['pdf']);
+            const entries: { name: string; path: string; size: number; is_dir: boolean }[] = data.entries ?? [];
+            const newFiles: FileItem[] = entries
+                .filter(e => !e.is_dir && exts.has((e.name.split('.').pop() ?? '').toLowerCase()))
+                .map(e => ({ path: e.path, name: e.name, size: e.size }));
+            if (newFiles.length > 0) {
+                addFiles(newFiles);
+                const pdfPaths = newFiles.filter(f => f.path.toLowerCase().endsWith('.pdf')).map(f => f.path);
+                if (pdfPaths.length > 0) fetchPageCounts(pdfPaths);
+            }
+        } catch { /* ignore */ }
     };
 
     const handleAppExplorerSelect = (paths: string[]) => {
@@ -360,9 +375,13 @@ export const PdfMergerPage: React.FC = () => {
                                 <FolderOpen className="w-4 h-4" />
                                 App Explorer
                             </button>
-                            <button type="button" onClick={browseWindows} className="btn btn-secondary">
-                                <Monitor className="w-4 h-4" />
-                                Windows
+                            <button type="button" onClick={browseFiles} className="btn btn-secondary">
+                                <Files className="w-4 h-4" />
+                                Select Files
+                            </button>
+                            <button type="button" onClick={browseFolder} className="btn btn-secondary">
+                                <FolderSearch className="w-4 h-4" />
+                                Select Folder
                             </button>
                         </div>
 
