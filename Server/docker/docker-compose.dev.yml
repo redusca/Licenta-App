@@ -56,7 +56,6 @@ services:
       DATABASE_URL: postgresql://licenta:licenta@postgres:5432/licenta
       REDIS_URL: redis://redis:6379/0
       AGENT_WORKER_COUNT: "5"
-      CONTAINER_IMAGE_NAME: licenta-container:latest
       MODEL_NAME: gemini-2.5-flash
     ports:
       - "8000:8000"
@@ -66,8 +65,6 @@ services:
       - ../../Server/Database:/app/Database
       # Mount built SPA so the server can serve it immediately (run: npm run build inside Server/Interface)
       - ../../Server/Interface/dist:/app/Interface/dist:ro
-      # Docker socket for /api/containers/download (optional in dev)
-      - /var/run/docker.sock:/var/run/docker.sock
       # Persist HuggingFace model cache — avoids re-downloading multi-GB weights on every restart
       - hf_cache:/root/.cache/huggingface
     # Allows the container to reach the host machine via host.docker.internal

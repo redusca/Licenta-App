@@ -1,0 +1,54 @@
+# -- Server image (macOS / Apple Silicon) -------------------------------------
+# Build context is the Server/ folder — that is all you need to deploy.
+#
+# Build from Server/:
+#   docker build --platform linux/arm64 -t licenta-server:mac -f docker/Dockerfile.mac .
+#
+# Or just use docker-compose.mac.yml which handles everything.
+#
+# Pre-requisites:
+#   Copy src/.env.example → src/.env and fill in secrets.
+
+# ── Stage 1: Build the React SPA ─────────────────────────────────────────────
+FROM --platform=linux/arm64 node:20-slim AS frontend
+WORKDIR /app/Interface
+COPY Interface/package.json Interface/package-lock.json* ./
+RUN npm ci
+COPY Interface/ ./
+RUN npm run build
+
+# ── Stage 2: Python server ────────────────────────────────────────────────────
+FROM --platform=linux/arm64 python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libpq-dev \
+    libsndfile1 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Python dependencies — two layers so the torch cache layer survives source-only rebuilds.
+COPY src/requirements.txt ./requirements.txt
+RUN grep -v -E '^\s*(torch|torchvision)\b' requirements.txt \
+    | grep -v '^\s*$' > requirements-base.txt && \
+    pip install --no-cache-dir --timeout 300 --retries 5 -r requirements-base.txt
+RUN pip install --no-cache-dir --timeout 300 --retries 5 \
+      --index-url https://download.pytorch.org/whl/cpu \
+      torch torchvision
+
+# Application source
+COPY src/        ./src/
+COPY Database/   ./Database/
+COPY migrations/ ./migrations/
+COPY alembic.ini ./alembic.ini
+
+# React SPA built in stage 1
+COPY --from=frontend /app/Interface/dist/ ./Interface/dist/
+
+ENV PYTHONPATH=/app/src:/app
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "cd /app && python -m alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000"]

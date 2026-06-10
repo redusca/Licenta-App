@@ -13,11 +13,9 @@ import os
 import json
 import shutil
 import datetime
+from utils.paths import get_data_dir
 
-# Directory where the registry file lives — APP/src/data/
-# __file__ is at APP/src/utils/drives_registry.py
-# dirname x1 = APP/src/utils  →  dirname x2 = APP/src  →  join "data" = APP/src/data
-_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
+_DATA_DIR = str(get_data_dir())
 _REGISTRY_FILE = os.path.join(_DATA_DIR, "known_drives.json")
 
 

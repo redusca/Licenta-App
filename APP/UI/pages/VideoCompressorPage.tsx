@@ -437,7 +437,7 @@ export const VideoCompressorPage: React.FC = () => {
 
                     {/* Summary results */}
                     {results && (
-                        <div className={`px-5 py-4 rounded-xl text-sm ${results.succeeded > 0 ? 'bg-green-500/10 border border-green-500/20 text-green-300' : 'bg-red-500/10 border border-red-500/20 text-red-400'}`}>
+                        <div className={`px-5 py-4 rounded-xl text-sm ${results.succeeded > 0 ? 'bg-emerald-50 dark:bg-emerald-900/25 border border-emerald-200 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300' : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400'}`}>
                             <div className="flex items-center gap-2 mb-2">
                                 <CheckCircle className="w-5 h-5 shrink-0" />
                                 <span className="font-semibold">
@@ -449,9 +449,13 @@ export const VideoCompressorPage: React.FC = () => {
                             )}
                             {results.virtualDrivePath && (
                                 <div className="mt-2 text-left">
-                                    <p className="text-xs text-green-400 mb-2">Saved to: {results.virtualDrivePath}</p>
+                                    <p
+                                        className="text-xs font-mono mb-2 break-all cursor-pointer hover:underline"
+                                        onClick={() => (window as any).electronAPI?.showItemInFolder?.(results.virtualDrivePath)}
+                                        title="Click to show in Explorer"
+                                    >Saved to: {results.virtualDrivePath}</p>
                                     <button type="button" onClick={() => navigate(`/files?path=${encodeURIComponent(results.virtualDrivePath)}`)}
-                                        className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 transition-colors">
+                                        className="text-xs flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-lg transition-colors">
                                         <HardDrive className="w-3.5 h-3.5" />
                                         Open Virtual Drive
                                     </button>

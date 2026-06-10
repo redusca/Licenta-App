@@ -1,8 +1,11 @@
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from pathlib import Path
 
 _ENV_FILE = Path(__file__).parent / ".env"
+
+_JWT_PLACEHOLDER = "change-me-in-production"
 
 
 class Settings(BaseSettings):
@@ -10,7 +13,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://licenta:licenta@localhost:5432/licenta"
 
     # JWT
-    JWT_SECRET: str = "change-me-in-production"
+    JWT_SECRET: str = _JWT_PLACEHOLDER
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
@@ -21,17 +24,9 @@ class Settings(BaseSettings):
     AGENT_WORKER_COUNT: int = 5
     AGENT_TASK_TIMEOUT: int = 120  # seconds a chat request will wait for a worker
 
-    # Google Gemini - shared by all agent workers
-    GOOGLE_API_KEY: str = ""
-    MODEL_NAME: str = "gemini-2.5-flash"
-    MAX_AGENT_ITERATIONS: int = 10
-
     # Groq - planning agent
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
-
-    # Container image name (only needed for the ZIP download feature)
-    CONTAINER_IMAGE_NAME: str = "licenta-container:latest"
 
     # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]
@@ -41,6 +36,17 @@ class Settings(BaseSettings):
     GITHUB_REPO: str = "redusca/Licenta-App"
 
     model_config = SettingsConfigDict(env_file=_ENV_FILE, env_file_encoding="utf-8", extra="ignore")
+
+    @model_validator(mode="after")
+    def _validate_secrets(self) -> "Settings":
+        if self.JWT_SECRET == _JWT_PLACEHOLDER:
+            raise ValueError(
+                "JWT_SECRET is still the default placeholder. "
+                "Set a strong random value in .env before starting the server."
+            )
+        if not self.JWT_SECRET:
+            raise ValueError("JWT_SECRET must not be empty. Set it in .env.")
+        return self
 
 
 @lru_cache

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  AlertTriangle, Check, X, Wrench, Info,
+  AlertTriangle, Check, X, Wrench,
   FolderOpen, HardDrive, ToggleLeft, ToggleRight,
   MessageSquare, Plus, FileText, Copy, Brain,
   Image, Music, FileSearch, Loader2, FolderSearch,

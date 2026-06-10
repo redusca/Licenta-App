@@ -223,6 +223,7 @@ def _make_callback_tool(td: ToolDefinition):
 
         async def execute(self, input: dict[str, Any]) -> str:
             if not td.callback_url:
+                logger.warning("Tool '%s' has no callback_url — returning error to LLM", td.name)
                 return f"[Error] Tool '{td.name}' has no callback_url configured."
             try:
                 async with httpx.AsyncClient(timeout=30.0) as client:

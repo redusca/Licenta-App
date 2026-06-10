@@ -16,6 +16,7 @@ Key operations:
 """
 from __future__ import annotations
 
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -67,7 +68,12 @@ class Chat:
 # Storage — api_key → {chat_id → Chat}
 # ---------------------------------------------------------------------------
 
+# All callers run as asyncio coroutines in a single event loop (no preemption
+# between synchronous operations), so the dict is safe without locks in the
+# current architecture. The lock below is defensive: it prevents data races
+# if the code is ever moved to a thread-pool or multi-threaded executor.
 _store: dict[str, dict[str, Chat]] = {}
+_lock = threading.Lock()
 
 
 # ---------------------------------------------------------------------------
@@ -86,41 +92,46 @@ def create_chat(
         title=title or f"Chat {chat_id[:8]}",
         tool_definitions=tool_definitions or [],
     )
-    _store.setdefault(api_key, {})[chat_id] = chat
+    with _lock:
+        _store.setdefault(api_key, {})[chat_id] = chat
     return chat
 
 
 def get_chat(api_key: str, chat_id: str) -> Chat | None:
-    return _store.get(api_key, {}).get(chat_id)
+    with _lock:
+        return _store.get(api_key, {}).get(chat_id)
 
 
 def list_chats(api_key: str) -> list[Chat]:
-    chats = list(_store.get(api_key, {}).values())
+    with _lock:
+        chats = list(_store.get(api_key, {}).values())
     chats.sort(key=lambda c: c.created_at, reverse=True)
     return chats
 
 
 def delete_chat(api_key: str, chat_id: str) -> bool:
-    user_chats = _store.get(api_key, {})
-    if chat_id in user_chats:
-        del user_chats[chat_id]
-        return True
+    with _lock:
+        user_chats = _store.get(api_key, {})
+        if chat_id in user_chats:
+            del user_chats[chat_id]
+            return True
     return False
 
 
 def delete_all_chats(api_key: str) -> None:
-    _store.pop(api_key, None)
+    with _lock:
+        _store.pop(api_key, None)
 
 
 def add_message(api_key: str, chat_id: str, role: str, content: str) -> Message | None:
-    chat = get_chat(api_key, chat_id)
-    if chat is None:
-        return None
-    msg = Message(role=role, content=content)
-    chat.messages.append(msg)
-    # Set title from the first user message
-    if role == "user" and chat.title.startswith("Chat "):
-        chat.title = content[:60] + ("..." if len(content) > 60 else "")
+    with _lock:
+        chat = _store.get(api_key, {}).get(chat_id)
+        if chat is None:
+            return None
+        msg = Message(role=role, content=content)
+        chat.messages.append(msg)
+        if role == "user" and chat.title.startswith("Chat "):
+            chat.title = content[:60] + ("..." if len(content) > 60 else "")
     return msg
 
 
@@ -129,6 +140,7 @@ def update_chat_tools(
     chat_id: str,
     tool_definitions: list[dict[str, Any]],
 ) -> None:
-    chat = get_chat(api_key, chat_id)
-    if chat:
-        chat.tool_definitions = tool_definitions
+    with _lock:
+        chat = _store.get(api_key, {}).get(chat_id)
+        if chat:
+            chat.tool_definitions = tool_definitions

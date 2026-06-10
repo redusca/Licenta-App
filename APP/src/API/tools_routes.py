@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from flask import Blueprint, jsonify, request, Response, stream_with_context
+from utils.paths import get_data_dir
 
 from tools import ask_user as ask_user_tool
 from tools import hello as hello_tool
@@ -69,7 +70,7 @@ def _normalize_sfx(chunks: list[dict]) -> list[dict]:
 
 tools_bp = Blueprint("tools", __name__)
 
-_TOOL_DRIVES_PATH = Path(__file__).parent.parent.parent / "data" / "tool_drives.json"
+_TOOL_DRIVES_PATH = get_data_dir() / "tool_drives.json"
 
 _PENDING: dict[str, dict] = {}
 _PENDING_LOCK = threading.Lock()

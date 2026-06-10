@@ -440,7 +440,6 @@ export const FolderPickerModal: React.FC<Props> = ({
                           <HardDrive className="w-9 h-9 text-blue-500 group-hover:text-blue-600 transition-colors" />
                           <div>
                             <p className="text-xs font-medium truncate max-w-full text-slate-700 dark:text-slate-200">{d.name || d.path}</p>
-                            <p className="text-[10px] text-slate-400 font-mono truncate">{d.path}</p>
                           </div>
                         </button>
                       ))}

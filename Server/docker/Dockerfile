@@ -3,11 +3,19 @@
 #   docker build -t licenta-server:latest -f Server/docker/Dockerfile .
 #
 # Pre-requisites:
-#   1. Pre-build the React SPA: cd Server/Interface && npm install && npm run build
-#   2. Set GOOGLE_API_KEY, JWT_SECRET, REDIS_URL, DATABASE_URL via env / .env
+#   Set GOOGLE_API_KEY, JWT_SECRET, REDIS_URL, DATABASE_URL via env / .env
 #
 # Services required at runtime: PostgreSQL, Redis
 
+# ── Stage 1: Build the React SPA ─────────────────────────────────────────────
+FROM node:20-slim AS frontend
+WORKDIR /app/Interface
+COPY Server/Interface/package.json Server/Interface/package-lock.json* ./
+RUN npm ci
+COPY Server/Interface/ ./
+RUN npm run build
+
+# ── Stage 2: Python server ────────────────────────────────────────────────────
 FROM python:3.12-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -34,26 +42,8 @@ COPY Server/Database/ ./Database/
 COPY Server/migrations/ ./migrations/
 COPY Server/alembic.ini ./alembic.ini
 
-# Built React interface (must be pre-built)
-COPY Server/Interface/dist/ ./Interface/dist/
-
-# Container source — kept for /api/containers/download (exports image as tar for self-hosted users)
-# The server no longer spawns per-user containers; the agent pool runs inside this process.
-RUN mkdir -p ./Container/docker ./Container/src
-COPY Container/docker/Dockerfile         ./Container/docker/Dockerfile
-COPY Container/docker/Dockerfile.runtime ./Container/Dockerfile.runtime
-COPY Container/docker/run.sh     ./Container/docker/run.sh
-COPY Container/docker/run.bat    ./Container/docker/run.bat
-COPY Container/docker/README.md  ./Container/docker/README.md
-COPY Container/src/              ./Container/src/
-
-# Release binaries — copy from APP/release/, rename spaces to dashes
-RUN mkdir -p ./downloads
-COPY APP/release/*.exe ./downloads_tmp/
-RUN for f in ./downloads_tmp/*.exe; do \
-      dest="./downloads/$(basename "$f" | sed 's/ /-/g')"; \
-      cp "$f" "$dest"; \
-    done && rm -rf ./downloads_tmp
+# Built React interface (from frontend stage)
+COPY --from=frontend /app/Interface/dist/ ./Interface/dist/
 
 # Make src importable
 ENV PYTHONPATH=/app/src:/app

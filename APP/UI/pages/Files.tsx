@@ -32,6 +32,8 @@ import {
     Filter,
     BarChart2,
     RefreshCw,
+    Link2,
+    CheckCircle2,
 } from 'lucide-react';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 
@@ -190,11 +192,11 @@ export const Files: React.FC = () => {
     const [moveDestFolder, setMoveDestFolder] = useState('');
 
     // Drive Pagination
-    const DRIVES_PER_PAGE = 6;
+    const DRIVES_PER_PAGE = 11;
     const [drivePage, setDrivePage] = useState(0);
 
     // Tool-drive filter & pagination
-    const TOOL_DRIVES_PER_PAGE = 6;
+    const TOOL_DRIVES_PER_PAGE = 12;
     const [toolDrivePage, setToolDrivePage] = useState(0);
     const [driveFilter, setDriveFilter] = useState<'all' | 'tool'>('all');
     const [driveTypeFilter, setDriveTypeFilter] = useState<'all' | 'shortcut' | 'move'>('all');
@@ -1024,14 +1026,44 @@ export const Files: React.FC = () => {
                     </div>
                      <div>
                         <label className="block text-sm font-medium mb-2">Default Operation Mode</label>
-                        <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => setNewDriveMode('shortcut')} className={`p-4 border rounded-xl text-left transition-all ${newDriveMode === 'shortcut' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-500' : 'border-slate-200 dark:border-slate-800'}`} >
-                                <h4 className="font-semibold mb-1 text-sm">Shortcut Mode</h4>
-                                <p className="text-xs text-slate-500">Creates .lnk shortcuts. Safe for original files.</p>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button
+                                onClick={() => setNewDriveMode('shortcut')}
+                                className={`relative p-4 border-2 rounded-xl text-left transition-all ${
+                                    newDriveMode === 'shortcut'
+                                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
+                                        : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700'
+                                }`}
+                            >
+                                {newDriveMode === 'shortcut' && (
+                                    <CheckCircle2 className="absolute top-3 right-3 w-4 h-4 text-blue-500" />
+                                )}
+                                <div className={`w-9 h-9 rounded-lg mb-3 flex items-center justify-center ${
+                                    newDriveMode === 'shortcut' ? 'bg-blue-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                }`}>
+                                    <Link2 className="w-4 h-4" />
+                                </div>
+                                <h4 className={`font-semibold text-sm mb-1 ${newDriveMode === 'shortcut' ? 'text-blue-700 dark:text-blue-300' : ''}`}>Shortcut Mode</h4>
+                                <p className="text-xs text-slate-500 leading-relaxed">Creates .lnk shortcuts. Safe for original files.</p>
                             </button>
-                            <button onClick={() => setNewDriveMode('move')} className={`p-4 border rounded-xl text-left transition-all ${newDriveMode === 'move' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-500' : 'border-slate-200 dark:border-slate-800'}`} >
-                                <h4 className="font-semibold mb-1 text-sm">Move Mode</h4>
-                                <p className="text-xs text-slate-500">Moves actual files. Organizes original data.</p>
+                            <button
+                                onClick={() => setNewDriveMode('move')}
+                                className={`relative p-4 border-2 rounded-xl text-left transition-all ${
+                                    newDriveMode === 'move'
+                                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-950/30'
+                                        : 'border-slate-200 dark:border-slate-700 hover:border-orange-300 dark:hover:border-orange-700'
+                                }`}
+                            >
+                                {newDriveMode === 'move' && (
+                                    <CheckCircle2 className="absolute top-3 right-3 w-4 h-4 text-orange-500" />
+                                )}
+                                <div className={`w-9 h-9 rounded-lg mb-3 flex items-center justify-center ${
+                                    newDriveMode === 'move' ? 'bg-orange-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                }`}>
+                                    <MoveRight className="w-4 h-4" />
+                                </div>
+                                <h4 className={`font-semibold text-sm mb-1 ${newDriveMode === 'move' ? 'text-orange-700 dark:text-orange-300' : ''}`}>Move Mode</h4>
+                                <p className="text-xs text-slate-500 leading-relaxed">Moves actual files. Organizes original data.</p>
                             </button>
                         </div>
                     </div>
@@ -1173,12 +1205,13 @@ export const Files: React.FC = () => {
                                                 background: 'var(--surface)', border: '1px solid var(--border)',
                                                 display: 'flex', alignItems: 'center', gap: 14,
                                                 opacity: available ? 1 : 0.5, cursor: available ? 'pointer' : 'not-allowed',
+                                                minWidth: 0, overflow: 'hidden',
                                             }}>
                                             <div style={{ width: 42, height: 42, borderRadius: 11, background: 'var(--c-sky-bg)', color: 'var(--c-sky)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                                 <HardDrive className="w-5 h-5" />
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{td.name}</div>
+                                                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{td.name}</div>
                                                 <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{td.path}</div>
                                                 {!available && <div style={{ fontSize: 11, color: 'var(--c-clay)', marginTop: 2 }}>Drive not connected</div>}
                                             </div>
@@ -1254,7 +1287,7 @@ export const Files: React.FC = () => {
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{d.name}</span>
+                                                    <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0, flexShrink: 1 }}>{d.name}</span>
                                                     <span className="pill" style={{ background: d.type === 'move' ? 'var(--c-sage-bg)' : 'var(--c-sky-bg)', color: d.type === 'move' ? 'var(--c-sage)' : 'var(--c-sky)', border: '1px solid transparent', padding: '2px 8px', fontSize: 11 }}>
                                                         {d.type === 'move' ? 'Move' : 'Shortcut'}
                                                     </span>

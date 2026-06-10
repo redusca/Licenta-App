@@ -153,12 +153,12 @@ async def get_releases():
             "published_at": date,
             "prerelease": False,
             "html_url": f"https://github.com/{repo}/releases/tag/{tag['name']}",
-            # Point directly to the server-hosted binary
+            # Lightweight tags have no attached assets — direct users to the GitHub page.
             "assets": [
                 {
                     "name": exe,
-                    "browser_download_url": f"/release-files/{exe}",
-                    "size": 0,   # unknown without stat; hidden in UI when 0
+                    "browser_download_url": f"https://github.com/{repo}/releases/tag/{tag['name']}",
+                    "size": 0,
                 }
             ],
         })

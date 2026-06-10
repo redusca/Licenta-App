@@ -25,7 +25,7 @@ const FEATURES = [
       </svg>
     ),
     title: 'AI Gateway',
-    desc: 'Lazy-load/unload pattern for 4 models: Swin2SR (image super-resolution), Whisper (audio transcription), Gemini (language), and VideoSubtitle. Each loads on demand, unloads after idle timeout.',
+    desc: 'Lazy-load/unload pattern for local models: Swin2SR (image super-resolution) and Whisper (audio transcription). Each loads on demand, unloads after idle timeout. LLM tasks use the Groq API.',
   },
   {
     icon: (

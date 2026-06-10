@@ -205,21 +205,6 @@ export const Settings: React.FC = () => {
                         />
                     </Field>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 4, borderTop: '1px solid var(--border)' }}>
-                        <button
-                            onClick={save}
-                            disabled={saving || loading}
-                            className="btn btn-primary"
-                            style={{ opacity: (saving || loading) ? 0.5 : 1 }}
-                        >
-                            {saving ? <><span className="spin" style={{ display: 'inline-block', width: 12, height: 12, border: '1.5px solid currentColor', borderRightColor: 'transparent', borderRadius: '50%' }} /> Saving…</> : <><Save size={13} /> Save</>}
-                        </button>
-                        {saved && (
-                            <span style={{ fontSize: 12.5, color: 'var(--c-sage)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <CheckCircle size={13} /> Saved
-                            </span>
-                        )}
-                    </div>
                 </CardBody>
             </Card>
 
@@ -257,23 +242,28 @@ export const Settings: React.FC = () => {
                         </div>
                     </Field>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingTop: 4, borderTop: '1px solid var(--border)' }}>
-                        <button
-                            onClick={save}
-                            disabled={saving || loading}
-                            className="btn btn-primary"
-                            style={{ opacity: (saving || loading) ? 0.5 : 1 }}
-                        >
-                            {saving ? 'Saving…' : <><Save size={13} /> Save</>}
-                        </button>
-                        {saved && (
-                            <span style={{ fontSize: 12.5, color: 'var(--c-sage)', display: 'flex', alignItems: 'center', gap: 5 }}>
-                                <CheckCircle size={13} /> Saved
-                            </span>
-                        )}
-                    </div>
                 </CardBody>
             </Card>
+
+            {/* Global save */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 4 }}>
+                <button
+                    onClick={save}
+                    disabled={saving || loading}
+                    className="btn btn-primary"
+                    style={{ opacity: (saving || loading) ? 0.5 : 1 }}
+                >
+                    {saving
+                        ? <><span className="spin" style={{ display: 'inline-block', width: 12, height: 12, border: '1.5px solid currentColor', borderRightColor: 'transparent', borderRadius: '50%' }} /> Saving…</>
+                        : <><Save size={13} /> Save Settings</>
+                    }
+                </button>
+                {saved && (
+                    <span style={{ fontSize: 12.5, color: 'var(--c-sage)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <CheckCircle size={13} /> Saved
+                    </span>
+                )}
+            </div>
         </div>
     );
 };

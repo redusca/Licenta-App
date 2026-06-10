@@ -268,3 +268,5 @@ APP/data/agent_config.json
 *.tex
 .claude/settings.local.json
 /diagrams
+/files_exclude
+/APP/resources

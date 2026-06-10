@@ -18,7 +18,6 @@ from config import settings
 from Database.session import engine
 from Database.models import Base
 from API.auth_routes import router as auth_router
-from API.container_routes import router as container_router
 from API.releases_routes import router as releases_router
 from API.agent_routes import router as agent_router
 from API.ai_gateway.router import router as ai_gateway_router
@@ -33,6 +32,25 @@ async def lifespan(app: FastAPI):
     # Create all tables on startup (Alembic handles migrations in prod)
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ensured")
+
+    # ── Startup configuration warnings ───────────────────────────────────────
+    if settings.ALLOWED_ORIGINS == ["*"]:
+        logger.warning(
+            "CORS is set to allow all origins ('*'). "
+            "Set ALLOWED_ORIGINS in .env for production deployments."
+        )
+    if not settings.GITHUB_TOKEN:
+        logger.warning(
+            "GITHUB_TOKEN is not set — GET /api/releases will return 503. "
+            "Set GITHUB_TOKEN in .env to enable release downloads."
+        )
+    if not settings.GROQ_API_KEY:
+        logger.warning(
+            "GROQ_API_KEY is not set — the planning agent and AI gateway LLM endpoints will not work. "
+            "Set GROQ_API_KEY in .env."
+        )
+    logger.info("Groq model: %s", settings.GROQ_MODEL)
+    # ─────────────────────────────────────────────────────────────────────────
 
     pool = AgentPool()
     await pool.start(settings.AGENT_WORKER_COUNT)
@@ -64,7 +82,6 @@ app.add_middleware(
 # ── API Routers ───────────────────────────────────────────────────────────────
 
 app.include_router(auth_router)
-app.include_router(container_router)
 app.include_router(releases_router)
 app.include_router(agent_router)
 app.include_router(ai_gateway_router)
@@ -78,13 +95,6 @@ def health():
 # ── Static SPA ────────────────────────────────────────────────────────────────
 # Serve the built React interface from Interface/dist/
 # Falls back to index.html for client-side routing
-
-# Release binaries at /release-files/<file.exe>  — must be mounted BEFORE the SPA catch-all
-# (Using /release-files instead of /downloads to avoid shadowing the SPA's /downloads React route)
-_downloads_dir = Path(__file__).parent.parent / "downloads"
-if _downloads_dir.exists() and any(_downloads_dir.iterdir()):
-    app.mount("/release-files", StaticFiles(directory=str(_downloads_dir)), name="downloads")
-    logger.info(f"Serving downloads from {_downloads_dir}")
 
 _interface_dist = Path(__file__).parent.parent / "Interface" / "dist"
 if _interface_dist.exists():

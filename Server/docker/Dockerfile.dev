@@ -36,11 +36,6 @@ COPY Server/Database/  ./Database/
 COPY Server/migrations/ ./migrations/
 COPY Server/alembic.ini ./alembic.ini
 
-# Embed Container source for the /api/containers/download endpoint
-RUN mkdir -p ./Container/docker ./Container/src
-COPY Container/docker/ ./Container/docker/
-COPY Container/src/    ./Container/src/
-
 ENV PYTHONPATH=/app/src:/app
 
 EXPOSE 8000

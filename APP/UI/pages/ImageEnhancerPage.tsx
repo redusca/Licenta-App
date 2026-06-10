@@ -3,15 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Sparkles, ChevronRight, FolderOpen,
     RefreshCw, CheckCircle, AlertCircle, FileImage,
-    Download, Cpu, ZapOff, Zap, Files, FolderSearch,
+    Download, Cpu, ZapOff, Zap, Files, FolderSearch, Loader2,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const FLASK_BASE = 'http://127.0.0.1:5000';
-const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type OutputMode = 'copy' | 'virtual_drive';
@@ -56,27 +54,17 @@ const STAGE_LABELS: Record<string, string> = {
 // ── Progress bar ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ progress }: { progress: Progress }) {
-    const pct = Math.round(progress.pct * 100);
-    const isLoading = progress.stage === 'loading_model' && pct < 30;
     return (
-        <div className="bg-slate-900 border border-blue-500/20 rounded-xl p-4 space-y-2">
-            <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-200">{progress.message}</span>
-                <span className="text-xs font-mono text-blue-400">{pct}%</span>
+        <div className="bg-slate-900 border border-blue-500/20 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 text-blue-400 animate-spin shrink-0" />
+                <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-slate-200 block">{progress.message}</span>
+                    <p className="text-xs text-slate-500 capitalize mt-0.5">
+                        {STAGE_LABELS[progress.stage] ?? progress.stage.replace(/_/g, ' ')}
+                    </p>
+                </div>
             </div>
-            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                {isLoading ? (
-                    <div className="h-full bg-linear-to-r from-blue-600 to-blue-400 rounded-full animate-pulse w-1/3" />
-                ) : (
-                    <div
-                        className="h-full bg-linear-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-700 ease-out"
-                        style={{ width: `${Math.max(pct, 4)}%` }}
-                    />
-                )}
-            </div>
-            <p className="text-xs text-slate-500 capitalize">
-                {STAGE_LABELS[progress.stage] ?? progress.stage.replace(/_/g, ' ')}
-            </p>
         </div>
     );
 }
@@ -343,16 +331,20 @@ export const ImageEnhancerPage: React.FC = () => {
 
                     {/* Done banner */}
                     {result && (
-                        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm">
+                        <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/25 border border-emerald-200 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-sm">
                             <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" />
                             <div className="flex-1 min-w-0">
                                 <p className="font-semibold mb-0.5">Image upscaled successfully</p>
                                 {result.outputPath && (
-                                    <p className="text-xs font-mono text-green-400 truncate">{result.outputPath}</p>
+                                    <p
+                                        className="text-xs font-mono mt-0.5 break-all cursor-pointer hover:underline"
+                                        onClick={() => (window as any).electronAPI?.showItemInFolder?.(result.outputPath)}
+                                        title="Click to show in Explorer"
+                                    >{result.outputPath}</p>
                                 )}
                             </div>
                             <button onClick={downloadResult}
-                                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-500/20 hover:bg-green-500/30 rounded-lg transition-colors shrink-0">
+                                className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-emerald-500/20 hover:bg-emerald-500/30 rounded-lg transition-colors shrink-0">
                                 <Download className="w-3.5 h-3.5" />Download
                             </button>
                         </div>
@@ -425,7 +417,7 @@ export const ImageEnhancerPage: React.FC = () => {
                                             <span className="text-sm text-slate-300 group-hover:text-slate-200 transition-colors">{opt.label}</span>
                                             <p className="text-xs text-slate-500">{opt.desc}</p>
                                             {opt.value === 'virtual_drive' && outputMode === 'virtual_drive' && (
-                                                <p className="text-xs font-mono mt-0.5 text-blue-400">
+                                                <p className="text-xs font-mono mt-0.5 text-blue-400 break-all">
                                                     {outputPath ? `${outputPath}\\ImageEnhancerResults` : 'No output path set in Settings.'}
                                                 </p>
                                             )}

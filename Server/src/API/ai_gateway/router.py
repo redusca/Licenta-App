@@ -106,7 +106,7 @@ async def gateway_status():
 async def wake_model(name: str):
     """Pre-load a model into memory.
 
-    Accepted names: ``swin2sr``, ``sd-x4``, ``whisper``.
+    Accepted names: ``swin2sr``, ``whisper``.
     """
     model = _ALL_MODELS.get(name)
     if model is None:
@@ -433,15 +433,15 @@ class LLMResponse(BaseModel):
 
 
 def _groq_api_key() -> str:
-    """Resolve the Groq API key — settings first, then KEY env var (same as planning agent)."""
-    return settings.GROQ_API_KEY or os.environ.get("KEY", "")
+    """Resolve the Groq API key — settings first, then GROQ_API_KEY env var."""
+    return settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
 
 
 def _get_groq_client():
     from groq import AsyncGroq
     api_key = _groq_api_key()
     if not api_key:
-        raise RuntimeError("No Groq API key found. Set GROQ_API_KEY (or KEY) in .env")
+        raise RuntimeError("No Groq API key found. Set GROQ_API_KEY in .env")
     return AsyncGroq(api_key=api_key)
 
 
@@ -453,7 +453,7 @@ async def llm_status():
     return {
         "configured": configured,
         "model": settings.GROQ_MODEL,
-        "detail": "Groq API key is set" if configured else "No API key found (set GROQ_API_KEY or KEY in .env)",
+        "detail": "Groq API key is set" if configured else "No API key found (set GROQ_API_KEY in .env)",
     }
 
 
@@ -587,7 +587,7 @@ async def vision_llama_scout(
 
     api_key = _groq_api_key()
     if not api_key:
-        raise HTTPException(status_code=503, detail="Groq API key not configured (set GROQ_API_KEY or KEY in .env)")
+        raise HTTPException(status_code=503, detail="Groq API key not configured (set GROQ_API_KEY in .env)")
 
     raw = await file.read()
     if not raw:

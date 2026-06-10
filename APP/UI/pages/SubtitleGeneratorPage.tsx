@@ -404,12 +404,16 @@ export const SubtitleGeneratorPage: React.FC = () => {
                     {/* Saved path */}
                     {result?.srtPath && (
                         <div style={{
-                            display: 'flex', alignItems: 'center', gap: 10,
+                            display: 'flex', alignItems: 'flex-start', gap: 10,
                             padding: '10px 14px', borderRadius: 'var(--r-control)',
                             background: 'var(--c-sage-bg)', border: '1px solid var(--c-sage)',
                         }}>
-                            <CheckCircle style={{ width: 15, height: 15, color: 'var(--c-sage)', flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--c-sage)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <CheckCircle style={{ width: 15, height: 15, color: 'var(--c-sage)', flexShrink: 0, marginTop: 1 }} />
+                            <span
+                                style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--c-sage)', wordBreak: 'break-all', cursor: 'pointer' }}
+                                onClick={() => (window as any).electronAPI?.showItemInFolder?.(result.srtPath)}
+                                title="Click to show in Explorer"
+                            >
                                 Saved: {result.srtPath}
                             </span>
                         </div>
@@ -525,7 +529,7 @@ export const SubtitleGeneratorPage: React.FC = () => {
                                         <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{opt.label}</span>
                                         <p style={{ margin: '2px 0 0', fontSize: 11.5, color: 'var(--muted)' }}>{opt.desc}</p>
                                         {opt.value === 'virtual_drive' && outputMode === 'virtual_drive' && (
-                                            <p style={{ margin: '3px 0 0', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--c-clay)' }}>
+                                            <p style={{ margin: '3px 0 0', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--c-clay)', wordBreak: 'break-all' }}>
                                                 {outputPath ? `${outputPath}\\SubtitleResults` : 'No output path set in Settings.'}
                                             </p>
                                         )}

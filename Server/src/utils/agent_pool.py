@@ -167,6 +167,20 @@ class AgentPool:
 
                 except asyncio.CancelledError:
                     raise
+                except (
+                    aioredis.ConnectionError,
+                    aioredis.TimeoutError,
+                    ConnectionResetError,
+                    OSError,
+                ) as exc:
+                    logger.warning("Worker %d: Redis connection lost (%s) — reconnecting in 2 s", worker_id, exc)
+                    await asyncio.sleep(2)
+                    try:
+                        await redis.aclose()
+                    except Exception:
+                        pass
+                    redis = aioredis.from_url(settings.REDIS_URL, decode_responses=True)
+                    logger.info("Worker %d: Redis reconnected", worker_id)
                 except Exception as exc:
                     logger.error("Worker %d unexpected error: %s", worker_id, exc)
                     await asyncio.sleep(1)

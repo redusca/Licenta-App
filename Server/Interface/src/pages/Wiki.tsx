@@ -380,7 +380,7 @@ const AI_GATEWAY_PAGE: WikiPage = {
         body={`multipart/form-data\n{\n  "file": <audio binary>,\n  "language": "en"\n}`}
         response={`{ "text": "Transcribed content...", "segments": [...] }`}
       />
-      <Endpoint method="POST" path="/ai/chat" desc="Send a prompt to the Gemini model" auth
+      <Endpoint method="POST" path="/ai/llm/generate" desc="Send a prompt to the Groq LLM" auth
         body={`{\n  "prompt": "Explain LangGraph",\n  "history": []\n}`}
         response={`{ "response": "LangGraph is a library...", "tokens_used": 142 }`}
       />
@@ -389,7 +389,7 @@ const AI_GATEWAY_PAGE: WikiPage = {
         response={`{ "srt_url": "/static/output/<uuid>.srt" }`}
       />
       <Endpoint method="GET" path="/ai/status" desc="Return load state of all models" auth
-        response={`{\n  "swin2sr": { "loaded": false, "last_used": null },\n  "whisper": { "loaded": true,  "last_used": 1719000000 },\n  "gemini":  { "loaded": true,  "last_used": 1719000100 },\n  "video":   { "loaded": false, "last_used": null }\n}`}
+        response={`{\n  "status": "ok",\n  "models": [\n    { "name": "swin2sr", "is_loaded": false, "device": "cpu" },\n    { "name": "whisper", "is_loaded": true,  "device": "cpu" }\n  ]\n}`}
       />
     </>
   ),
@@ -410,7 +410,7 @@ const AGENT_PAGE: WikiPage = {
       <WikiTable
         headers={['Node', 'Role', 'Output']}
         rows={[
-          ['plan', 'Gemini decomposes the user task into ordered steps', 'List of step strings'],
+          ['plan', 'Groq LLM decomposes the user task into ordered steps', 'List of step strings'],
           ['execute', 'Dispatches the next step to ReAct sub-graph', 'Tool call or direct answer'],
           ['tool', 'POSTs to callback_url, waits for FileO approval', 'Tool execution result'],
           ['reflect', 'Checks if all steps are done or re-plans', 'done | replan | next_step'],
@@ -456,20 +456,21 @@ const TECH_STACK_PAGE: WikiPage = {
       <WikiTable
         headers={['Package', 'Version', 'Role']}
         rows={[
-          ['fastapi', '≥0.110', 'Async HTTP framework, automatic OpenAPI'],
-          ['uvicorn', '≥0.29', 'ASGI server'],
-          ['langgraph', '≥0.0.40', 'Agent graph execution (ReAct + Plan-and-Execute)'],
-          ['langchain-google-genai', '≥1.0', 'Gemini LLM integration'],
-          ['redis', '≥5.0', 'Task queue (LPUSH/BRPOP) and pub/sub'],
-          ['supabase', '≥2.4', 'PostgreSQL client (Supabase)'],
+          ['fastapi + uvicorn', '≥0.110 / ≥0.29', 'Async HTTP framework + ASGI server'],
+          ['sqlalchemy + alembic', 'latest', 'ORM and database migrations (PostgreSQL)'],
+          ['psycopg2-binary', 'latest', 'PostgreSQL driver'],
           ['python-jose[cryptography]', '≥3.3', 'JWT signing and verification'],
-          ['passlib[bcrypt]', '≥1.7', 'Password hashing'],
-          ['torch + torchvision', '≥2.2', 'PyTorch for Swin2SR inference'],
-          ['openai-whisper', 'latest', 'Audio transcription (runs locally)'],
-          ['Pillow', '≥10.0', 'Image processing for Swin2SR output'],
-          ['ffmpeg-python', '≥0.2', 'Video processing for VideoSubtitle'],
+          ['bcrypt', 'latest', 'Password hashing'],
+          ['pydantic-settings', '≥2.0', 'Settings and request/response validation'],
           ['httpx', '≥0.27', 'Async HTTP client for tool callbacks'],
-          ['pydantic', '≥2.0', 'Request/response schema validation'],
+          ['redis[asyncio]', '≥5.0', 'Task queue (LPUSH/BRPOP) and pub/sub'],
+          ['groq', '≥0.9', 'Groq LLM client (planning agent + LLM chat endpoints)'],
+          ['langchain + langgraph', 'latest', 'ReAct agent graph execution'],
+          ['langchain-google-genai', '≥1.0', 'Google AI SDK (tool-calling agent)'],
+          ['torch + torchvision', '≥2.2', 'PyTorch for Swin2SR inference (CPU wheels)'],
+          ['transformers + accelerate', 'latest', 'Whisper Large V3 inference'],
+          ['pillow + numpy', '≥10.0', 'Image processing for Swin2SR'],
+          ['soundfile', 'latest', 'Audio decoding for Whisper'],
         ]}
       />
       <h3>FileO desktop stack</h3>
@@ -488,10 +489,11 @@ const TECH_STACK_PAGE: WikiPage = {
       <WikiTable
         headers={['Service', 'Provider', 'Notes']}
         rows={[
-          ['PostgreSQL', 'Supabase (cloud)', 'User + AgentKey tables; free tier sufficient'],
-          ['Redis', 'Self-hosted or Redis Cloud', 'Required for agent task queue'],
-          ['Gemini API', 'Google AI', 'Requires user API key; stored encrypted in AgentKey'],
-          ['Container', 'Docker / docker-compose', 'Single-file compose stack in Server/docker/'],
+          ['PostgreSQL', 'Self-hosted or cloud', 'User + AgentKey tables; configured via DATABASE_URL'],
+          ['Redis', 'Self-hosted or Redis Cloud', 'Required for agent task queue; configured via REDIS_URL'],
+          ['Groq API', 'Groq', 'GROQ_API_KEY required — planning agent and LLM chat endpoints'],
+          ['Google AI API', 'Google', 'GOOGLE_API_KEY required — ReAct tool-calling agent'],
+          ['Container', 'Docker / docker-compose', 'Compose stacks in Server/docker/'],
         ]}
       />
     </>

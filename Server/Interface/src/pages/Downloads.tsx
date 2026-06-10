@@ -142,7 +142,7 @@ export default function Downloads() {
             'No Python installation required — bundled via PyInstaller',
             '4 GB RAM recommended (8 GB for AI models)',
             'GPU optional — models fall back to CPU automatically',
-            'Internet connection for Gemini API calls only',
+            'Internet connection required for LLM API calls (Groq)',
           ].map(req => (
             <div key={req} className="dl-req-row">
               <div className="dl-dot"/>

@@ -49,10 +49,10 @@ def _get_groq():
     global _groq_client
     if _groq_client is None:
         from groq import AsyncGroq
-        api_key = settings.GROQ_API_KEY or os.environ.get("KEY", "")
+        api_key = settings.GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
         if not api_key:
             raise RuntimeError(
-                "No Groq API key found. Set GROQ_API_KEY (or KEY) in .env"
+                "No Groq API key found. Set GROQ_API_KEY in .env"
             )
         _groq_client = AsyncGroq(api_key=api_key)
     return _groq_client

@@ -21,12 +21,13 @@ from pathlib import Path
 
 import requests
 from flask import Blueprint, jsonify, request, Response, stream_with_context
+from utils.paths import get_data_dir
 
 logger = logging.getLogger(__name__)
 
 agent_bp = Blueprint("agent", __name__)
 
-_CONFIG_PATH = Path(__file__).parent.parent.parent / "data" / "agent_config.json"
+_CONFIG_PATH = get_data_dir() / "agent_config.json"
 
 _DEFAULT_CONFIG: dict = {
     "mode": "server_proxy",

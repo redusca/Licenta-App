@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, send_file
 from utils.drive_manager import create_drive, add_file, add_folder, get_drive_config, delete_item, rename_item, paste_items, open_item, get_drive_tree, delete_drive, move_drive_contents, rename_drive_config, resolve_shortcut
 from utils.mft_scan import scan_drive, search_volume, get_volume_stats, list_directory_mft, invalidate_cache, build_path_map
 from utils.drives_registry import load_registry, save_registry
+from utils.paths import get_data_dir
 from migrations import migrate_all_known_drives
 from config import APP_VERSION
 import os
@@ -16,8 +17,7 @@ def get_registry():
 
         # Also include tool-created drives from tool_drives.json
         import json as _json
-        from pathlib import Path as _Path
-        _tool_drives_path = _Path(__file__).parent.parent.parent / "data" / "tool_drives.json"
+        _tool_drives_path = get_data_dir() / "tool_drives.json"
         tool_drives: list = []
         if _tool_drives_path.exists():
             try:

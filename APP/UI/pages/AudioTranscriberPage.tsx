@@ -375,9 +375,13 @@ export const AudioTranscriberPage: React.FC = () => {
 
                     {/* Saved path */}
                     {result?.outputPath && (
-                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-300 text-sm">
+                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/25 border border-emerald-200 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-300 text-sm">
                             <CheckCircle className="w-4 h-4 shrink-0" />
-                            <span className="text-xs font-mono text-green-400 truncate">Saved: {result.outputPath}</span>
+                            <span
+                                className="text-xs font-mono break-all cursor-pointer hover:underline"
+                                onClick={() => (window as any).electronAPI?.showItemInFolder?.(result.outputPath)}
+                                title="Click to show in Explorer"
+                            >Saved: {result.outputPath}</span>
                         </div>
                     )}
 
@@ -484,7 +488,7 @@ export const AudioTranscriberPage: React.FC = () => {
                                         <span className="text-sm text-slate-300 group-hover:text-slate-200 transition-colors">{opt.label}</span>
                                         <p className="text-xs text-slate-500">{opt.desc}</p>
                                         {opt.value === 'virtual_drive' && outputMode === 'virtual_drive' && (
-                                            <p className="text-xs font-mono mt-0.5 text-purple-400">
+                                            <p className="text-xs font-mono mt-0.5 text-purple-400 break-all">
                                                 {outputPath ? `${outputPath}\\TranscriptResults` : 'No output path set in Settings.'}
                                             </p>
                                         )}

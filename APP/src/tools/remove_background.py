@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
+import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -28,6 +30,110 @@ _TOOL_DRIVES_PATH = _DATA_DIR / "tool_drives.json"
 _CONFIG_FILENAME = ".drive_config.json"
 SUPPORTED_INPUT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 OUTPUT_FORMATS = {"png"}
+
+# Cached path to a system Python that has rembg+onnxruntime installed
+_PYTHON_EXE_CACHE: str | None = None
+_PYTHON_EXE_SEARCHED = False
+
+
+def _find_python_with_rembg() -> str | None:
+    """Find a Python interpreter (outside this bundle) that has rembg available."""
+    global _PYTHON_EXE_CACHE, _PYTHON_EXE_SEARCHED
+    if _PYTHON_EXE_SEARCHED:
+        return _PYTHON_EXE_CACHE
+
+    _PYTHON_EXE_SEARCHED = True
+
+    candidates: list[str] = []
+
+    # When NOT bundled, the current interpreter already works — no need to spawn
+    if not getattr(sys, "frozen", False):
+        _PYTHON_EXE_CACHE = sys.executable
+        return _PYTHON_EXE_CACHE
+
+    # PATH lookup
+    for name in ("python", "python3", "py"):
+        found = shutil.which(name)
+        if found:
+            candidates.append(found)
+
+    # Common Windows per-user install locations
+    local_app = os.environ.get("LOCALAPPDATA", "")
+    for ver in ("Python313", "Python312", "Python311", "Python310", "Python39"):
+        p = os.path.join(local_app, "Programs", "Python", ver, "python.exe")
+        candidates.append(p)
+
+    # System-wide installs
+    for ver in ("313", "312", "311", "310", "39"):
+        candidates.append(rf"C:\Python{ver}\python.exe")
+
+    seen: set[str] = set()
+    for exe in candidates:
+        if not exe or exe in seen:
+            continue
+        seen.add(exe)
+        if not os.path.isfile(exe):
+            continue
+        try:
+            r = subprocess.run(
+                [exe, "-c", "import rembg, onnxruntime"],
+                capture_output=True,
+                timeout=15,
+            )
+            if r.returncode == 0:
+                _PYTHON_EXE_CACHE = exe
+                return exe
+        except Exception:
+            pass
+
+    return None
+
+
+# The background-removal logic executed in the subprocess
+_REMBG_SCRIPT = """\
+import sys
+from PIL import Image
+from rembg import remove
+
+src, dst, preserve = sys.argv[1], sys.argv[2], sys.argv[3] == 'true'
+img = Image.open(src)
+out = remove(img)
+kw = {}
+if preserve:
+    try:
+        ex = img.info.get('exif')
+        if ex:
+            kw['exif'] = ex
+    except Exception:
+        pass
+out.save(dst, format='PNG', **kw)
+"""
+
+
+def _remove_background_subprocess(
+    src_path: str,
+    dst_path: str,
+    preserve_metadata: bool = True,
+) -> None:
+    python_exe = _find_python_with_rembg()
+    if not python_exe:
+        raise RuntimeError(
+            "rembg requires onnxruntime, which could not be loaded in this environment. "
+            "Make sure Python with 'rembg' installed is available on your PATH."
+        )
+
+    result = subprocess.run(
+        [python_exe, "-c", _REMBG_SCRIPT, src_path, dst_path,
+         "true" if preserve_metadata else "false"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+    if result.returncode != 0 or not os.path.isfile(dst_path):
+        detail = (result.stderr or "").strip()[-500:]
+        raise RuntimeError(f"Background removal failed: {detail or 'unknown error'}")
+
 
 def _ensure_model(model_name: str = "u2net") -> None:
     try:
@@ -51,7 +157,7 @@ def _ensure_model(model_name: str = "u2net") -> None:
         print(f"Downloaded {model_name} successfully.")
     except Exception as e:
         print(f"Warning: Failed to pre-download rembg model: {e}")
-        # rembg will try its own download as fallback
+
 
 DEFINITION = {
     "name": "remove_background",
@@ -105,7 +211,6 @@ DEFINITION = {
 }
 
 
-
 def _load_tool_drives() -> list:
     if _TOOL_DRIVES_PATH.exists():
         try:
@@ -132,7 +237,6 @@ def _register_tool_drive(drive_path: str, name: str, tool: str) -> None:
     _save_tool_drives(drives)
 
 
-
 def _ensure_virtual_drive(output_path: str) -> str:
     drive_name = "RemovedBackgrounds"
     drive_path = os.path.join(output_path, drive_name)
@@ -157,12 +261,17 @@ def _ensure_virtual_drive(output_path: str) -> str:
     return drive_path
 
 
-
 def _remove_background(
     src_path: str,
     dst_path: str,
     preserve_metadata: bool = True,
 ) -> None:
+    # When running inside a PyInstaller bundle, onnxruntime native DLLs may not
+    # be loadable — delegate to the system Python which has them properly installed.
+    if getattr(sys, "frozen", False):
+        _remove_background_subprocess(src_path, dst_path, preserve_metadata)
+        return
+
     try:
         from PIL import Image
     except ImportError:
@@ -227,7 +336,6 @@ def execute(input: dict) -> str:
     results = []
     for item in files:
         src = item.get("path", "")
-        raw_fmt = item.get("outputFormat", "").lower().lstrip(".")
 
         if not src or not os.path.isfile(src):
             results.append({"path": src, "success": False, "error": "File not found"})
@@ -274,7 +382,6 @@ def execute(input: dict) -> str:
     return json.dumps(response)
 
 
-
 def _process_single_item(
     item: dict,
     output_mode: str,
@@ -312,6 +419,7 @@ def _process_single_item(
         return {"path": src, "outputPath": final, "success": True}
     except Exception as exc:
         return {"path": src, "success": False, "error": str(exc)}
+
 
 def execute_parallel(input_data: dict, max_workers: int = 4) -> str:
     _ensure_model()

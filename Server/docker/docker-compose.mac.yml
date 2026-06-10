@@ -1,13 +1,13 @@
-# Licenta Server � Production Docker Compose
+# Licenta Server — macOS / Apple Silicon Docker Compose
 #
-# Usage (from repo root):
-#   docker compose -f Server/docker/docker-compose.yml up --build
+# Build context is the Server/ folder — download only that from GitHub.
+#
+# Usage (from Server/):
+#   docker compose -f docker/docker-compose.mac.yml up --build
 #
 # Pre-requisites:
-#   1. Copy Server/src/.env.example ? Server/src/.env and fill in secrets
-#   2. Build the React interface: cd Server/Interface && npm install && npm run build
-#
-# Services: postgres, redis, server (with embedded 5-worker agent pool)
+#   1. Install Docker Desktop for Mac
+#   2. Copy src/.env.example → src/.env and fill in your secrets
 
 version: "3.9"
 
@@ -16,13 +16,16 @@ services:
   # -- PostgreSQL --------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
+    platform: linux/arm64
     restart: unless-stopped
     environment:
       POSTGRES_DB: licenta
       POSTGRES_USER: licenta
       POSTGRES_PASSWORD: licenta
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_mac:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U licenta"]
       interval: 5s
@@ -32,23 +35,26 @@ services:
   # -- Redis (task queue for the agent pool) ----------------------------------
   redis:
     image: redis:7-alpine
+    platform: linux/arm64
     restart: unless-stopped
     command: redis-server --save "" --appendonly no
+    ports:
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
 
-  # -- Licenta Server ---------------------------------------------------------
+  # -- Licenta Server ----------------------------------------------------------
   server:
-    image: europe-west10-docker.pkg.dev/licenta-ubb/licenta-server/server:latest
+    platform: linux/arm64
     build:
-      context: ../..
-      dockerfile: Server/docker/Dockerfile
+      context: ..                          # Server/ folder is all that is needed
+      dockerfile: docker/Dockerfile.mac
     restart: unless-stopped
     env_file:
-      - ../src/.env           # JWT_SECRET, GOOGLE_API_KEY, GITHUB_TOKEN, etc.
+      - src/.env
     environment:
       DATABASE_URL: postgresql://licenta:licenta@postgres:5432/licenta
       REDIS_URL: redis://redis:6379/0
@@ -57,6 +63,10 @@ services:
       PORT: "8000"
     ports:
       - "8000:8000"
+    volumes:
+      # Persist HuggingFace model cache — avoids re-downloading multi-GB weights on every restart
+      - hf_cache_mac:/root/.cache/huggingface
+    # host.docker.internal resolves automatically on macOS — no extra_hosts needed
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,5 +74,7 @@ services:
         condition: service_healthy
 
 volumes:
-  postgres_data:
+  postgres_data_mac:
+    driver: local
+  hf_cache_mac:
     driver: local
