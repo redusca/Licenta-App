@@ -271,6 +271,7 @@ def get_llm_insights(text: str, word_count: int) -> dict[str, Any]:
                 "temperature": 0.2,
                 "max_output_tokens": 1024,
             },
+            headers=ai_gateway.auth_headers(),
             timeout=(5, 90),
         )
         resp.raise_for_status()

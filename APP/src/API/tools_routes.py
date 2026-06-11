@@ -721,6 +721,7 @@ def image_enhancer_run():
         resp = _req.post(
             f"{ai_gateway.get_url()}/api/ai/upscale/swin2sr",
             files={"file": (os.path.basename(file_path), raw, mime)},
+            headers=ai_gateway.auth_headers(),
             timeout=(10, 900),
         )
         resp.raise_for_status()
@@ -804,6 +805,7 @@ def audio_transcriber_run():
             f"{ai_gateway.get_url()}/api/ai/transcribe/whisper",
             files={"file": (os.path.basename(file_path), raw)},
             data=form_data,
+            headers=ai_gateway.auth_headers(),
             timeout=(10, 1200),
         )
         resp.raise_for_status()
@@ -891,6 +893,7 @@ def image_enhancer_stream():
             resp = _req.post(
                 f"{ai_gateway.get_url()}/api/ai/upscale/swin2sr/stream",
                 files={"file": (filename, file_bytes, mime)},
+                headers=ai_gateway.auth_headers(),
                 stream=True,
                 timeout=(10, 900),
             )
@@ -993,6 +996,7 @@ def audio_transcriber_stream():
                 f"{ai_gateway.get_url()}/api/ai/transcribe/whisper/stream",
                 files={"file": (filename, file_bytes)},
                 data=form_data,
+                headers=ai_gateway.auth_headers(),
                 stream=True,
                 timeout=(10, 1200),
             )
@@ -1133,6 +1137,7 @@ def subtitle_generator_stream():
                     f"{ai_gateway.get_url()}/api/ai/subtitle/whisper/stream",
                     files={"file": ("audio.wav", audio_bytes, "audio/wav")},
                     data=form_data,
+                    headers=ai_gateway.auth_headers(),
                     stream=True,
                     timeout=(10, 1800),
                 )

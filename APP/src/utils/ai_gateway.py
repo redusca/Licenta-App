@@ -14,16 +14,18 @@ from utils.paths import get_data_dir
 logger = logging.getLogger(__name__)
 
 
+def _load_cfg() -> dict:
+    cfg_path = get_data_dir() / "agent_config.json"
+    if not cfg_path.exists():
+        return {}
+    with open(cfg_path, encoding="utf-8") as f:
+        return json.load(f)
+
+
 def get_url() -> str:
     """Return the AI Gateway base URL from agent_config.json, stripped of trailing slash."""
     try:
-        cfg_path = get_data_dir() / "agent_config.json"
-        if not cfg_path.exists():
-            logger.warning("ai_gateway.get_url: config not found at %s", cfg_path)
-            return ""
-        with open(cfg_path, encoding="utf-8") as f:
-            cfg = json.load(f)
-        url = cfg.get("server_url", "").rstrip("/")
+        url = _load_cfg().get("server_url", "").rstrip("/")
         if not url:
             logger.warning("ai_gateway.get_url: server_url is empty in config")
         return url
@@ -32,18 +34,43 @@ def get_url() -> str:
         return ""
 
 
+def get_api_key() -> str:
+    """Return the API key from agent_config.json."""
+    try:
+        return _load_cfg().get("api_key", "")
+    except Exception:
+        logger.exception("ai_gateway.get_api_key: failed to read config")
+        return ""
+
+
+def auth_headers() -> dict:
+    """Return the X-API-Key header dict for AI Gateway requests."""
+    key = get_api_key()
+    return {"X-API-Key": key} if key else {}
+
+
 def health_check(timeout: int = 3) -> tuple[bool, str]:
     """
-    Check if the AI Gateway host is reachable.
-    Any HTTP response (even 404) means the server is up.
-    Only a connection error or timeout means it is offline.
-    Returns (True, "") when reachable, (False, human-readable error) otherwise.
+    Check AI Gateway reachability and API key validity.
+    Sends the API key with the status request so the server can reject it with 401
+    if the key is wrong — catching auth failures before the actual AI request.
+    Returns (True, "") on success, (False, human-readable error) otherwise.
     """
     base = get_url()
     if not base:
         return False, "AI Gateway URL not configured. Go to Settings → Agent Connection."
+    api_key = get_api_key()
+    if not api_key:
+        return False, "API key not configured. Go to Settings → Agent Connection."
     try:
-        requests.get(f"{base}/api/ai/status", timeout=timeout)
+        resp = requests.get(
+            f"{base}/api/ai/status",
+            headers={"X-API-Key": api_key},
+            timeout=timeout,
+        )
+        if resp.status_code == 401:
+            logger.warning("ai_gateway.health_check: 401 at %s — invalid API key", base)
+            return False, "Invalid API key — the server rejected authentication. Go to Settings → Agent Connection."
         return True, ""
     except requests.exceptions.ConnectionError:
         logger.warning("ai_gateway.health_check: connection refused at %s", base)

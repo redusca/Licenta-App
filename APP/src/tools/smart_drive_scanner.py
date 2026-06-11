@@ -67,6 +67,7 @@ def _analyze_image(path: str) -> dict[str, Any]:
                     "Be concise and factual."
                 ),
             },
+            headers=ai_gateway.auth_headers(),
             timeout=(5, 60),
         )
         resp.raise_for_status()
@@ -91,6 +92,7 @@ def _analyze_audio(path: str) -> dict[str, Any]:
             f"{ai_gateway.get_url()}/api/ai/transcribe/whisper",
             files={"file": (os.path.basename(path), raw)},
             data={"max_new_tokens": "128"},
+            headers=ai_gateway.auth_headers(),
             timeout=(10, 300),
         )
         resp.raise_for_status()
