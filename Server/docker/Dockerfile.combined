@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # -- Combined Server + Redis image --------------------------------------------
 # Runs Redis and the Licenta server in a single container via supervisord.
 # Postgres still needs to be provided externally (DATABASE_URL env var).
@@ -14,18 +15,31 @@
 
 FROM python:3.12-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# BuildKit cache: apt packages are persisted between builds — no re-download on source changes.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
+    libsndfile1 \
+    ffmpeg \
     redis-server \
-    supervisor \
-    && rm -rf /var/lib/apt/lists/*
+    supervisor
 
 WORKDIR /app
 
-# Python dependencies
+# Python dependencies — two layers so the torch cache layer survives source-only rebuilds.
+# BuildKit cache: pip wheels are reused across builds; torch layer is only re-run when
+# requirements.txt changes (not on every source file change).
 COPY Server/src/requirements.txt ./requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    grep -v -E '^\s*(torch|torchvision)\b' requirements.txt \
+    | grep -v '^\s*$' > requirements-base.txt && \
+    pip install --timeout 300 --retries 5 -r requirements-base.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --timeout 300 --retries 5 \
+      --index-url https://download.pytorch.org/whl/cpu \
+      torch torchvision
 
 # Application source
 COPY Server/src/ ./src/

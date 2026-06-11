@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # -- Server image (Production) ------------------------------------------------
 # Build from the repo root:
 #   docker build -t licenta-server:latest -f Server/docker/Dockerfile .
@@ -11,28 +12,36 @@
 FROM node:20-slim AS frontend
 WORKDIR /app/Interface
 COPY Server/Interface/package.json Server/Interface/package-lock.json* ./
-RUN npm ci
+# BuildKit cache: node_modules are NOT re-downloaded if package-lock.json is unchanged.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 COPY Server/Interface/ ./
 RUN npm run build
 
 # ── Stage 2: Python server ────────────────────────────────────────────────────
 FROM python:3.12-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# BuildKit cache: apt packages are persisted between builds — no re-download on source changes.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     libsndfile1 \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+    ffmpeg
 
 WORKDIR /app
 
 # Python dependencies — two layers; torch/torchvision use CPU-only wheels (~250 MB).
+# BuildKit cache: pip wheels are reused across builds; torch layer is only re-run when
+# requirements.txt changes (not on every source file change).
 COPY Server/src/requirements.txt ./requirements.txt
-RUN grep -v -E '^\s*(torch|torchvision)\b' requirements.txt \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    grep -v -E '^\s*(torch|torchvision)\b' requirements.txt \
     | grep -v '^\s*$' > requirements-base.txt && \
-    pip install --no-cache-dir --timeout 300 --retries 5 -r requirements-base.txt
-RUN pip install --no-cache-dir --timeout 300 --retries 5 \
+    pip install --timeout 300 --retries 5 -r requirements-base.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --timeout 300 --retries 5 \
       --index-url https://download.pytorch.org/whl/cpu \
       torch torchvision
 

@@ -49,6 +49,8 @@ services:
     build:
       context: ../..        # repo root
       dockerfile: Server/docker/Dockerfile.dev
+      cache_from:
+        - licenta-server:dev
     restart: unless-stopped
     env_file:
       - ../src/.env         # copy from .env.example and fill in your secrets

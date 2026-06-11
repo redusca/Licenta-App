@@ -52,9 +52,11 @@ services:
     build:
       context: ..                          # Server/ folder is all that is needed
       dockerfile: docker/Dockerfile.mac
+      cache_from:
+        - licenta-server:mac
     restart: unless-stopped
     env_file:
-      - src/.env
+      - ../src/.env
     environment:
       DATABASE_URL: postgresql://licenta:licenta@postgres:5432/licenta
       REDIS_URL: redis://redis:6379/0
