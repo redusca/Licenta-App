@@ -10,10 +10,11 @@ import io
 import json
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 import requests
+
+import utils.ai_gateway as ai_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,6 @@ _AUDIO_EXTS = frozenset({".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma"
 _DOC_EXTS   = frozenset({".pdf", ".docx", ".doc", ".txt", ".md", ".html", ".htm"})
 _VIDEO_EXTS = frozenset({".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"})
 
-_AI_GATEWAY = "http://127.0.0.1:8000"
 _MAX_FILES   = 500   # hard cap on files collected by the scan
 _DEFAULT_MAX_ANALYZE = 50
 
@@ -57,7 +57,7 @@ def _analyze_image(path: str) -> dict[str, Any]:
 
     try:
         resp = requests.post(
-            f"{_AI_GATEWAY}/api/ai/vision/llama-scout",
+            f"{ai_gateway.get_url()}/api/ai/vision/llama-scout",
             files={"file": ("thumb.jpg", img_bytes, "image/jpeg")},
             data={
                 "max_tokens": "80",
@@ -88,7 +88,7 @@ def _analyze_audio(path: str) -> dict[str, Any]:
         with open(path, "rb") as fh:
             raw = fh.read()
         resp = requests.post(
-            f"{_AI_GATEWAY}/api/ai/transcribe/whisper",
+            f"{ai_gateway.get_url()}/api/ai/transcribe/whisper",
             files={"file": (os.path.basename(path), raw)},
             data={"max_new_tokens": "128"},
             timeout=(10, 300),

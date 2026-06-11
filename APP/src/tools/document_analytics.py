@@ -19,6 +19,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import utils.ai_gateway as ai_gateway
+
 logger = logging.getLogger(__name__)
 
 # ── Stopwords (English) ───────────────────────────────────────────────────────
@@ -204,7 +206,6 @@ def _flesch_grade(score: float) -> str:
 
 # ── LLM insight via gateway ───────────────────────────────────────────────────
 
-_LLM_GATEWAY = "http://127.0.0.1:8000"
 _INSIGHT_WORD_LIMIT = 1500  # words sent to LLM — keeps context short so the model has room to respond
 
 _SYSTEM_PROMPT = (
@@ -263,7 +264,7 @@ def get_llm_insights(text: str, word_count: int) -> dict[str, Any]:
 
     try:
         resp = requests.post(
-            f"{_LLM_GATEWAY}/api/ai/llm/generate",
+            f"{ai_gateway.get_url()}/api/ai/llm/generate",
             json={
                 "prompt": prompt,
                 "system": _SYSTEM_PROMPT,
@@ -284,7 +285,8 @@ def get_llm_insights(text: str, word_count: int) -> dict[str, Any]:
             "error": None,
         }
     except requests.exceptions.ConnectionError:
-        return {"error": "LLM Gateway not running (port 8000)", "summary": "", "topics": [], "tone": "", "entities": [], "truncated": truncated}
+        url = ai_gateway.get_url()
+        return {"error": f"Cannot connect to AI Gateway at {url}", "summary": "", "topics": [], "tone": "", "entities": [], "truncated": truncated}
     except requests.exceptions.Timeout:
         return {"error": "LLM Gateway timed out (90 s)", "summary": "", "topics": [], "tone": "", "entities": [], "truncated": truncated}
     except json.JSONDecodeError:

@@ -10,6 +10,7 @@ from pathlib import Path
 
 from flask import Blueprint, jsonify, request, Response, stream_with_context
 from utils.paths import get_data_dir
+import utils.ai_gateway as ai_gateway
 
 from tools import ask_user as ask_user_tool
 from tools import hello as hello_tool
@@ -582,17 +583,13 @@ def blend_to_glb():
         return jsonify({"error": f"Blender conversion error: {exc}"}), 500
 
 
-_AI_GATEWAY_BASE = "http://127.0.0.1:8000"
-
-
 @tools_bp.get("/ai-gateway/status")
 def ai_gateway_status():
-    import requests as _req
-    try:
-        r = _req.get(f"{_AI_GATEWAY_BASE}/api/ai/status", timeout=5)
-        return jsonify(r.json()), r.status_code
-    except _req.exceptions.ConnectionError:
-        return jsonify({"status": "offline", "error": "AI Gateway is not running"}), 503
+    ok, err = ai_gateway.health_check()
+    if ok:
+        return jsonify({"status": "ok"})
+    return jsonify({"status": "offline", "error": err}), 503
+
 
 
 @tools_bp.post("/open-file")
@@ -714,18 +711,22 @@ def image_enhancer_run():
     mime_map = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
     mime = mime_map.get(ext, "image/png")
 
+    gw_ok, gw_err = ai_gateway.health_check()
+    if not gw_ok:
+        return jsonify({"error": gw_err}), 503
+
     try:
         with open(file_path, "rb") as fh:
             raw = fh.read()
         resp = _req.post(
-            f"{_AI_GATEWAY_BASE}/api/ai/upscale/swin2sr",
+            f"{ai_gateway.get_url()}/api/ai/upscale/swin2sr",
             files={"file": (os.path.basename(file_path), raw, mime)},
             timeout=(10, 900),
         )
         resp.raise_for_status()
         result = resp.json()
     except _req.exceptions.ConnectionError:
-        return jsonify({"error": "AI Gateway is not running. Start the Server (port 8000) first."}), 503
+        return jsonify({"error": f"Lost connection to AI Gateway at {ai_gateway.get_url()}"}), 503
     except _req.exceptions.Timeout:
         return jsonify({"error": "Request timed out — the model may still be loading. Try again in a moment."}), 504
     except _req.exceptions.HTTPError as exc:
@@ -785,6 +786,10 @@ def audio_transcriber_run():
     if not file_path or not os.path.isfile(file_path):
         return jsonify({"error": "File not found or invalid path"}), 400
 
+    gw_ok, gw_err = ai_gateway.health_check()
+    if not gw_ok:
+        return jsonify({"error": gw_err}), 503
+
     try:
         with open(file_path, "rb") as fh:
             raw = fh.read()
@@ -796,7 +801,7 @@ def audio_transcriber_run():
             form_data["expected_text"] = expected_text
 
         resp = _req.post(
-            f"{_AI_GATEWAY_BASE}/api/ai/transcribe/whisper",
+            f"{ai_gateway.get_url()}/api/ai/transcribe/whisper",
             files={"file": (os.path.basename(file_path), raw)},
             data=form_data,
             timeout=(10, 1200),
@@ -804,7 +809,7 @@ def audio_transcriber_run():
         resp.raise_for_status()
         result = resp.json()
     except _req.exceptions.ConnectionError:
-        return jsonify({"error": "AI Gateway is not running. Start the Server (port 8000) first."}), 503
+        return jsonify({"error": f"Lost connection to AI Gateway at {ai_gateway.get_url()}"}), 503
     except _req.exceptions.Timeout:
         return jsonify({"error": "Request timed out — the model may still be loading. Try again in a moment."}), 504
     except _req.exceptions.HTTPError as exc:
@@ -878,20 +883,18 @@ def image_enhancer_stream():
                         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     def _generate():
+        ok, err = ai_gateway.health_check()
+        if not ok:
+            yield _err_event(err)
+            return
         try:
             resp = _req.post(
-                f"{_AI_GATEWAY_BASE}/api/ai/upscale/swin2sr/stream",
+                f"{ai_gateway.get_url()}/api/ai/upscale/swin2sr/stream",
                 files={"file": (filename, file_bytes, mime)},
                 stream=True,
                 timeout=(10, 900),
             )
-        except _req.exceptions.ConnectionError:
-            yield _err_event("AI Gateway is not running. Start the Server (port 8000) first.")
-            return
-        except _req.exceptions.Timeout:
-            yield _err_event("Connection to AI Gateway timed out.")
-            return
-        except Exception as exc:
+        except _req.exceptions.RequestException as exc:
             yield _err_event(str(exc))
             return
 
@@ -981,21 +984,19 @@ def audio_transcriber_stream():
         form_data["expected_text"] = expected_text
 
     def _generate():
+        ok, err = ai_gateway.health_check()
+        if not ok:
+            yield _err_event(err)
+            return
         try:
             resp = _req.post(
-                f"{_AI_GATEWAY_BASE}/api/ai/transcribe/whisper/stream",
+                f"{ai_gateway.get_url()}/api/ai/transcribe/whisper/stream",
                 files={"file": (filename, file_bytes)},
                 data=form_data,
                 stream=True,
                 timeout=(10, 1200),
             )
-        except _req.exceptions.ConnectionError:
-            yield _err_event("AI Gateway is not running. Start the Server (port 8000) first.")
-            return
-        except _req.exceptions.Timeout:
-            yield _err_event("Connection to AI Gateway timed out.")
-            return
-        except Exception as exc:
+        except _req.exceptions.RequestException as exc:
             yield _err_event(str(exc))
             return
 
@@ -1089,6 +1090,10 @@ def subtitle_generator_stream():
     base_name = os.path.splitext(filename)[0]
 
     def _generate():
+        ok, err = ai_gateway.health_check()
+        if not ok:
+            yield _err_event(err)
+            return
         tmp_audio = None
         try:
             yield _evt({"stage": "extracting_audio", "message": "Extracting audio from video...", "progress": 0.05})
@@ -1125,16 +1130,13 @@ def subtitle_generator_stream():
 
             try:
                 resp = _req.post(
-                    f"{_AI_GATEWAY_BASE}/api/ai/subtitle/whisper/stream",
+                    f"{ai_gateway.get_url()}/api/ai/subtitle/whisper/stream",
                     files={"file": ("audio.wav", audio_bytes, "audio/wav")},
                     data=form_data,
                     stream=True,
                     timeout=(10, 1800),
                 )
-            except _req.exceptions.ConnectionError:
-                yield _err_event("AI Gateway is not running. Start the Server (port 8000) first.")
-                return
-            except Exception as exc:
+            except _req.exceptions.RequestException as exc:
                 yield _err_event(str(exc))
                 return
 

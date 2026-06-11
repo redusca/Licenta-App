@@ -22,6 +22,7 @@ from pathlib import Path
 import requests
 from flask import Blueprint, jsonify, request, Response, stream_with_context
 from utils.paths import get_data_dir
+import utils.ai_gateway as ai_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -30,15 +31,11 @@ agent_bp = Blueprint("agent", __name__)
 _CONFIG_PATH = get_data_dir() / "agent_config.json"
 
 _DEFAULT_CONFIG: dict = {
-    "mode": "server_proxy",
     "server_url": "http://localhost:8000",
     "api_key": "",
-    "container_url": "",
     "output_path": "",
 }
 
-# When the Server (Docker) calls back to the APP's tool executor,
-# it must reach the host machine via host.docker.internal.
 _TOOL_CALLBACK_URL = "http://host.docker.internal:5000/api/tools/execute"
 
 # In-memory map: api_key → chat_id currently active on the server.
@@ -55,8 +52,9 @@ def _load_config() -> dict:
                 data = json.load(f)
             data.pop("session_id", None)
             data.pop("jwt_token", None)
-            if "api_key" not in data:
-                data["api_key"] = data.pop("container_api_key", "") or ""
+            data.pop("mode", None)
+            data.pop("container_url", None)
+            data.pop("container_api_key", None)
             return {**_DEFAULT_CONFIG, **data}
         except Exception:
             pass
@@ -76,11 +74,7 @@ def _agent_headers(cfg: dict) -> dict:
 # ── Tool list builder ──────────────────────────────────────────────────────────
 
 def _build_tool_list() -> list[dict]:
-    """
-    Build the tool definitions to send to the planning agent.
-    Injects callback_url pointing to this APP's /execute endpoint
-    (using host.docker.internal so the Server container can reach it).
-    """
+    """Build the tool definitions to send to the planning agent."""
     try:
         from API.tools_routes import _TOOLS
         defs: list[dict] = []
@@ -108,9 +102,7 @@ def get_config():
 def save_config():
     data = request.get_json(force=True) or {}
     cfg = _load_config()
-    cfg["mode"] = data.get("mode", cfg["mode"])
     cfg["server_url"] = data.get("server_url", cfg["server_url"])
-    cfg["container_url"] = data.get("container_url", cfg["container_url"])
     if data.get("api_key"):
         cfg["api_key"] = data["api_key"]
     if "output_path" in data:
@@ -130,10 +122,12 @@ def create_chat():
     """
     cfg = _load_config()
     api_key = cfg.get("api_key", "")
-    server_url = cfg.get("server_url", "http://localhost:8000").rstrip("/")
+    server_url = ai_gateway.get_url()
 
     if not api_key:
         return jsonify({"error": "API key not configured. Go to Settings → Agent Connection."}), 400
+    if not server_url:
+        return jsonify({"error": "AI server URL not configured. Go to Settings → Agent Connection."}), 400
 
     tools = _build_tool_list()
     try:
@@ -145,6 +139,12 @@ def create_chat():
         )
         resp.raise_for_status()
         data = resp.json()
+    except requests.exceptions.HTTPError as exc:
+        status = exc.response.status_code if exc.response is not None else 0
+        if status == 401:
+            return jsonify({"error": "Invalid API key — the server rejected authentication (401). Go to Settings → Agent Connection and update the key."}), 401
+        logger.error("Failed to create chat: %s", exc)
+        return jsonify({"error": f"Server returned error {status}: {exc}"}), 502
     except requests.RequestException as exc:
         logger.error("Failed to create chat: %s", exc)
         return jsonify({"error": f"Cannot reach server: {exc}"}), 502
@@ -169,7 +169,7 @@ def delete_chat():
     """Delete the active chat on the server and clear local state."""
     cfg = _load_config()
     api_key = cfg.get("api_key", "")
-    server_url = cfg.get("server_url", "http://localhost:8000").rstrip("/")
+    server_url = ai_gateway.get_url()
     chat_id = _ACTIVE_CHATS.pop(api_key, None)
     if chat_id:
         try:
@@ -207,10 +207,12 @@ def stream_chat():
 
     cfg = _load_config()
     api_key = cfg.get("api_key", "")
-    server_url = cfg.get("server_url", "http://localhost:8000").rstrip("/")
+    server_url = ai_gateway.get_url()
 
     if not api_key:
         return jsonify({"error": "API key not configured"}), 400
+    if not server_url:
+        return jsonify({"error": "AI server URL not configured. Go to Settings → Agent Connection."}), 400
 
     # Accept an explicit chat_id (e.g. after page reload) or use active one
     chat_id = body.get("chat_id") or _ACTIVE_CHATS.get(api_key)
