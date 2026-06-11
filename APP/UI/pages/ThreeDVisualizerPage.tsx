@@ -65,6 +65,49 @@ async function loadTextureFromPath(filePath: string): Promise<THREE.Texture> {
     });
 }
 
+// Returns only textures that are likely related to the given model file.
+// Priority: (1) textures/ subfolder next to model, (2) files sharing the model's base name,
+// (3) files in the same directory, (4) everything (fallback).
+function filterRelatedTextures(textures: FolderFile[], modelFilePath: string): FolderFile[] {
+    const lastSep = Math.max(modelFilePath.lastIndexOf('/'), modelFilePath.lastIndexOf('\\'));
+    const modelDir = modelFilePath.substring(0, lastSep).toLowerCase();
+    const modelBase = modelFilePath.substring(lastSep + 1).replace(/\.[^.]+$/, '').toLowerCase();
+
+    const TEXTURE_SUBDIRS = new Set(['textures', 'tex', 'maps', 'materials', 'mat']);
+
+    const getDirOf = (f: FolderFile) => {
+        const s = Math.max(f.path.lastIndexOf('/'), f.path.lastIndexOf('\\'));
+        return f.path.substring(0, s).toLowerCase();
+    };
+    const getDirName = (dir: string) => dir.split(/[/\\]/).pop()?.toLowerCase() || '';
+    const getParentDir = (dir: string) => {
+        const s = Math.max(dir.lastIndexOf('/'), dir.lastIndexOf('\\'));
+        return s !== -1 ? dir.substring(0, s) : dir;
+    };
+
+    // Tier 1: dedicated textures subfolder (textures/, tex/, maps/, etc.) next to the model
+    const tier1 = textures.filter(f => {
+        const dir = getDirOf(f);
+        return TEXTURE_SUBDIRS.has(getDirName(dir)) && getParentDir(dir) === modelDir;
+    });
+    if (tier1.length > 0) return tier1;
+
+    const sameDir = textures.filter(f => getDirOf(f) === modelDir);
+
+    // Tier 2: same dir + filename starts with or contains the model's base name
+    const nameMatch = sameDir.filter(f => {
+        const fn = f.name.toLowerCase().replace(/\.[^.]+$/, '');
+        return fn.startsWith(modelBase) || fn.includes(modelBase);
+    });
+    if (nameMatch.length > 0) return nameMatch;
+
+    // Tier 3: any image in the same directory as the model
+    if (sameDir.length > 0) return sameDir;
+
+    // Tier 4: fallback — all images (original behaviour)
+    return textures;
+}
+
 function classifyTexture(name: string): string {
     const n = name.toLowerCase();
     // Strip extension for cleaner matching
@@ -210,7 +253,8 @@ function Model({
 
         // ── applyTextures: fetch-based, fully async ──
         const applyTextures = async (obj: THREE.Object3D) => {
-            const texFiles = folderFiles.filter(f => !f.is_dir && TEXTURE_EXTS.includes(getExt(f.name)));
+            const allTexFiles = folderFiles.filter(f => !f.is_dir && TEXTURE_EXTS.includes(getExt(f.name)));
+            const texFiles = filterRelatedTextures(allTexFiles, modelPath);
             if (texFiles.length === 0) { setStatus(''); return; }
 
             setStatus(`Loading ${texFiles.length} texture(s)…`);
@@ -452,7 +496,10 @@ export const ThreeDVisualizerPage: React.FC = () => {
 
     // Derived lists
     const modelFiles = useMemo(() => folderFiles.filter(f => !f.is_dir && MODEL_EXTS.includes(getExt(f.name))), [folderFiles]);
-    const textureFiles = useMemo(() => folderFiles.filter(f => !f.is_dir && TEXTURE_EXTS.includes(getExt(f.name))), [folderFiles]);
+    const textureFiles = useMemo(() => {
+        const all = folderFiles.filter(f => !f.is_dir && TEXTURE_EXTS.includes(getExt(f.name)));
+        return modelPath ? filterRelatedTextures(all, modelPath) : all;
+    }, [folderFiles, modelPath]);
     const mtlFiles = useMemo(() => folderFiles.filter(f => !f.is_dir && getExt(f.name) === 'mtl'), [folderFiles]);
 
     // Load folder contents from API
@@ -672,7 +719,7 @@ export const ThreeDVisualizerPage: React.FC = () => {
                                 )}
                             </div>
                             <p className="text-xs text-slate-500 mt-3 leading-snug">
-                                Textures are auto-mapped by filename: <code className="text-slate-400">norm</code>, <code className="text-slate-400">rough</code>, <code className="text-slate-400">metal</code>, <code className="text-slate-400">ao</code>, <code className="text-slate-400">emit</code> → PBR slots. Others → diffuse.
+                                Prefers a <code className="text-slate-400">textures/</code> subfolder, then files matching the model name, then same-folder images. Mapped by keyword: <code className="text-slate-400">norm</code>, <code className="text-slate-400">rough</code>, <code className="text-slate-400">metal</code>, <code className="text-slate-400">ao</code>, <code className="text-slate-400">emit</code> → PBR slots.
                             </p>
                         </div>
                     )}

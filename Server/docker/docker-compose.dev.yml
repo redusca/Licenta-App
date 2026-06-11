@@ -31,19 +31,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # -- Redis (task queue for the agent pool) ----------------------------------
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --save "" --appendonly no
-    ports:
-      - "6379:6379"         # accessible from host for redis-cli debugging
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   # -- Licenta Server (built locally, hot-reload) ----------------------------
   server:
     build:
@@ -56,9 +43,6 @@ services:
       - ../src/.env         # copy from .env.example and fill in your secrets
     environment:
       DATABASE_URL: postgresql://licenta:licenta@postgres:5432/licenta
-      REDIS_URL: redis://redis:6379/0
-      AGENT_WORKER_COUNT: "5"
-      MODEL_NAME: gemini-2.5-flash
     ports:
       - "8000:8000"
     volumes:
@@ -75,8 +59,6 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
 volumes:

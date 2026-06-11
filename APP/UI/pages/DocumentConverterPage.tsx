@@ -316,7 +316,7 @@ export const DocumentConverterPage: React.FC = () => {
                                         {OUTPUT_FORMATS.map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
                                     </select>
                                     <button type="button" onClick={applyGlobalFormat}
-                                        className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">
+                                        className="text-xs px-3 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 font-medium transition-colors">
                                         Apply to all
                                     </button>
                                 </div>

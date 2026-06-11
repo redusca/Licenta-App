@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Mic, ChevronRight, FolderOpen, Files, FolderSearch,
     CheckCircle, AlertCircle, FileAudio,
-    Copy, Download, Cpu, ZapOff, Zap, Check, RefreshCw,
+    Copy, Download, Check,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 
@@ -25,8 +25,6 @@ const LANGUAGES = [
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type OutputMode = 'none' | 'copy' | 'virtual_drive';
-interface GatewayModel { name: string; is_loaded: boolean; device: string; task: string }
-
 interface Progress {
     stage: string;
     message: string;
@@ -131,18 +129,8 @@ export const AudioTranscriberPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
-    const [gatewayModels, setGatewayModels] = useState<GatewayModel[]>([]);
-    const [gatewayOnline, setGatewayOnline] = useState<boolean | null>(null);
-
     useEffect(() => {
-        Promise.all([
-            fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({})),
-            fetch(`${FLASK_BASE}/api/tools/ai-gateway/status`).then(r => r.json()).catch(() => null),
-        ]).then(([cfgData, gwData]) => {
-            setOutputPath(cfgData.output_path || '');
-            if (gwData?.status === 'ok') { setGatewayOnline(true); setGatewayModels(gwData.models || []); }
-            else setGatewayOnline(false);
-        });
+        fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).then(d => setOutputPath(d.output_path || '')).catch(() => {});
     }, []);
 
     const pickFile = useCallback((path: string, name: string, size: number) => {
@@ -265,7 +253,6 @@ export const AudioTranscriberPage: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
-    const whisperModel = gatewayModels.find(m => m.name?.toLowerCase().includes('whisper'));
     const canRun = !!selectedFile && !running;
 
     return (
@@ -395,44 +382,6 @@ export const AudioTranscriberPage: React.FC = () => {
 
                 {/* ── Right ── */}
                 <div className="space-y-4">
-
-                    {/* Gateway status */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-                        <p className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                            <Cpu className="w-4 h-4" />AI Gateway
-                        </p>
-                        {gatewayOnline === null ? (
-                            <div className="flex items-center gap-2 text-slate-500 text-xs">
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />Checking...
-                            </div>
-                        ) : gatewayOnline ? (
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-xs text-green-400">
-                                    <span className="w-2 h-2 rounded-full bg-green-400" />Online — port 8000
-                                </div>
-                                {whisperModel && (
-                                    <div className="flex items-center justify-between text-xs mt-1">
-                                        <span className="text-slate-500">Whisper</span>
-                                        <span className={`flex items-center gap-1 ${whisperModel.is_loaded ? 'text-green-400' : 'text-slate-500'}`}>
-                                            {whisperModel.is_loaded
-                                                ? <><Zap className="w-3 h-3" />Loaded ({whisperModel.device})</>
-                                                : <><ZapOff className="w-3 h-3" />Will load on first run</>}
-                                        </span>
-                                    </div>
-                                )}
-                                {!whisperModel?.is_loaded && (
-                                    <p className="text-xs text-slate-600 mt-1">First run downloads ~3 GB and loads into VRAM — may take 3–5 min.</p>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="space-y-1.5">
-                                <div className="flex items-center gap-2 text-xs text-red-400">
-                                    <span className="w-2 h-2 rounded-full bg-red-400" />Offline
-                                </div>
-                                <p className="text-xs text-slate-600">Start the Server container on port 8000 first.</p>
-                            </div>
-                        )}
-                    </div>
 
                     {/* Language */}
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">

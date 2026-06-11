@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 DEFINITION = {
     "name": "drive_creator",
-    "description": "Scans a folder for specific extensions and creates a virtual drive containing them.",
+    "description": (
+        "Scans a folder for specific extensions and creates a NEW virtual drive containing them. "
+        "Use this only when the user wants to CREATE a new drive by grouping files. "
+        "Do NOT use this to move files between two existing drives — use drive_file_mover for that."
+    ),
     "input_instructions": (
         "sourceFolder: the folder to scan — use ask_user(input_type='folder') to pick from the app's virtual drives. "
         "extensions: list of extensions to include, e.g. ['.jpg', '.png', '.mp4']. "

@@ -41,6 +41,67 @@ def load_registry() -> list[dict]:
         return []
 
 
+def resolve_drive(name_or_path: str) -> str | None:
+    """
+    Resolve a drive name or path string to an absolute directory path.
+
+    Resolution order:
+      1. Already an absolute path that exists on disk → return as-is.
+      2. Exact case-insensitive match on registry display name.
+      3. Exact case-insensitive match on the folder's basename.
+      4. Fuzzy: query is a substring of a name, OR a name is a substring of
+         the query — only when exactly one registry entry matches.
+      5. Fallback: relative/bare path that is a real directory.
+
+    Returns None if nothing matches.
+    """
+    if not name_or_path:
+        return None
+    value = name_or_path.strip()
+
+    # 1 — absolute path
+    if os.path.isabs(value) and os.path.isdir(value):
+        return value
+
+    norm = value.lower()
+
+    try:
+        registry = load_registry()
+    except Exception:
+        registry = []
+
+    # 2 & 3 — exact matches
+    for entry in registry:
+        ep: str = entry.get("path", "")
+        en: str = entry.get("name", "")
+        if not os.path.isdir(ep):
+            continue
+        if en.lower() == norm or os.path.basename(ep).lower() == norm:
+            return ep
+
+    # 4 — fuzzy substring match (unique hit only)
+    candidates: list[str] = []
+    for entry in registry:
+        ep = entry.get("path", "")
+        en = entry.get("name", "")
+        if not os.path.isdir(ep):
+            continue
+        en_l = en.lower()
+        base_l = os.path.basename(ep).lower()
+        if norm in en_l or en_l in norm or norm in base_l or base_l in norm:
+            if ep not in candidates:
+                candidates.append(ep)
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # 5 — bare relative path
+    if os.path.isdir(value):
+        return os.path.abspath(value)
+
+    return None
+
+
 def save_registry(drives: list[dict]) -> None:
     """
     Overwrite the registry with *drives*.

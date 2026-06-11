@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, ChevronRight, FolderOpen, Files, FolderSearch,
-    RefreshCw, CheckCircle, AlertCircle, Film,
-    Copy, Download, Cpu, ZapOff, Zap, Check,
+    CheckCircle, AlertCircle, Film,
+    Copy, Download, Check,
     Languages, FileText,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
@@ -50,7 +50,6 @@ const TRANSLATE_LANGUAGES = [
 ];
 
 type OutputMode = 'copy' | 'virtual_drive';
-interface GatewayModel { name: string; is_loaded: boolean; device: string; task: string }
 interface Progress { stage: string; message: string; pct: number }
 interface SubtitleResult {
     srtPath: string; srtContent: string;
@@ -150,18 +149,8 @@ export const SubtitleGeneratorPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
-    const [gatewayModels, setGatewayModels] = useState<GatewayModel[]>([]);
-    const [gatewayOnline, setGatewayOnline] = useState<boolean | null>(null);
-
     useEffect(() => {
-        Promise.all([
-            fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).catch(() => ({})),
-            fetch(`${FLASK_BASE}/api/tools/ai-gateway/status`).then(r => r.json()).catch(() => null),
-        ]).then(([cfgData, gwData]) => {
-            setOutputPath(cfgData.output_path || '');
-            if (gwData?.status === 'ok') { setGatewayOnline(true); setGatewayModels(gwData.models || []); }
-            else setGatewayOnline(false);
-        });
+        fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).then(d => setOutputPath(d.output_path || '')).catch(() => {});
     }, []);
 
     const pickFile = useCallback((path: string, name: string, size: number) => {
@@ -252,7 +241,6 @@ export const SubtitleGeneratorPage: React.FC = () => {
         URL.revokeObjectURL(url);
     };
 
-    const whisperModel = gatewayModels.find(m => m.name?.toLowerCase().includes('whisper'));
     const canRun = !!selectedFile && !running;
 
     const selectStyle: React.CSSProperties = {
@@ -447,48 +435,6 @@ export const SubtitleGeneratorPage: React.FC = () => {
 
                 {/* ── Right column ── */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-                    {/* AI Gateway status */}
-                    <div style={card}>
-                        <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <Cpu style={{ width: 14, height: 14, color: 'var(--muted)' }} />AI Gateway
-                        </p>
-                        {gatewayOnline === null ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--muted)', fontSize: 12 }}>
-                                <RefreshCw style={{ width: 13, height: 13 }} className="spin" />Checking...
-                            </div>
-                        ) : gatewayOnline ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--c-sage)' }}>
-                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--c-sage)', display: 'inline-block' }} />
-                                    Online — port 8000
-                                </div>
-                                {whisperModel && (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
-                                        <span style={{ color: 'var(--muted)' }}>Whisper</span>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: whisperModel.is_loaded ? 'var(--c-sage)' : 'var(--muted)' }}>
-                                            {whisperModel.is_loaded
-                                                ? <><Zap style={{ width: 11, height: 11 }} />Loaded ({whisperModel.device})</>
-                                                : <><ZapOff style={{ width: 11, height: 11 }} />Will load on first run</>}
-                                        </span>
-                                    </div>
-                                )}
-                                {!whisperModel?.is_loaded && (
-                                    <p style={{ margin: 0, fontSize: 11, color: 'var(--faint)', lineHeight: 1.4 }}>
-                                        First run downloads ~3 GB and loads into VRAM — may take 3–5 min.
-                                    </p>
-                                )}
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--c-clay)' }}>
-                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--c-clay)', display: 'inline-block' }} />
-                                    Offline
-                                </div>
-                                <p style={{ margin: 0, fontSize: 11, color: 'var(--faint)' }}>Start the Server container on port 8000 first.</p>
-                            </div>
-                        )}
-                    </div>
 
                     {/* Video Language */}
                     <div style={card}>

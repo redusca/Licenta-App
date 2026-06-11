@@ -65,10 +65,8 @@ const FLASK = 'http://127.0.0.1:5000/api/agent';
 const HELLO_PROMPT = 'Give me a fun fact and say hello!';
 
 interface AgentConfig {
-    mode: 'server_proxy' | 'direct';
     server_url: string;
     api_key_set: boolean;
-    container_url: string;
 }
 
 function ConfigStatus({ onReady }: { onReady: (ok: boolean) => void }) {
@@ -79,15 +77,12 @@ function ConfigStatus({ onReady }: { onReady: (ok: boolean) => void }) {
             .then(r => r.json())
             .then((c: AgentConfig) => {
                 setCfg(c);
-                const ok = c.api_key_set && (c.mode === 'server_proxy' ? !!c.server_url : !!c.container_url);
-                onReady(ok);
+                onReady(c.api_key_set && !!c.server_url);
             })
             .catch(() => onReady(false));
     }, [onReady]);
 
-    const configured = cfg?.api_key_set && (
-        cfg.mode === 'server_proxy' ? !!cfg.server_url : !!cfg.container_url
-    );
+    const configured = cfg?.api_key_set && !!cfg.server_url;
 
     return (
         <div className={`flex items-center justify-between px-5 py-3.5 rounded-xl border mb-6 ${configured
@@ -99,7 +94,7 @@ function ConfigStatus({ onReady }: { onReady: (ok: boolean) => void }) {
                     : <AlertCircle className="w-4 h-4 text-yellow-400" />}
                 <span className={configured ? 'text-green-300' : 'text-yellow-300'}>
                     {configured
-                        ? `Agent connected via ${cfg!.mode === 'server_proxy' ? 'server proxy' : 'direct'} — ${cfg!.mode === 'server_proxy' ? cfg!.server_url : cfg!.container_url}`
+                        ? `Agent connected — ${cfg!.server_url}`
                         : 'Agent not configured. Set server URL and API key in Settings.'}
                 </span>
             </div>

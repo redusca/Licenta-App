@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { ToolApprovalCard, PendingTool } from '../components/ToolApprovalModal';
 import { FolderPickerModal } from '../components/FolderPickerModal';
+import { PipelineDiagram, PipelineStep } from '../components/PipelineDiagram';
 
 const AGENT = 'http://127.0.0.1:5000/api/agent';
 const TOOLS = 'http://127.0.0.1:5000/api/tools';
@@ -73,6 +74,7 @@ interface ChatEntry {
   content: string;
   attachments?: Attachment[];
   outputFiles?: string[];
+  pipeline?: PipelineStep[];
 }
 
 interface HistoryChat {
@@ -411,6 +413,14 @@ const RunCard: React.FC<{ run: LiveRun; planOpen: boolean; onTogglePlan: () => v
               )}
             </>
           )}
+          {/* Live pipeline diagram — shows as steps complete */}
+          {run.plan.filter(s => s.type === 'tool' && s.tool && s.tool !== 'ask_user' && (s.status === 'done' || s.status === 'error')).length >= 2 && (
+            <PipelineDiagram
+              steps={run.plan
+                .filter(s => s.type === 'tool' && s.tool && s.tool !== 'ask_user' && (s.status === 'done' || s.status === 'error'))
+                .map(s => ({ tool: s.tool!, desc: s.description, result: s.result ?? '{}', status: s.status as 'done' | 'error' }))}
+            />
+          )}
           {run.synthesis && (
             <div style={{ marginTop: run.plan.length > 0 ? 14 : 0, fontSize: 14, color: 'var(--ink)', lineHeight: 1.6 }}>
               <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -502,7 +512,7 @@ const mdComponents = {
   },
 };
 
-const AssistantBubble: React.FC<{ content: string; outputFiles?: string[] }> = ({ content, outputFiles }) => (
+const AssistantBubble: React.FC<{ content: string; outputFiles?: string[]; pipeline?: PipelineStep[] }> = ({ content, outputFiles, pipeline }) => (
   <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
     <Avatar kind="bot" />
     <div style={{ maxWidth: '80%', flex: 1 }}>
@@ -529,6 +539,9 @@ const AssistantBubble: React.FC<{ content: string; outputFiles?: string[] }> = (
               {outputFiles.map((p, i) => <FileLink key={i} path={p} />)}
             </div>
           </div>
+        )}
+        {pipeline && pipeline.length >= 2 && (
+          <PipelineDiagram steps={pipeline} />
         )}
       </div>
     </div>
@@ -686,10 +699,14 @@ export const Chat: React.FC = () => {
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Mirrors live state so handleEvent (stable callback) can read current plan
+  const liveRef = useRef<LiveRun | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [entries, live?.synthesis, pendingTool]);
+
+  useEffect(() => { liveRef.current = live; }, [live]);
 
   useEffect(() => {
     if (!showAttachMenu) return;
@@ -863,18 +880,24 @@ export const Chat: React.FC = () => {
       case 'final_chunk':
         setLive(prev => prev ? { ...prev, synthesis: prev.synthesis + (evt.content ?? '') } : null);
         break;
-      case 'final':
+      case 'final': {
+        const pipeline: PipelineStep[] = (liveRef.current?.plan ?? [])
+          .filter(s => s.type === 'tool' && s.tool && s.tool !== 'ask_user' && s.tool !== 'hello'
+                    && (s.status === 'done' || s.status === 'error'))
+          .map(s => ({ tool: s.tool!, desc: s.description, result: s.result ?? '{}', status: s.status as 'done' | 'error' }));
         setLastToolOutputPaths(prev => {
           setEntries(e => [...e, {
             id: `a-${Date.now()}`,
             kind: 'assistant',
             content: evt.response ?? '',
             outputFiles: prev.length > 0 ? [...prev] : undefined,
+            pipeline: pipeline.length >= 2 ? pipeline : undefined,
           }]);
           return prev;
         });
         setLive(null);
         break;
+      }
       case 'error':
         setEntries(prev => [...prev, {
           id: `e-${Date.now()}`,
@@ -1198,7 +1221,7 @@ export const Chat: React.FC = () => {
 
             {entries.map(entry => {
               if (entry.kind === 'user')      return <UserBubble key={entry.id} content={entry.content} attachments={entry.attachments} />;
-              if (entry.kind === 'assistant') return <AssistantBubble key={entry.id} content={entry.content} outputFiles={entry.outputFiles} />;
+              if (entry.kind === 'assistant') return <AssistantBubble key={entry.id} content={entry.content} outputFiles={entry.outputFiles} pipeline={entry.pipeline} />;
               return <ErrorBubble key={entry.id} content={entry.content} />;
             })}
 

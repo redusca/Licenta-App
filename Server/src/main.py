@@ -21,7 +21,6 @@ from API.auth_routes import router as auth_router
 from API.releases_routes import router as releases_router
 from API.agent_routes import router as agent_router
 from API.ai_gateway.router import router as ai_gateway_router
-from utils.agent_pool import AgentPool
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s — %(message)s")
 logger = logging.getLogger(__name__)
@@ -52,13 +51,8 @@ async def lifespan(app: FastAPI):
     logger.info("Groq model: %s", settings.GROQ_MODEL)
     # ─────────────────────────────────────────────────────────────────────────
 
-    pool = AgentPool()
-    await pool.start(settings.AGENT_WORKER_COUNT)
-    app.state.agent_pool = pool
-
     yield
 
-    await pool.shutdown()
     logger.info("Server shutting down")
 
 

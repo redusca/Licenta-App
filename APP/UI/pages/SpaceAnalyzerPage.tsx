@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
-    ArrowLeft, ChevronRight, Folder, File, Loader2, PieChart, HardDrive, Play, ArrowUpCircle
+    ArrowLeft, ChevronRight, Folder, File, Loader2, PieChart, HardDrive, Play, ArrowUpCircle, ChevronDown
 } from 'lucide-react';
 import { MediaPreviewModal } from '../components/MediaPreviewModal';
 
@@ -244,6 +244,17 @@ export const SpaceAnalyzerPage: React.FC = () => {
     const [history, setHistory] = useState<string[]>([]); // stack of paths
     const [targetDirInput, setTargetDirInput] = useState<string>(''); // specific folder
     const [availableDrives, setAvailableDrives] = useState<string[]>([]);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node))
+                setDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     useEffect(() => {
         let intv: number, fileIntv: number;
@@ -285,16 +296,6 @@ export const SpaceAnalyzerPage: React.FC = () => {
             })
             .catch(console.error);
     }, []);
-
-    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const val = e.target.value;
-        if (val === 'FOLDER') {
-            browseFolder();
-        } else {
-            setDriveLetter(val);
-            setTargetDirInput('');
-        }
-    };
 
     const browseFolder = async () => {
         const dir = await (window as any).electronAPI?.selectDirectory?.();
@@ -401,20 +402,53 @@ export const SpaceAnalyzerPage: React.FC = () => {
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 flex flex-wrap items-center gap-4">
                 <div className="flex items-center gap-3">
                     <span className="text-xs text-slate-400 uppercase font-semibold whitespace-nowrap hidden sm:block">Target:</span>
-                    <div className="relative">
-                        <select 
-                            value={targetDirInput ? 'FOLDER' : driveLetter} 
-                            onChange={handleSelectChange}
-                            className="w-48 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 appearance-none pl-9"
+
+                    {/* Custom dropdown — fixes re-select bug and looks better */}
+                    <div className="relative" ref={dropdownRef}>
+                        <button
+                            type="button"
+                            onClick={() => setDropdownOpen(v => !v)}
+                            className="flex items-center gap-2 w-48 bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500 transition-colors"
                         >
-                            {availableDrives.length === 0 && <option value="C">C:\ (Windows)</option>}
-                            {availableDrives.map(d => (
-                                <option key={d} value={d}>{d}:\</option>
-                            ))}
-                            <option disabled>──────────</option>
-                            <option value="FOLDER">📁 Select Folder...</option>
-                        </select>
-                        <HardDrive className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                            {targetDirInput
+                                ? <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+                                : <HardDrive className="w-4 h-4 text-slate-400 shrink-0" />
+                            }
+                            <span className="flex-1 text-left truncate">
+                                {targetDirInput
+                                    ? (targetDirInput.split(/[/\\]/).filter(Boolean).pop() || targetDirInput)
+                                    : `${driveLetter}:\\`
+                                }
+                            </span>
+                            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {dropdownOpen && (
+                            <div className="absolute left-0 top-full mt-1.5 w-52 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-50 py-1.5 overflow-hidden">
+                                {(availableDrives.length === 0 ? ['C'] : availableDrives).map(d => (
+                                    <button
+                                        key={d}
+                                        type="button"
+                                        onClick={() => { setDriveLetter(d); setTargetDirInput(''); setDropdownOpen(false); }}
+                                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-slate-700 ${
+                                            driveLetter === d && !targetDirInput ? 'bg-slate-700/60 text-white' : 'text-slate-300'
+                                        }`}
+                                    >
+                                        <HardDrive className="w-4 h-4 text-slate-400 shrink-0" />
+                                        {d}:\
+                                    </button>
+                                ))}
+                                <div className="my-1.5 border-t border-slate-700/70" />
+                                <button
+                                    type="button"
+                                    onClick={() => { setDropdownOpen(false); browseFolder(); }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 transition-colors"
+                                >
+                                    <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+                                    Select Folder…
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -424,7 +458,7 @@ export const SpaceAnalyzerPage: React.FC = () => {
                 </button>
 
                 {targetDirInput && (
-                    <div className="text-xs text-emerald-400 font-mono truncate px-2 border-l border-slate-700 max-w-sm flex-1">
+                    <div className="text-xs text-emerald-400 font-mono truncate px-2 border-l border-slate-700 max-w-sm flex-1" title={targetDirInput}>
                         {targetDirInput}
                     </div>
                 )}

@@ -149,9 +149,16 @@ function startPythonBackend() {
     args = [];
   }
 
-  console.log(`Starting Python backend: ${command} ${args.join(' ')}`);
+  // Always pass the data directory explicitly so dev and prod use the same location.
+  const dataDir = isDev
+    ? path.join(__dirname, '../data')
+    : path.join(process.resourcesPath, 'backend', 'data');
 
-  pythonProcess = spawn(command, args);
+  console.log(`Starting Python backend: ${command} ${args.join(' ')} (data: ${dataDir})`);
+
+  pythonProcess = spawn(command, args, {
+    env: { ...process.env, APP_DATA_DIR: dataDir },
+  });
 
   pythonProcess.stdout?.on('data', (data) => {
     console.log(`[Python stdout]: ${data}`);

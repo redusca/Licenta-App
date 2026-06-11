@@ -378,7 +378,7 @@ export const VideoCompressorPage: React.FC = () => {
                             </label>
 
                             <button type="button" onClick={applyGlobalSettings} disabled={files.length === 0}
-                                className="w-full py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 text-sm transition-colors disabled:opacity-50">
+                                className="w-full py-2 border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 rounded-lg text-rose-400 text-sm font-medium transition-colors disabled:opacity-50">
                                 Apply to all files
                             </button>
                         </div>

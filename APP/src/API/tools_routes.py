@@ -30,6 +30,13 @@ from tools.subtitle_generator import build_srt as _build_srt
 from tools import document_analytics as document_analytics_tool
 from tools import smart_drive_scanner as smart_drive_scanner_tool
 from tools import smart_drive_builder as smart_drive_builder_tool
+from tools import drive_file_mover as drive_file_mover_tool
+from tools import drive_list as drive_list_tool
+from tools import drive_inspector as drive_inspector_tool
+from tools import drive_rename as drive_rename_tool
+from tools import drive_delete as drive_delete_tool
+from tools import drive_create_empty as drive_create_empty_tool
+from tools import file_content_reader as file_content_reader_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
@@ -83,6 +90,18 @@ _LAST_OUTPUT_LOCK = threading.Lock()
 _LAST_SCAN_FILES: list[dict] = []
 _LAST_SCAN_LOCK = threading.Lock()
 
+# Pipeline log — one entry per tool execution within the current agent run
+_PIPELINE_LOG: list[dict] = []
+_PIPELINE_LOCK = threading.Lock()
+
+# Tracks the most recently created/operated-on virtual drive path so subsequent
+# tools can chain onto it without the agent needing to hard-code the path.
+_LAST_VIRTUAL_DRIVE: list[str] = []   # 0 or 1 element
+_LAST_DRIVE_LOCK = threading.Lock()
+
+# Fields that refer to an existing virtual drive by name or path
+_DRIVE_FIELDS = frozenset({"sourceDrive", "destinationDrive", "driveName"})
+
 
 def _looks_like_real_path(p: str) -> bool:
     if not p or len(p) < 3:
@@ -120,7 +139,53 @@ def _substitute_placeholders(tool_input: dict, real_paths: list[str]) -> dict:
     return {**tool_input, "files": new_files}
 
 
-def _record_outputs(result_json: str, tool_name: str = "") -> None:
+def _patch_drive_fields(tool_name: str, tool_input: dict) -> dict:
+    """
+    For every drive-related string field in tool_input:
+      1. Try resolve_drive() — exact match, then fuzzy substring match.
+      2. If still unresolved, fall back to the last known virtual drive path.
+
+    Also, for drive_create_empty: if 'location' is blank/unresolvable,
+    inject the parent directory of the last known virtual drive.
+    """
+    from utils.drives_registry import resolve_drive
+
+    with _LAST_DRIVE_LOCK:
+        last_drive = _LAST_VIRTUAL_DRIVE[0] if _LAST_VIRTUAL_DRIVE else None
+
+    result = dict(tool_input)
+
+    for field in _DRIVE_FIELDS:
+        value = result.get(field)
+        if not isinstance(value, str) or not value.strip():
+            continue
+        # Already a valid absolute dir path — leave it
+        if _looks_like_real_path(value) and os.path.isdir(value):
+            continue
+        resolved = resolve_drive(value)
+        if resolved:
+            if resolved != value:
+                logger.info("drive field '%s.%s': '%s' → '%s'", tool_name, field, value, resolved)
+            result[field] = resolved
+        elif last_drive and os.path.isdir(last_drive):
+            logger.info("drive field '%s.%s': no match for '%s', falling back to last drive %s",
+                        tool_name, field, value, last_drive)
+            result[field] = last_drive
+
+    # Special case: drive_create_empty needs a 'location' (parent dir) not a drive path
+    if tool_name == "drive_create_empty":
+        loc = result.get("location", "")
+        if not isinstance(loc, str) or not loc.strip() or not os.path.isdir(loc):
+            if last_drive:
+                parent = os.path.dirname(last_drive)
+                if os.path.isdir(parent):
+                    result["location"] = parent
+                    logger.info("drive_create_empty: defaulting location to %s", parent)
+
+    return result
+
+
+def _record_outputs(result_json: str, tool_name: str = "", tool_input: dict | None = None) -> None:
     try:
         parsed = json.loads(result_json)
     except Exception:
@@ -148,11 +213,34 @@ def _record_outputs(result_json: str, tool_name: str = "") -> None:
             _LAST_SCAN_FILES.clear()
             _LAST_SCAN_FILES.extend(parsed["files"])
 
+    # Track the most recently produced virtual drive path for field chaining
+    vdp = (parsed.get("virtualDrivePath") or parsed.get("drivePath")
+           or parsed.get("destinationPath"))
+    if not vdp and isinstance(parsed.get("drive"), dict):
+        vdp = parsed["drive"].get("path")
+    if vdp and isinstance(vdp, str) and os.path.isdir(vdp):
+        with _LAST_DRIVE_LOCK:
+            _LAST_VIRTUAL_DRIVE.clear()
+            _LAST_VIRTUAL_DRIVE.append(vdp)
+
+    # Append to pipeline log for diagram generation
+    if tool_name and tool_name not in ("ask_user", "hello"):
+        import datetime
+        entry = {
+            "tool": tool_name,
+            "timestamp": datetime.datetime.utcnow().isoformat(),
+            "success": parsed.get("success", True),
+            "result": parsed,
+            "input": {k: v for k, v in (tool_input or {}).items() if k not in ("files",)},
+        }
+        with _PIPELINE_LOCK:
+            _PIPELINE_LOG.append(entry)
+
 _APPROVAL_REQUIRED = frozenset({
     "image_converter", "remove_background", "image_to_svg",
     "video_converter", "video_compressor", "audio_converter",
     "drive_creator", "pdf_merger", "model_converter", "document_converter",
-    "smart_drive_build",
+    "smart_drive_build", "drive_file_mover", "drive_rename", "drive_delete",
 })
 
 _TOOLS: dict[str, object] = {
@@ -173,6 +261,13 @@ _TOOLS: dict[str, object] = {
     "document_analytics": document_analytics_tool,
     "smart_drive_scan": smart_drive_scanner_tool,
     "smart_drive_build": smart_drive_builder_tool,
+    "drive_file_mover": drive_file_mover_tool,
+    "drive_list": drive_list_tool,
+    "drive_inspector": drive_inspector_tool,
+    "drive_rename": drive_rename_tool,
+    "drive_delete": drive_delete_tool,
+    "drive_create_empty": drive_create_empty_tool,
+    "file_content_reader": file_content_reader_tool,
 }
 
 
@@ -195,6 +290,10 @@ def execute():
         tool_name in _APPROVAL_REQUIRED
         or definition.get("requires_approval", False)
     )
+
+    # Resolve drive name/path fields and inject last-drive fallback before
+    # the approval card is shown (or before the tool runs for non-approval tools).
+    tool_input = _patch_drive_fields(tool_name, tool_input)
 
     if needs_approval:
         # Replace LLM-generated placeholder paths with the real paths from the
@@ -248,7 +347,7 @@ def execute():
 
     try:
         result: str = tool.execute(tool_input)
-        _record_outputs(result, tool_name)
+        _record_outputs(result, tool_name, tool_input)
         logger.info("Tool '%s' executed successfully", tool_name)
         return jsonify({"result": result})
     except Exception as exc:
@@ -1271,6 +1370,20 @@ def document_analytics_run():
     except Exception as exc:
         logger.exception("Document analytics failed")
         return jsonify({"error": str(exc)}), 500
+
+
+@tools_bp.get("/pipeline")
+def get_pipeline():
+    with _PIPELINE_LOCK:
+        log = list(_PIPELINE_LOG)
+    return jsonify({"steps": log, "total": len(log)})
+
+
+@tools_bp.post("/pipeline/reset")
+def reset_pipeline():
+    with _PIPELINE_LOCK:
+        _PIPELINE_LOG.clear()
+    return jsonify({"ok": True})
 
 
 @tools_bp.get("/created-drives")

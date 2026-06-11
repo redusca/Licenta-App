@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, ChevronRight, BarChart2, FolderOpen, Files, FolderSearch,
-    RefreshCw, CheckCircle, AlertCircle, FileText,
-    Cpu, Zap, ZapOff, Brain, Hash,
+    CheckCircle, AlertCircle, FileText,
+    Brain, Hash,
     Clock, BookOpen, AlignLeft, Tag, Search,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
@@ -108,25 +108,12 @@ function FleschBar({ score }: { score: number }) {
 export const DocumentAnalyticsPage: React.FC = () => {
     const navigate = useNavigate();
     const [showAppExplorer, setShowAppExplorer] = useState(false);
-    const [gatewayOnline, setGatewayOnline] = useState<boolean | null>(null);
-    const [llmConfigured, setLlmConfigured] = useState<boolean | null>(null);
-
     const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null);
     const [includeLLM, setIncludeLLM] = useState(true);
 
     const [analyzing, setAnalyzing] = useState(false);
     const [result, setResult] = useState<AnalyticsResult | null>(null);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        Promise.all([
-            fetch(`${FLASK_BASE}/api/tools/ai-gateway/status`).then(r => r.json()).catch(() => null),
-            fetch('http://localhost:8000/api/ai/llm/status').then(r => r.json()).catch(() => null),
-        ]).then(([gwData, llmData]) => {
-            setGatewayOnline(gwData?.status === 'ok');
-            setLlmConfigured(llmData?.configured ?? null);
-        });
-    }, []);
 
     const pickFile = useCallback((path: string, name: string, size: number) => {
         setSelectedFile({ path, name, size });
@@ -454,43 +441,6 @@ export const DocumentAnalyticsPage: React.FC = () => {
 
                 {/* ── Right column ── */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-                    {/* LLM Gateway status */}
-                    <div style={card}>
-                        <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: 'var(--ink)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                            <Cpu style={{ width: 14, height: 14, color: 'var(--muted)' }} />LLM Gateway
-                        </p>
-                        {gatewayOnline === null ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, color: 'var(--muted)', fontSize: 12 }}>
-                                <RefreshCw style={{ width: 13, height: 13 }} className="spin" />Checking...
-                            </div>
-                        ) : gatewayOnline ? (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--c-sage)' }}>
-                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--c-sage)', display: 'inline-block' }} />
-                                    Online — port 8000
-                                </div>
-                                {llmConfigured !== null && (
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
-                                        <span style={{ color: 'var(--muted)' }}>Groq LLM</span>
-                                        <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: llmConfigured ? 'var(--c-sage)' : 'var(--c-clay)' }}>
-                                            {llmConfigured
-                                                ? <><Zap style={{ width: 11, height: 11 }} />Configured</>
-                                                : <><ZapOff style={{ width: 11, height: 11 }} />Key not set</>}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--c-clay)' }}>
-                                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--c-clay)', display: 'inline-block' }} />
-                                    Offline
-                                </div>
-                                <p style={{ margin: 0, fontSize: 11, color: 'var(--faint)' }}>Statistics work offline. Start the Server on port 8000 for AI insights.</p>
-                            </div>
-                        )}
-                    </div>
 
                     {/* Options */}
                     <div style={card}>

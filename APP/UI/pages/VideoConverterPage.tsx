@@ -286,7 +286,7 @@ export const VideoConverterPage: React.FC = () => {
                                         {OUTPUT_FORMATS.map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
                                     </select>
                                     <button type="button" onClick={applyGlobalFormat}
-                                        className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">
+                                        className="text-xs px-3 py-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-medium transition-colors">
                                         Apply to all
                                     </button>
                                 </div>

@@ -314,7 +314,7 @@ export const ModelConverterPage: React.FC = () => {
                                         {OUTPUT_FORMATS.map(f => <option key={f} value={f}>{fmtLabel(f)}</option>)}
                                     </select>
                                     <button type="button" onClick={applyGlobalFormat}
-                                        className="text-xs px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 transition-colors">
+                                        className="text-xs px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-medium transition-colors">
                                         Apply to all
                                     </button>
                                 </div>

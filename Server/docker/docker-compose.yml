@@ -7,7 +7,7 @@
 #   1. Copy Server/src/.env.example ? Server/src/.env and fill in secrets
 #   2. Build the React interface: cd Server/Interface && npm install && npm run build
 #
-# Services: postgres, redis, server (with embedded 5-worker agent pool)
+# Services: postgres, server
 
 version: "3.9"
 
@@ -29,17 +29,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # -- Redis (task queue for the agent pool) ----------------------------------
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --save "" --appendonly no
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
   # -- Licenta Server ---------------------------------------------------------
   server:
     image: europe-west10-docker.pkg.dev/licenta-ubb/licenta-server/server:latest
@@ -54,9 +43,6 @@ services:
       - ../src/.env           # JWT_SECRET, GOOGLE_API_KEY, GITHUB_TOKEN, etc.
     environment:
       DATABASE_URL: postgresql://licenta:licenta@postgres:5432/licenta
-      REDIS_URL: redis://redis:6379/0
-      AGENT_WORKER_COUNT: "5"
-      MODEL_NAME: gemini-2.5-flash
       PORT: "8000"
     ports:
       - "8000:8000"
@@ -65,8 +51,6 @@ services:
       - hf_cache:/root/.cache/huggingface
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
 
 volumes:

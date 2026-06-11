@@ -115,7 +115,6 @@ export const Settings: React.FC = () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    mode: 'server_proxy',
                     server_url: serverUrl,
                     api_key: apiKey,
                     output_path: outputPath,
@@ -195,7 +194,7 @@ export const Settings: React.FC = () => {
                                 )}
                             </span>
                         }
-                        hint="The API key is generated when you deploy a container on the server. Open the server web UI → Containers → copy the key."
+                        hint="The API key is generated on the server. Open the server web UI and copy the key."
                     >
                         <TextInput
                             type="password"

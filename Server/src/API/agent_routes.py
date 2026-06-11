@@ -5,12 +5,10 @@ Authentication:
   - JWT (Bearer)  → register / view / delete your agent API key
   - X-API-Key     → chat endpoints (no JWT needed from the APP)
 
-── Legacy endpoints (ReAct / Gemini) ──────────────────────────────────────────
+── Key management (JWT) ────────────────────────────────────────────────────────
   POST   /api/agent/register      — create an api_key for the authenticated user
-  GET    /api/agent/key           — return existing api_key (JWT)
-  DELETE /api/agent/key           — delete api_key + close session (JWT)
-  POST   /api/agent/chat          — send a message, non-streaming (X-API-Key)
-  DELETE /api/agent/session       — reset conversation history (X-API-Key)
+  GET    /api/agent/key           — return existing api_key
+  DELETE /api/agent/key           — delete api_key + all chats
 
 ── Planning Agent — chat management (X-API-Key) ───────────────────────────────
   POST   /api/agent/chats                      — create a new chat
@@ -21,7 +19,6 @@ Authentication:
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import uuid
@@ -32,11 +29,9 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from config import settings
 from Database.session import get_db
 from Database.models import AgentKey, User
 from utils.auth import get_current_user
-from utils.agent_runner import ToolDefinition, delete_session
 from utils.chat_manager import (
     create_chat,
     get_chat,
@@ -59,22 +54,6 @@ router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 class AgentKeyOut(BaseModel):
     api_key: str
-
-
-class ToolCallOut(BaseModel):
-    tool_name: str
-    input: dict[str, Any]
-    output: str
-
-
-class ChatIn(BaseModel):
-    message: str
-    tools: list[ToolDefinition] = []
-
-
-class ChatOut(BaseModel):
-    response: str
-    tool_calls: list[ToolCallOut]
 
 
 # ── Planning chat schemas ────────────────────────────────────────────────────
@@ -189,57 +168,10 @@ def delete_agent_key(
     record = db.query(AgentKey).filter(AgentKey.user_id == current_user.id).first()
     if not record:
         raise HTTPException(status_code=404, detail="No agent key found.")
-    delete_session(record.api_key)
     delete_all_chats(record.api_key)
     db.delete(record)
     db.commit()
     logger.info("Deleted agent key for user %s", current_user.id)
-
-
-# ---------------------------------------------------------------------------
-# Legacy chat — non-streaming ReAct / Gemini (kept for backwards compat)
-# ---------------------------------------------------------------------------
-
-@router.post("/chat", response_model=ChatOut)
-async def chat(
-    body: ChatIn,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    api_key = _get_api_key_from_header(request)
-    _get_user_by_api_key(api_key, db)
-
-    pool = request.app.state.agent_pool
-    try:
-        result = await pool.enqueue(api_key, body.message, body.tools or None)
-    except (TimeoutError, asyncio.TimeoutError):
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"All {settings.AGENT_WORKER_COUNT} agent workers are busy. Try again shortly.",
-        )
-    except Exception as exc:
-        logger.exception("Agent pool error")
-        raise HTTPException(status_code=500, detail=f"Agent error: {exc}")
-
-    return ChatOut(
-        response=result.response,
-        tool_calls=[
-            ToolCallOut(tool_name=tc.tool_name, input=tc.input, output=tc.output)
-            for tc in result.tool_calls
-        ],
-    )
-
-
-@router.delete("/session", status_code=status.HTTP_204_NO_CONTENT)
-def reset_session(
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    """Clear the LangGraph conversation history for this user's API key."""
-    api_key = _get_api_key_from_header(request)
-    _get_user_by_api_key(api_key, db)
-    delete_session(api_key)
-    logger.info("Session reset for api_key=...%s", api_key[-6:])
 
 
 # ---------------------------------------------------------------------------

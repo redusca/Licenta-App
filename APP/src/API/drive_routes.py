@@ -62,6 +62,7 @@ def post_registry():
 
 
 
+@drive_bp.post('/startup-migrate')
 def startup_migrate():
     """
     Called once on app startup by the frontend.

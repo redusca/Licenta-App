@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Sparkles, ChevronRight, FolderOpen,
-    RefreshCw, CheckCircle, AlertCircle, FileImage,
-    Download, Cpu, ZapOff, Zap, Files, FolderSearch, Loader2,
+    CheckCircle, AlertCircle, FileImage,
+    Download, Files, FolderSearch, Loader2,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 
@@ -13,8 +13,6 @@ const FLASK_BASE = 'http://127.0.0.1:5000';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type OutputMode = 'copy' | 'virtual_drive';
-
-interface GatewayModel { name: string; is_loaded: boolean; device: string; task: string }
 
 interface Progress {
     stage: string;
@@ -95,15 +93,8 @@ export const ImageEnhancerPage: React.FC = () => {
     const [result, setResult] = useState<EnhanceResult | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const [gatewayModels, setGatewayModels] = useState<GatewayModel[]>([]);
-    const [gatewayOnline, setGatewayOnline] = useState<boolean | null>(null);
-
     useEffect(() => {
         fetch(`${FLASK_BASE}/api/agent/config`).then(r => r.json()).then(d => setOutputPath(d.output_path || '')).catch(() => {});
-        fetch(`${FLASK_BASE}/api/tools/ai-gateway/status`).then(r => r.json()).then(gwData => {
-            if (gwData?.status === 'ok') { setGatewayOnline(true); setGatewayModels(gwData.models || []); }
-            else setGatewayOnline(false);
-        }).catch(() => setGatewayOnline(false));
     }, []);
 
     const pickFile = useCallback((path: string, name: string, size: number) => {
@@ -206,7 +197,6 @@ export const ImageEnhancerPage: React.FC = () => {
         link.click();
     };
 
-    const swin2srModel = gatewayModels.find(m => m.name === 'swin2sr' || m.name?.toLowerCase().includes('swin'));
     const canRun = !!selectedFile && !running && !(outputMode === 'virtual_drive' && !outputPath);
     const previewUrl = selectedFile ? `${FLASK_BASE}/api/tools/preview?path=${encodeURIComponent(selectedFile.path)}` : null;
 
@@ -360,44 +350,6 @@ export const ImageEnhancerPage: React.FC = () => {
 
                 {/* ── Right ── */}
                 <div className="space-y-4">
-
-                    {/* Gateway status */}
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
-                        <p className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                            <Cpu className="w-4 h-4" />AI Gateway
-                        </p>
-                        {gatewayOnline === null ? (
-                            <div className="flex items-center gap-2 text-slate-500 text-xs">
-                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />Checking...
-                            </div>
-                        ) : gatewayOnline ? (
-                            <div className="space-y-2">
-                                <div className="flex items-center gap-2 text-xs text-green-400">
-                                    <span className="w-2 h-2 rounded-full bg-green-400" />Online — port 8000
-                                </div>
-                                {swin2srModel && (
-                                    <div className="flex items-center justify-between text-xs mt-1">
-                                        <span className="text-slate-500">Swin2SR</span>
-                                        <span className={`flex items-center gap-1 ${swin2srModel.is_loaded ? 'text-green-400' : 'text-slate-500'}`}>
-                                            {swin2srModel.is_loaded
-                                                ? <><Zap className="w-3 h-3" />Loaded ({swin2srModel.device})</>
-                                                : <><ZapOff className="w-3 h-3" />Will load on first run</>}
-                                        </span>
-                                    </div>
-                                )}
-                                {!swin2srModel?.is_loaded && (
-                                    <p className="text-xs text-slate-600 mt-1">First run downloads ~200 MB and loads into VRAM — may take 1–3 min.</p>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="space-y-1.5">
-                                <div className="flex items-center gap-2 text-xs text-red-400">
-                                    <span className="w-2 h-2 rounded-full bg-red-400" />Offline
-                                </div>
-                                <p className="text-xs text-slate-600">Start the Server container on port 8000 first.</p>
-                            </div>
-                        )}
-                    </div>
 
                     {/* Output mode */}
                     {selectedFile && (

@@ -295,11 +295,17 @@ export const PdfMergerPage: React.FC = () => {
 
     // ── Tab config ───────────────────────────────────────────────────────────
 
-    const tabs: { key: TabMode; label: string; icon: React.ReactNode; desc: string }[] = [
-        { key: 'merge', label: 'Merge & Reorder', icon: <Merge className="w-4 h-4" />, desc: 'Combine PDFs into one' },
-        { key: 'split', label: 'Extract Pages', icon: <Scissors className="w-4 h-4" />, desc: 'Cut page ranges from a PDF' },
-        { key: 'convert', label: 'Convert Format', icon: <ArrowRightLeft className="w-4 h-4" />, desc: 'PDF ↔ Word conversion' },
+    const tabs: { key: TabMode; label: string; icon: React.ReactNode; desc: string; color: 'amber' | 'violet' | 'blue' }[] = [
+        { key: 'merge',   label: 'Merge & Reorder', icon: <Merge className="w-5 h-5" />,          desc: 'Combine PDFs into one',      color: 'amber'  },
+        { key: 'split',   label: 'Extract Pages',   icon: <Scissors className="w-5 h-5" />,        desc: 'Cut page ranges from a PDF', color: 'violet' },
+        { key: 'convert', label: 'Convert Format',  icon: <ArrowRightLeft className="w-5 h-5" />,  desc: 'PDF ↔ Word conversion',      color: 'blue'   },
     ];
+
+    const tabPalette = {
+        amber:  { active: 'border-amber-500/50 bg-amber-500/10 text-amber-200 shadow-lg shadow-amber-900/20',   inactive: 'border-slate-700 text-slate-400 hover:border-amber-500/30 hover:bg-amber-500/5 hover:text-amber-300',   icon: 'bg-amber-500/15 text-amber-400',   dot: 'bg-amber-400' },
+        violet: { active: 'border-violet-500/50 bg-violet-500/10 text-violet-200 shadow-lg shadow-violet-900/20', inactive: 'border-slate-700 text-slate-400 hover:border-violet-500/30 hover:bg-violet-500/5 hover:text-violet-300', icon: 'bg-violet-500/15 text-violet-400', dot: 'bg-violet-400' },
+        blue:   { active: 'border-blue-500/50 bg-blue-500/10 text-blue-200 shadow-lg shadow-blue-900/20',       inactive: 'border-slate-700 text-slate-400 hover:border-blue-500/30 hover:bg-blue-500/5 hover:text-blue-300',       icon: 'bg-blue-500/15 text-blue-400',     dot: 'bg-blue-400'   },
+    };
 
     const actionLabel = activeTab === 'merge' ? 'Merge' : activeTab === 'split' ? 'Extract' : 'Convert';
 
@@ -338,21 +344,26 @@ export const PdfMergerPage: React.FC = () => {
             </div>
 
             {/* Action Tabs */}
-            <div className="flex gap-2">
-                {tabs.map(tab => (
-                    <button key={tab.key} type="button"
-                        onClick={() => { setActiveTab(tab.key); setResults(null); setError(null); setFileStatuses(new Map()); }}
-                        className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === tab.key
-                            ? 'bg-amber-500/15 border border-amber-500/30 text-amber-300 shadow-lg shadow-amber-900/10'
-                            : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-600'
-                            }`}>
-                        {tab.icon}
-                        <div className="text-left">
-                            <div>{tab.label}</div>
-                            <div className="text-[10px] opacity-60 font-normal">{tab.desc}</div>
-                        </div>
-                    </button>
-                ))}
+            <div className="flex gap-3">
+                {tabs.map(tab => {
+                    const p = tabPalette[tab.color];
+                    const isActive = activeTab === tab.key;
+                    return (
+                        <button key={tab.key} type="button"
+                            onClick={() => { setActiveTab(tab.key); setResults(null); setError(null); setFileStatuses(new Map()); }}
+                            className={`flex-1 flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all ${isActive ? p.active : `bg-slate-900 ${p.inactive}`}`}
+                        >
+                            <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${p.icon} ${isActive ? '' : 'opacity-60'}`}>
+                                {tab.icon}
+                            </div>
+                            <div className="text-left">
+                                <div className="text-sm font-semibold leading-tight">{tab.label}</div>
+                                <div className={`text-xs mt-0.5 font-normal ${isActive ? 'opacity-60' : 'text-slate-500'}`}>{tab.desc}</div>
+                            </div>
+                            {isActive && <div className={`ml-auto w-1.5 h-1.5 rounded-full shrink-0 ${p.dot}`} />}
+                        </button>
+                    );
+                })}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

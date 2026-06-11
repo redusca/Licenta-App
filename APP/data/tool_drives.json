@@ -35,7 +35,7 @@
     "tool": "pdf_merger"
   },
   {
-    "path": "D:\\DProjects\\Drives\\ModelConversionResults",
+    "path": "D:\\DProjects\\licentaFiles\\ModelConversionResults",
     "name": "ModelConversionResults",
     "tool": "model_converter"
   },
