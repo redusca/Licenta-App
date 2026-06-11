@@ -51,9 +51,12 @@ def auth_headers() -> dict:
 
 def health_check(timeout: int = 3) -> tuple[bool, str]:
     """
-    Check AI Gateway reachability and API key validity.
-    Sends the API key with the status request so the server can reject it with 401
-    if the key is wrong — catching auth failures before the actual AI request.
+    Check server reachability AND API key validity.
+
+    Uses GET /api/agent/chats — the lightest endpoint that actually validates
+    X-API-Key against the database (returns 401/403 for bad/inactive keys).
+    /api/ai/status has no auth, so it cannot be used for key validation.
+
     Returns (True, "") on success, (False, human-readable error) otherwise.
     """
     base = get_url()
@@ -64,13 +67,17 @@ def health_check(timeout: int = 3) -> tuple[bool, str]:
         return False, "API key not configured. Go to Settings → Agent Connection."
     try:
         resp = requests.get(
-            f"{base}/api/ai/status",
+            f"{base}/api/agent/chats",
             headers={"X-API-Key": api_key},
             timeout=timeout,
         )
-        if resp.status_code == 401:
-            logger.warning("ai_gateway.health_check: 401 at %s — invalid API key", base)
-            return False, "Invalid API key — the server rejected authentication. Go to Settings → Agent Connection."
+        if resp.status_code in (401, 403):
+            try:
+                detail = resp.json().get("detail", "")
+            except Exception:
+                detail = ""
+            logger.warning("ai_gateway.health_check: auth rejected (%s) at %s — %s", resp.status_code, base, detail)
+            return False, f"Invalid API key — {detail or 'the server rejected authentication'}. Go to Settings → Agent Connection."
         return True, ""
     except requests.exceptions.ConnectionError:
         logger.warning("ai_gateway.health_check: connection refused at %s", base)
