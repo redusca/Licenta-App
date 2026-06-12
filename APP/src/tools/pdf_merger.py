@@ -37,7 +37,8 @@ SUPPORTED_ALL_EXTENSIONS = SUPPORTED_PDF_EXTENSIONS | SUPPORTED_DOC_EXTENSIONS
 DEFINITION = {
     "name": "pdf_merger",
     "description": (
-        "Merge, split, reorder PDF files and convert between PDF and DOCX. "
+        "Perform PDF operations: merge multiple PDFs into one, split a PDF by page ranges, "
+        "reorder pages within a PDF, convert between PDF and DOCX, or inspect page count. "
         "Supports batch processing and virtual-drive output."
     ),
     "parameters": {
@@ -45,56 +46,75 @@ DEFINITION = {
         "properties": {
             "action": {
                 "type": "string",
-                "enum": ["merge", "split", "convert"],
-                "description": "The operation to perform.",
+                "enum": ["merge", "split", "reorder", "convert", "page_info"],
+                "description": (
+                    "'merge' — combine multiple PDFs into one file. "
+                    "'split' — extract specific page ranges from a PDF into separate files. "
+                    "'reorder' — rearrange the pages of a PDF in a custom order (provide pageOrder). "
+                    "'convert' — convert PDF→DOCX or DOCX→PDF (set convertTo). "
+                    "'page_info' — return the page count of a PDF without modifying it."
+                ),
             },
             "files": {
                 "type": "array",
-                "description": 'List of file objects, e.g. [{"path": "..."}]',
+                "description": 'List of file objects: [{"path": "C:\\\\...\\\\file.pdf"}]',
                 "items": {"type": "object"},
             },
             "outputMode": {
                 "type": "string",
                 "enum": ["replace", "copy", "virtual_drive"],
-                "description": "How to handle the output file(s).",
+                "description": (
+                    "'copy' places the result alongside the original (safe default). "
+                    "'replace' overwrites the original. "
+                    "'virtual_drive' saves into a new virtual drive (requires outputPath)."
+                ),
             },
             "outputPath": {
                 "type": "string",
-                "description": "Parent directory for virtual drive (only for virtual_drive mode).",
+                "description": "Parent directory for the virtual drive (only for virtual_drive mode).",
             },
             "outputFilename": {
                 "type": "string",
-                "description": "Base name for the merged output (without extension).",
+                "description": "Base name for the output file, without extension (e.g. 'merged_report').",
             },
             "pageRanges": {
                 "type": "string",
-                "description": "Comma-separated page ranges for split, e.g. '1-3,5,7-9'.",
+                "description": "For split: comma-separated page ranges, e.g. '1-3,5,7-9'.",
+            },
+            "pageOrder": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "description": "For reorder: 1-based list of page numbers in the desired order, e.g. [3,1,2].",
             },
             "convertTo": {
                 "type": "string",
                 "enum": ["pdf", "docx"],
-                "description": "Target format for conversion.",
+                "description": "For convert: target format — 'pdf' or 'docx'.",
+            },
+            "addBookmarks": {
+                "type": "boolean",
+                "description": "For merge: add a bookmark per source file in the merged PDF (default true).",
             },
         },
         "required": ["action", "files"],
     },
     "input_instructions": (
-        "files: array of {path} — provide file paths directly if you already have them (e.g. from document_converter output). "
-        "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
-        "CHAINING: if a previous tool returned a result, extract each item's outputPath "
-        "and pass them as [{\"path\": outputPath}, ...] — do NOT call ask_user again. "
-        "action: 'merge' (combine PDFs), 'split' (extract page ranges), or 'convert' (PDF↔DOCX). "
-        "outputMode: 'copy' is recommended when chaining (keeps originals); "
-        "'replace' overwrites original; 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder. "
-        "outputFilename: base name for merged/split output (no extension). "
-        "pageRanges: for split action, comma-separated ranges like '1-3,5,7-9'. "
-        "convertTo: 'pdf' or 'docx' for convert action."
+        "files: array of {path} — provide file paths directly if you already have them. "
+        "Only call ask_user(input_type='file') when the user has not specified files yet. "
+        "CHAINING: pass each prior result's outputPath directly here — do NOT call ask_user again. "
+        "action guide: "
+        "'merge' — pass all PDFs in files[], set outputFilename for the result name. "
+        "'split' — pass one PDF in files[], set pageRanges (e.g. '1-3,5') to define which pages to extract. "
+        "'reorder' — pass one PDF in files[], set pageOrder as a 1-based list (e.g. [3,1,2]). "
+        "'convert' — pass files[], set convertTo ('pdf' or 'docx'). "
+        "'page_info' — pass one PDF in files[]; no other params needed, returns page count only. "
+        "outputMode: 'copy' keeps originals (recommended); 'replace' overwrites; 'virtual_drive' needs outputPath. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder."
     ),
     "output_description": (
         "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}. "
-        "CHAINING: each result's outputPath is the produced file — pass it directly as the 'path' "
-        "in the next tool's files array without calling ask_user."
+        "page_info returns {success, pages, path} instead. "
+        "CHAINING: each result's outputPath is the produced file — pass it as 'path' in the next tool."
     ),
 }
 

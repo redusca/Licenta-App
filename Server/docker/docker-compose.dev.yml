@@ -3,7 +3,7 @@
 # Usage (from repo root):
 #   docker compose -f Server/docker/docker-compose.dev.yml up --build
 #
-# All three services (postgres, redis, server) start on your local machine.
+# All services (postgres, server) start on your local machine.
 # The server is built from source — no cloud registry needed.
 # Hot-reload is enabled via uvicorn --reload.
 #

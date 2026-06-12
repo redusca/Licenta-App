@@ -8,12 +8,12 @@ import {
 const FLASK_BASE = 'http://127.0.0.1:5000';
 
 const CATEGORY_EXTENSIONS: Record<string, string[]> = {
-    'image': ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.gif'],
-    'audio': ['.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac', '.wma', '.mka'],
-    'video': ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v'],
-    'documents': ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf', '.odt', '.ods', '.odp', '.zip', '.rar', '.7z'],
-    '3d': ['.obj', '.fbx', '.glb', '.gltf', '.stl', '.ply'],
-    'programming': ['.py', '.js', '.ts', '.html', '.css', '.tsx', '.jsx', '.cpp', '.cs', '.java', '.json']
+    'image':       ['.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.heic', '.heif', '.avif', '.raw', '.cr2', '.cr3', '.nef', '.dng', '.arw'],
+    'audio':       ['.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac', '.wma', '.mka', '.opus', '.aiff', '.aif', '.ape', '.wv', '.alac'],
+    'video':       ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts', '.m2ts', '.mts', '.3gp', '.vob', '.ogv', '.rm', '.rmvb'],
+    'documents':   ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf', '.odt', '.ods', '.odp', '.md', '.epub', '.zip', '.rar', '.7z'],
+    '3d':          ['.obj', '.fbx', '.glb', '.gltf', '.stl', '.ply', '.blend', '.dae', '.3ds', '.max'],
+    'programming': ['.py', '.js', '.ts', '.html', '.css', '.tsx', '.jsx', '.cpp', '.c', '.h', '.cs', '.java', '.go', '.rs', '.php', '.rb', '.swift', '.kt', '.json', '.yaml', '.yml', '.toml', '.xml'],
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -235,8 +235,8 @@ export const DriveCreatorPage: React.FC = () => {
                                 <label className="block text-xs text-slate-400 mb-2 uppercase font-semibold">Virtual Drive Location</label>
                                 <div className="flex gap-2">
                                     <button type="button" onClick={browseOutputFolder}
-                                        className="shrink-0 flex items-center justify-center px-4 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-sm text-slate-300 transition-colors">
-                                        <FolderOpen className="w-4 h-4 mr-2" />
+                                        className="shrink-0 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 hover:border-emerald-500/60 text-sm text-emerald-400 hover:text-emerald-300 font-medium transition-all duration-150">
+                                        <FolderOpen className="w-4 h-4" />
                                         Select Folder
                                     </button>
                                     <div className="flex-1 px-3 py-2 bg-slate-800/50 rounded-lg border border-slate-700 flex items-center overflow-hidden">

@@ -37,6 +37,8 @@ from tools import drive_rename as drive_rename_tool
 from tools import drive_delete as drive_delete_tool
 from tools import drive_create_empty as drive_create_empty_tool
 from tools import file_content_reader as file_content_reader_tool
+from tools import audio_transcriber as audio_transcriber_tool
+from tools import image_enhancer as image_enhancer_tool
 from tools.catalog import TOOLS as CATALOG_TOOLS, CATEGORIES as CATALOG_CATEGORIES
 
 logger = logging.getLogger(__name__)
@@ -175,12 +177,49 @@ def _patch_drive_fields(tool_name: str, tool_input: dict) -> dict:
     # Special case: drive_create_empty needs a 'location' (parent dir) not a drive path
     if tool_name == "drive_create_empty":
         loc = result.get("location", "")
-        if not isinstance(loc, str) or not loc.strip() or not os.path.isdir(loc):
+        if not isinstance(loc, str):
+            loc = ""
+
+        # If the agent passed a JSON blob (previous tool result), extract the real path.
+        loc = loc.strip()
+        if loc.startswith(("{", "[")):
+            import json as _json
+            try:
+                parsed = _json.loads(loc)
+                _path_keys = ("outputPath", "path", "drivePath", "virtualDrivePath",
+                               "srtPath", "filePath", "outputFile", "location", "destinationPath")
+                extracted = ""
+                if isinstance(parsed, dict):
+                    for _k in _path_keys:
+                        _v = parsed.get(_k)
+                        if isinstance(_v, str) and _v.strip():
+                            extracted = _v.strip()
+                            break
+                elif isinstance(parsed, list):
+                    extracted = next((v for v in parsed if isinstance(v, str) and _looks_like_real_path(v)), "")
+                if extracted:
+                    loc = extracted
+                    result["location"] = loc
+            except Exception:
+                pass
+
+        if not loc or not os.path.isdir(loc):
+            # 1st fallback: parent of the last known virtual drive
             if last_drive:
                 parent = os.path.dirname(last_drive)
                 if os.path.isdir(parent):
                     result["location"] = parent
-                    logger.info("drive_create_empty: defaulting location to %s", parent)
+                    logger.info("drive_create_empty: defaulting location to last drive parent %s", parent)
+            else:
+                # 2nd fallback: parent of the last tool output file
+                with _LAST_OUTPUT_LOCK:
+                    last_outputs = list(_LAST_OUTPUT_PATHS)
+                for out_path in last_outputs:
+                    candidate = os.path.dirname(out_path)
+                    if os.path.isdir(candidate):
+                        result["location"] = candidate
+                        logger.info("drive_create_empty: defaulting location to last output parent %s", candidate)
+                        break
 
     return result
 
@@ -241,6 +280,7 @@ _APPROVAL_REQUIRED = frozenset({
     "video_converter", "video_compressor", "audio_converter",
     "drive_creator", "pdf_merger", "model_converter", "document_converter",
     "smart_drive_build", "drive_file_mover", "drive_rename", "drive_delete",
+    "audio_transcriber", "image_enhancer",
 })
 
 _TOOLS: dict[str, object] = {
@@ -268,6 +308,8 @@ _TOOLS: dict[str, object] = {
     "drive_delete": drive_delete_tool,
     "drive_create_empty": drive_create_empty_tool,
     "file_content_reader": file_content_reader_tool,
+    "audio_transcriber": audio_transcriber_tool,
+    "image_enhancer": image_enhancer_tool,
 }
 
 
@@ -764,6 +806,30 @@ def pick_folder():
         "$d.ShowNewFolderButton = $true; "
         "[System.Windows.Forms.Application]::EnableVisualStyles() | Out-Null; "
         "if ($d.ShowDialog() -eq 'OK') { Write-Output $d.SelectedPath }"
+    )
+    try:
+        result = subprocess.run(
+            ["powershell", "-WindowStyle", "Hidden", "-Command", ps_script],
+            capture_output=True, text=True, timeout=120,
+        )
+        path = result.stdout.strip()
+        if path:
+            return jsonify({"path": path})
+        return jsonify({"path": None, "cancelled": True})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@tools_bp.get("/pick-file")
+def pick_file():
+    import subprocess
+    ps_script = (
+        "Add-Type -AssemblyName System.Windows.Forms; "
+        "$d = New-Object System.Windows.Forms.OpenFileDialog; "
+        "$d.Title = 'Select a file'; "
+        "$d.Multiselect = $false; "
+        "[System.Windows.Forms.Application]::EnableVisualStyles() | Out-Null; "
+        "if ($d.ShowDialog() -eq 'OK') { Write-Output $d.FileName }"
     )
     try:
         result = subprocess.run(

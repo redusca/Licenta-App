@@ -15,14 +15,16 @@ logger = logging.getLogger(__name__)
 DEFINITION = {
     "name": "space_analyzer",
     "description": (
-        "Scans a drive or a specific folder and returns nested folder sizes for "
-        "visualizing space usage. Provide either driveLetter OR folderPath."
+        "Scan a drive or folder and return nested folder sizes so the user can see what is consuming disk space. "
+        "Use this when the user asks: 'what is taking up space', 'show disk usage', 'which folders are largest', "
+        "or 'analyze my drive'. The result is displayed as an interactive treemap in the UI. "
+        "Provide either driveLetter (to scan an entire drive) OR folderPath (to scan a specific directory)."
     ),
     "input_instructions": (
-        "Always ask the user what to scan before calling this tool. "
-        "To scan an entire drive: use ask_user(input_type='drive') and pass the result as driveLetter. "
+        "Always ask the user what to scan before calling this tool — never guess or hard-code a path. "
+        "To scan an entire drive: use ask_user(input_type='drive') and pass the result as driveLetter (e.g. 'C'). "
         "To scan a specific folder: use ask_user(input_type='folder') and pass the result as folderPath. "
-        "Never guess or hard-code the drive letter or folder path."
+        "Use targetDir only when the user wants to zoom into a subfolder of a drive scan."
     ),
     "output_description": (
         "JSON {success, data: {path, total_size, children: [{name, full_path, is_dir, size}]}} "

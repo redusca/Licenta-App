@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, Mic, ChevronRight, FolderOpen, Files, FolderSearch,
     CheckCircle, AlertCircle, FileAudio,
-    Copy, Download, Check,
+    Copy, Download, Check, Loader2,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 
@@ -74,27 +74,17 @@ const STAGE_LABELS: Record<string, string> = {
 // ── Progress bar ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ progress }: { progress: Progress }) {
-    const pct = Math.round(progress.pct * 100);
-    const isIndeterminate = progress.stage === 'loading_model' && pct < 30;
     return (
-        <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-4 space-y-2">
-            <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-200">{progress.message}</span>
-                <span className="text-xs font-mono text-purple-400">{pct}%</span>
+        <div className="bg-slate-900 border border-purple-500/20 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 text-purple-400 animate-spin shrink-0" />
+                <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-slate-200 block">{progress.message}</span>
+                    <p className="text-xs text-slate-500 capitalize mt-0.5">
+                        {STAGE_LABELS[progress.stage] ?? progress.stage.replace(/_/g, ' ')}
+                    </p>
+                </div>
             </div>
-            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                {isIndeterminate ? (
-                    <div className="h-full bg-linear-to-r from-purple-600 to-purple-400 rounded-full animate-pulse w-1/3" />
-                ) : (
-                    <div
-                        className="h-full bg-linear-to-r from-purple-600 to-purple-400 rounded-full transition-all duration-700 ease-out"
-                        style={{ width: `${Math.max(pct, 4)}%` }}
-                    />
-                )}
-            </div>
-            <p className="text-xs text-slate-500 capitalize">
-                {STAGE_LABELS[progress.stage] ?? progress.stage.replace(/_/g, ' ')}
-            </p>
         </div>
     );
 }
@@ -119,7 +109,7 @@ export const AudioTranscriberPage: React.FC = () => {
 
     const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; size: number } | null>(null);
     const [language, setLanguage] = useState('auto');
-    const [maxNewTokens, setMaxNewTokens] = useState(256);
+    const [maxNewTokens, setMaxNewTokens] = useState(224);
     const [expectedText, setExpectedText] = useState('');
     const [outputMode, setOutputMode] = useState<OutputMode>('none');
 
@@ -401,11 +391,11 @@ export const AudioTranscriberPage: React.FC = () => {
                                     <label className="text-xs text-slate-400">Max tokens</label>
                                     <span className="text-xs font-mono text-purple-400">{maxNewTokens}</span>
                                 </div>
-                                <input type="range" min={64} max={1024} step={64} value={maxNewTokens}
+                                <input type="range" min={64} max={444} step={64} value={maxNewTokens}
                                     onChange={e => setMaxNewTokens(Number(e.target.value))}
                                     className="w-full accent-purple-500" />
                                 <div className="flex justify-between text-xs text-slate-600 mt-0.5">
-                                    <span>64 — short</span><span>1024 — long</span>
+                                    <span>64 — short</span><span>444 — max</span>
                                 </div>
                             </div>
                             <div>

@@ -8,7 +8,7 @@ import os
 import logging
 from pathlib import Path
 
-from utils.mft_scan import _ensure_cached
+from utils.mft_scan import _ensure_cached, invalidate_cache, resolve_dir_mft_prefix, is_admin as _mft_is_admin
 from utils.drive_manager import create_drive, add_file
 from utils.drives_registry import load_registry, save_registry
 
@@ -61,13 +61,17 @@ DEFINITION = {
     }
 }
 
+def _walk_for_extensions(folder: str, target_extensions: set) -> list:
+    result = []
+    for root, _, files in os.walk(folder):
+        for fname in files:
+            if os.path.splitext(fname)[1].lower() in target_extensions:
+                result.append(os.path.join(root, fname))
+    return result
+
+
 def execute(input_data: dict) -> str:
     source_folder = input_data.get("sourceFolder", "")
-    if source_folder:
-        try:
-            source_folder = os.path.realpath(source_folder)
-        except Exception:
-            pass
     extensions = input_data.get("extensions", [])
     drive_name = input_data.get("driveName", "New Drive")
     action = input_data.get("action", "shortcuts")
@@ -80,56 +84,50 @@ def execute(input_data: dict) -> str:
 
     target_extensions = set(ext.lower() if ext.startswith('.') else f'.{ext}'.lower() for ext in extensions)
 
-    # 1. Use MFT scan to get file list efficiently
-    drive_letter = os.path.splitdrive(source_folder)[0].replace(":", "")
-    if not drive_letter:
-        drive_letter = "C"
-
-    cached = None
-    try:
-        from utils.mft_scan import invalidate_cache
-        invalidate_cache(drive_letter)  # Force fresh MFT read for accuracy
-        cached = _ensure_cached(drive_letter)
-    except Exception as exc:
-        logger.error(f"MFT scan failed: {exc}")
+    drive_letter = os.path.splitdrive(source_folder)[0].replace(":", "") or "C"
 
     matched_files = []
-    
-    if cached:
-        records = cached.get("records", [])
-        if len(records) == 0:
-            return json.dumps({"success": False, "error": "NTFS scan returned 0 records. Ensure your terminal is running as Administrator."})
-            
-        path_map = cached["path_map"]
-        norm_source = os.path.normpath(source_folder).lower()
-        if not norm_source.endswith("\\"):
-            norm_source += "\\"
 
-        for r in records:
-            if r.get("is_dir"):
-                continue
-            rn = r.get("record_num")
-            if rn not in path_map:
-                continue
-            
-            full_path = path_map[rn]
-            if not full_path.lower().startswith(norm_source):
-                continue
-                
-            name = r.get("name", "")
-            ext = os.path.splitext(name)[1].lower()
-            if ext in target_extensions:
-                matched_files.append(full_path)
-    else:
-        # Fallback to os.walk
-        for root, dirs, files in os.walk(source_folder):
-            for file in files:
-                ext = os.path.splitext(file)[1].lower()
-                if ext in target_extensions:
-                    matched_files.append(os.path.join(root, file))
+    # Try MFT first (fast whole-drive scan). MFT can fail silently due to junction
+    # path resolution issues (e.g. OneDrive Known Folder Move makes Desktop a
+    # junction whose physical path differs from the user-visible path).
+    # Rule: only trust the MFT result if it found at least one file. A zero-match
+    # MFT result is treated as a potential false negative and os.walk takes over.
+    mft_ok = False
+    if _mft_is_admin():
+        try:
+            invalidate_cache(drive_letter)
+            cached = _ensure_cached(drive_letter)
+            if cached and len(cached.get("records", [])) >= 50:
+                mft_prefix = resolve_dir_mft_prefix(cached["path_map"], source_folder)
+                if mft_prefix:
+                    prefix_lower = mft_prefix.lower()
+                    for r in cached["records"]:
+                        if r.get("is_dir"):
+                            continue
+                        rn = r.get("record_num")
+                        if rn not in cached["path_map"]:
+                            continue
+                        full_path = cached["path_map"][rn]
+                        if not full_path.lower().startswith(prefix_lower):
+                            continue
+                        if os.path.splitext(r.get("name", ""))[1].lower() in target_extensions:
+                            matched_files.append(full_path)
+                    mft_ok = bool(matched_files)
+        except Exception as exc:
+            logger.error(f"MFT scan failed: {exc}")
+
+    if not mft_ok:
+        # MFT unavailable, failed, or returned 0 matches (possible path resolution
+        # bug). os.walk is always correct and handles junctions transparently.
+        logger.info("Using os.walk for drive_creator (mft_ok=%s)", mft_ok)
+        matched_files = _walk_for_extensions(source_folder, target_extensions)
 
     if not matched_files:
-        return json.dumps({"success": False, "error": "No files matched the selected extensions in the source folder."})
+        return json.dumps({
+            "success": False,
+            "error": f"No files matched the selected extensions in '{source_folder}'.",
+        })
 
     # 2. Create the virtual drive folder
     drive_type = "move" if action == "move" else "shortcut"

@@ -4,9 +4,9 @@
 #   docker build -t licenta-server:latest -f Server/docker/Dockerfile .
 #
 # Pre-requisites:
-#   Set GOOGLE_API_KEY, JWT_SECRET, REDIS_URL, DATABASE_URL via env / .env
+#   Set GOOGLE_API_KEY, JWT_SECRET, DATABASE_URL via env / .env
 #
-# Services required at runtime: PostgreSQL, Redis
+# Services required at runtime: PostgreSQL
 
 # ── Stage 1: Build the React SPA ─────────────────────────────────────────────
 FROM node:20-slim AS frontend

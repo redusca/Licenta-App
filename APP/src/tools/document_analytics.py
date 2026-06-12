@@ -370,7 +370,10 @@ DEFINITION = {
     },
     "input_instructions": (
         "filePath: use ask_user(input_type='file') to let the user pick a document. "
-        "Accepted formats: .pdf, .docx, .txt, .md, .html, .htm"
+        "Accepted formats: .pdf, .docx, .doc, .txt, .md, .html, .htm. "
+        "includeLLM: defaults to true — pass false only if the user explicitly wants only basic stats "
+        "(word count, readability) without the AI summary, or if speed is critical. "
+        "This tool is read-only and does not modify any files."
     ),
     "output_description": (
         "JSON {success, stats: {word_count, sentence_count, paragraph_count, unique_words, "

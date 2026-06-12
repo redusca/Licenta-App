@@ -1,6 +1,108 @@
 [
   {
-    "path": "C:\\\\Users\\\\redis\\\\Documents\\\\licenta-test\\\\Drive1",
-    "name": "Drive1"
+    "name": "photos",
+    "path": "D:\\\\DProjects\\\\Drives\\photos"
+  },
+  {
+    "name": "ImageConversionResults",
+    "path": "D:\\DProjects\\Drives\\ImageConversionResults"
+  },
+  {
+    "name": "RemovedBackgrounds",
+    "path": "D:\\DProjects\\licentaFiles\\RemovedBackgrounds"
+  },
+  {
+    "name": "SVGVectorResults",
+    "path": "D:\\DProjects\\Drives\\SVGVectorResults"
+  },
+  {
+    "name": "VideoConversionResults",
+    "path": "D:\\DProjects\\Drives\\VideoConversionResults"
+  },
+  {
+    "name": "AudioConversionResults",
+    "path": "D:\\DProjects\\Drives\\AudioConversionResults"
+  },
+  {
+    "name": "VideoCompressionResults",
+    "path": "D:\\DProjects\\Drives\\VideoCompressionResults"
+  },
+  {
+    "name": "PdfToolResults",
+    "path": "D:\\DProjects\\Drives\\PdfToolResults"
+  },
+  {
+    "name": "ModelConversionResults",
+    "path": "D:\\DProjects\\licentaFiles\\ModelConversionResults"
+  },
+  {
+    "name": "DocConvertResults",
+    "path": "D:\\DProjects\\licentaFiles\\DocConvertResults"
+  },
+  {
+    "name": "ModelConversionResults",
+    "path": "D:\\DProjects\\Drives\\ModelConversionResults"
+  },
+  {
+    "name": "ImageConversionResults",
+    "path": "D:\\DProjects\\licentaFiles\\ImageConversionResults"
+  },
+  {
+    "name": "Animal Photos",
+    "path": "C:\\Users\\redis\\Pictures\\anima\\drive\\Animal Photos"
+  },
+  {
+    "name": "RemovedBackgrounds",
+    "path": "D:\\DProjects\\Drives\\RemovedBackgrounds"
+  },
+  {
+    "name": "drivefain234",
+    "path": "C:\\Users\\redis\\Desktop\\f\\drivefain",
+    "type": "shortcut"
+  },
+  {
+    "name": "drivefain3",
+    "path": "C:\\Users\\redis\\Desktop\\ofof\\drivefain3",
+    "type": "shortcut"
+  },
+  {
+    "name": "MyVirtualDrive",
+    "path": "C:\\Users\\redis\\Desktop\\recovery\\MyVirtualDrive",
+    "type": "shortcut"
+  },
+  {
+    "name": "A new drive",
+    "path": "C:\\Users\\redis\\Desktop\\recovery\\A new drive",
+    "type": "shortcut"
+  },
+  {
+    "name": "Drive_Test",
+    "path": "C:\\Users\\redis\\Documents\\Licenta\\Drive_Test",
+    "type": "shortcut"
+  },
+  {
+    "name": "driverool",
+    "path": "D:\\DProjects\\Drives\\driverool",
+    "type": "shortcut"
+  },
+  {
+    "name": "My New Folder Drive",
+    "path": "D:\\DProjects\\Drives\\My New Folder Drive",
+    "type": "shortcut"
+  },
+  {
+    "name": "testestest",
+    "path": "D:\\DProjects\\licentaFiles\\testestest",
+    "type": "shortcut"
+  },
+  {
+    "name": "audio",
+    "path": "D:\\DProjects\\licentaFiles\\audio",
+    "type": "shortcut"
+  },
+  {
+    "name": "anewaudiodrive",
+    "path": "D:\\DProjects\\licentaFiles\\anewaudiodrive",
+    "type": "shortcut"
   }
 ]

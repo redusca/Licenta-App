@@ -117,12 +117,6 @@ function ArchDiagram() {
       <DiagramBox x={160} y={44} w={140} h={54} label="AI Gateway" sublabel="/ai/*"/>
       <DiagramBox x={316} y={44} w={120} h={54} label="Agent API" sublabel="/agent/*" accent/>
 
-      {/* Redis */}
-      <DiagramBox x={160} y={130} w={140} h={34} label="Redis Queue"/>
-
-      {/* Arrow agent → redis */}
-      <Arrow x1={376} y1={98} x2={300} y2={137} label="LPUSH"/>
-
       {/* FileO and Browser */}
       <DiagramBox x={470} y={44}  w={140} h={40} label="FileO Desktop" sublabel="tool callbacks" accent/>
       <DiagramBox x={470} y={100} w={140} h={40} label="Browser Client" sublabel="SSE stream"/>
@@ -189,44 +183,7 @@ function ModelHierarchyDiagram() {
   )
 }
 
-// Diagram 4: AgentPool + Redis + workers
-function AgentPoolDiagram() {
-  return (
-    <SvgWrap w={580} h={240}>
-      {/* AgentPool */}
-      <rect x="10" y="10" width="200" height="130" rx="10" fill="var(--surface)" stroke="var(--border-2)" strokeWidth="1.5"/>
-      <rect x="10" y="10" width="200" height="32" rx="10" fill="var(--accent-soft)" stroke="var(--accent)" strokeWidth="1.5"/>
-      <text x="110" y="30" textAnchor="middle" fontSize="12" fontWeight="700" fill="var(--accent-ink)" fontFamily="var(--font-display)">AgentPool</text>
-      {['submit_task(session_id, msg)','get_session(session_id)','stream_events(session_id)'].map((m, i) => (
-        <text key={m} x="22" y={60 + i * 22} fontSize="10.5" fill="var(--ink-2)" fontFamily="var(--font-mono)">{m}</text>
-      ))}
-
-      {/* Redis */}
-      <DiagramBox x={260} y={30} w={120} h={44} label="Redis" sublabel="agent:tasks"/>
-
-      {/* Workers */}
-      {[0,1,2,3,4].map(i => (
-        <rect key={i} x={260 + i * 62} y={130} width="52" height="28" rx="6"
-          fill="var(--surface-2)" stroke="var(--border)" strokeWidth="1.5"/>
-      ))}
-      {[0,1,2,3,4].map(i => (
-        <text key={i} x={286 + i * 62} y={149} textAnchor="middle" fontSize="10" fill="var(--muted)" fontFamily="var(--font-display)">W{i+1}</text>
-      ))}
-      <text x="390" y="200" textAnchor="middle" fontSize="10.5" fill="var(--faint)" fontFamily="var(--font-display)">5 concurrent workers</text>
-
-      {/* Arrows */}
-      <Arrow x1={210} y1={55} x2={260} y2={55} label="LPUSH"/>
-      <Arrow x1={320} y1={74} x2={320} y2={130} label="BRPOP"/>
-
-      {/* LangGraph label */}
-      <rect x="360" y="170" width="100" height="24" rx="6" fill="var(--surface-2)" stroke="var(--border)" strokeWidth="1"/>
-      <text x="410" y="185" textAnchor="middle" fontSize="10" fill="var(--muted)" fontFamily="var(--font-display)">LangGraph graph</text>
-      <line x1="286" y1="158" x2="360" y2="176" stroke="var(--border)" strokeWidth="1" strokeDasharray="3 2"/>
-    </SvgWrap>
-  )
-}
-
-// Diagram 5: Human-in-the-loop sequence
+// Diagram 4: Human-in-the-loop sequence
 function HitlDiagram() {
   const col1 = 80, col2 = 380
   const rows = [60, 100, 145, 190, 240, 285, 325]
@@ -303,7 +260,6 @@ const OVERVIEW_PAGE: WikiPage = {
         rows={[
           ['API', 'FastAPI + Uvicorn', 'Async HTTP, automatic OpenAPI docs'],
           ['Agent', 'LangGraph', 'ReAct + Plan-and-Execute graph execution'],
-          ['Queue', 'Redis (LPUSH/BRPOP)', 'Durable task queue for agent workers'],
           ['AI models', 'Swin2SR, Whisper, Gemini, VideoSubtitle', 'Lazy-loaded AI gateway'],
           ['Database', 'Supabase PostgreSQL', 'Users and AgentKey persistence'],
           ['Auth', 'JWT (python-jose)', 'Stateless token authentication'],
@@ -400,12 +356,10 @@ const AGENT_PAGE: WikiPage = {
   content: (
     <>
       <p>
-        The agent system uses LangGraph to build a ReAct + Plan-and-Execute graph.
-        An <Code>AgentPool</Code> maintains up to 5 concurrent worker threads, each listening
-        on a Redis list (<Code>BRPOP agent:tasks</Code>). SSE streams progress back to clients.
+        The agent system uses a Groq-backed Plan-and-Execute graph. The planner decomposes
+        the user's request into steps, executes tool calls or LLM reasoning steps in sequence,
+        then synthesises a final answer. SSE streams all progress events back to the client.
       </p>
-      <h3>AgentPool + Redis + workers</h3>
-      <AgentPoolDiagram />
       <h3>LangGraph nodes</h3>
       <WikiTable
         headers={['Node', 'Role', 'Output']}
@@ -463,7 +417,6 @@ const TECH_STACK_PAGE: WikiPage = {
           ['bcrypt', 'latest', 'Password hashing'],
           ['pydantic-settings', '≥2.0', 'Settings and request/response validation'],
           ['httpx', '≥0.27', 'Async HTTP client for tool callbacks'],
-          ['redis[asyncio]', '≥5.0', 'Task queue (LPUSH/BRPOP) and pub/sub'],
           ['groq', '≥0.9', 'Groq LLM client (planning agent + LLM chat endpoints)'],
           ['langchain + langgraph', 'latest', 'ReAct agent graph execution'],
           ['langchain-google-genai', '≥1.0', 'Google AI SDK (tool-calling agent)'],
@@ -490,7 +443,6 @@ const TECH_STACK_PAGE: WikiPage = {
         headers={['Service', 'Provider', 'Notes']}
         rows={[
           ['PostgreSQL', 'Self-hosted or cloud', 'User + AgentKey tables; configured via DATABASE_URL'],
-          ['Redis', 'Self-hosted or Redis Cloud', 'Required for agent task queue; configured via REDIS_URL'],
           ['Groq API', 'Groq', 'GROQ_API_KEY required — planning agent and LLM chat endpoints'],
           ['Google AI API', 'Google', 'GOOGLE_API_KEY required — ReAct tool-calling agent'],
           ['Container', 'Docker / docker-compose', 'Compose stacks in Server/docker/'],
@@ -528,32 +480,12 @@ const IMPLEMENTATION_PAGE: WikiPage = {
             await asyncio.sleep(30)
             if self._loaded and (time.time() - self._last_used) > self.idle_timeout:
                 await self.unload()`}</CodeBlock>
-      <h3>Redis task queue</h3>
-      <p>
-        Tasks are serialised to JSON and pushed onto <Code>agent:tasks</Code>.
-        Each worker calls <Code>BRPOP agent:tasks 0</Code> (blocking). Progress events are published
-        to <Code>agent:events:&lt;session_id&gt;</Code> for the SSE endpoint.
-      </p>
-      <CodeBlock lang="python">{`# Submit
-redis.lpush("agent:tasks", json.dumps({
-    "task_id": task_id, "session_id": session_id, "message": message,
-}))
-
-# Worker
-while True:
-    _, raw = redis.brpop("agent:tasks")
-    task = json.loads(raw)
-    async for event in run_agent_graph(task):
-        redis.publish(f"agent:events:{task['session_id']}", json.dumps(event))`}</CodeBlock>
       <h3>SSE streaming</h3>
-      <CodeBlock lang="python">{`@router.get("/agent/stream/{session_id}")
-async def stream_events(session_id: str, user=Depends(get_current_user)):
+      <CodeBlock lang="python">{`@router.get("/agent/run/{chat_id}")
+async def run_agent(chat_id: str, body: RunRequest, api_key=Depends(verify_api_key)):
     async def event_generator():
-        pubsub = redis.pubsub()
-        await pubsub.subscribe(f"agent:events:{session_id}")
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                yield f"data: {message['data']}\\n\\n"
+        async for event in run_planning_agent(api_key, chat_id, body.message, body.tools):
+            yield f"data: {json.dumps(event)}\\n\\n"
     return StreamingResponse(event_generator(), media_type="text/event-stream")`}</CodeBlock>
       <h3>Virtual Drive integration</h3>
       <p>

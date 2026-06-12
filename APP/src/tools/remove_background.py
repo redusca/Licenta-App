@@ -162,18 +162,21 @@ def _ensure_model(model_name: str = "u2net") -> None:
 DEFINITION = {
     "name": "remove_background",
     "description": (
-        "Batch-remove backgrounds from images using rembg. "
-        "Supports three output modes: replace originals, copy alongside, or virtual drive."
+        "Batch-remove backgrounds from images using AI (rembg). Output is always PNG with a transparent background. "
+        "Use this when the user wants to isolate subjects, remove image backgrounds, create product photos "
+        "on transparent backgrounds, or prepare images for compositing. "
+        "Supported inputs: JPEG, PNG, WebP."
     ),
     "input_instructions": (
         "files: array of {path} — provide file paths directly if you already have them (e.g. from a prior tool's output). "
         "Only call ask_user(input_type='file') when the user has not yet specified which files to process. "
         "CHAINING: if a previous tool (e.g. image_converter) returned a result, extract each item's outputPath "
         "and pass them as [{\"path\": outputPath}, ...] — do NOT call ask_user again. "
-        "Supported inputs: JPEG, PNG, WebP. Output is always PNG with transparent background. "
-        "outputMode: 'copy' is recommended when chaining (keeps originals); "
-        "'replace' overwrites original; 'virtual_drive' saves to a new virtual drive. "
-        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder."
+        "Output is always PNG with a transparent background — no outputFormat needed in files objects. "
+        "outputMode: 'copy' is recommended (keeps originals alongside the new PNG); "
+        "'replace' overwrites the original file; 'virtual_drive' saves to a new virtual drive. "
+        "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder. "
+        "preserveMetadata: set to false only if the user specifically does not want EXIF data copied."
     ),
     "output_description": (
         "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, error?}], virtualDrivePath?}. "
@@ -185,25 +188,25 @@ DEFINITION = {
         "properties": {
             "files": {
                 "type": "array",
-                "description": 'List of objects: [{"path": "...", "outputFormat": "png"}, ...]',
+                "description": 'List of image file objects: [{"path": "C:\\\\...\\\\photo.jpg"}]',
                 "items": {"type": "object"},
             },
             "outputMode": {
                 "type": "string",
                 "enum": ["replace", "copy", "virtual_drive"],
-                "description": "How to handle the converted file.",
+                "description": (
+                    "'copy' saves the transparent PNG alongside the original (recommended). "
+                    "'replace' overwrites the original. "
+                    "'virtual_drive' saves into a new virtual drive (requires outputPath)."
+                ),
             },
             "outputPath": {
                 "type": "string",
                 "description": "Parent directory for the virtual drive (only for virtual_drive mode).",
             },
-            "quality": {
-                "type": "integer",
-                "description": "JPEG/WebP lossy quality 1–100 (default 85). Ignored (output is PNG).",
-            },
             "preserveMetadata": {
                 "type": "boolean",
-                "description": "Copy EXIF metadata to PNG outputs (default true).",
+                "description": "Copy EXIF metadata from the source to the output PNG (default true).",
             },
         },
         "required": ["files", "outputMode"],

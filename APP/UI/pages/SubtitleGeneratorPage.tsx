@@ -4,7 +4,7 @@ import {
     ArrowLeft, ChevronRight, FolderOpen, Files, FolderSearch,
     CheckCircle, AlertCircle, Film,
     Copy, Download, Check,
-    Languages, FileText,
+    Languages, FileText, Loader2,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 
@@ -93,27 +93,17 @@ const card: React.CSSProperties = {
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
 function ProgressBar({ progress }: { progress: Progress }) {
-    const pct = Math.round(progress.pct * 100);
-    const indeterminate = progress.stage === 'loading_model' && pct < 30;
     return (
         <div style={{ ...card, borderColor: 'var(--c-clay)', background: 'var(--c-clay-bg)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>{progress.message}</span>
-                <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--c-clay)' }}>{pct}%</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <Loader2 style={{ width: 18, height: 18, color: 'var(--c-clay)', flexShrink: 0, animation: 'spin 1s linear infinite' }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', display: 'block' }}>{progress.message}</span>
+                    <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, textTransform: 'capitalize' }}>
+                        {STAGE_LABELS[progress.stage] ?? progress.stage.replace(/_/g, ' ')}
+                    </p>
+                </div>
             </div>
-            <div style={{ height: 6, background: 'var(--surface-3)', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{
-                    height: '100%',
-                    width: indeterminate ? '33%' : `${Math.max(pct, 4)}%`,
-                    background: 'var(--c-clay)',
-                    borderRadius: 4,
-                    transition: indeterminate ? undefined : 'width .7s ease-out',
-                    animation: indeterminate ? 'pulse-soft 1.4s ease-in-out infinite' : undefined,
-                }} />
-            </div>
-            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, textTransform: 'capitalize' }}>
-                {STAGE_LABELS[progress.stage] ?? progress.stage.replace(/_/g, ' ')}
-            </p>
         </div>
     );
 }

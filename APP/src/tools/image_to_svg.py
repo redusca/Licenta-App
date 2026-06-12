@@ -43,9 +43,12 @@ DEFINITION = {
         "and pass them as [{\"path\": outputPath}, ...] — do NOT call ask_user again. "
         "Supported inputs: JPEG, PNG, WebP, BMP. Output is always SVG. "
         "outputMode: 'copy' is recommended when chaining (keeps originals); "
-        "'replace' removes original; 'virtual_drive' saves to a new virtual drive. "
+        "'replace' removes the original raster file; 'virtual_drive' saves to a new virtual drive. "
         "outputPath: required only for virtual_drive — use ask_user(input_type='folder') to pick a folder. "
-        "colormode: 'color' (default) or 'binary' (black-and-white)."
+        "colormode: 'color' (default, preserves original colors) or 'binary' (black-and-white line art). "
+        "hierarchical: 'stacked' (default, layers overlap) or 'cutout' (each color layer is cut out from layers below — better for logos). "
+        "filterSpeckle: removes small noise blobs below this pixel size (default 4; increase for cleaner output on noisy images). "
+        "colorPrecision: color quantization bits 1–8 (default 6; lower = fewer colors = simpler SVG; higher = more faithful colors)."
     ),
     "output_description": (
         "JSON {success, total, succeeded, failed, results:[{path, outputPath, success, svgContent?, error?}], virtualDrivePath?}. "

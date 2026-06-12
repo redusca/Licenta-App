@@ -35,7 +35,7 @@ const FEATURES = [
       </svg>
     ),
     title: 'LangGraph Agent',
-    desc: 'ReAct + Plan-and-Execute agent graph orchestrated by LangGraph. AgentPool maintains up to 5 concurrent workers, each backed by a Redis task queue (LPUSH/BRPOP) for durable message passing.',
+    desc: 'Plan-and-Execute agent orchestrated by LangGraph. Groq LLM decomposes user tasks into steps, executes tools or LLM reasoning steps, then synthesises a final answer via SSE streaming.',
   },
   {
     icon: (
@@ -76,7 +76,7 @@ export default function Home() {
     <main className="page-body">
       {/* Hero */}
       <section className="hero">
-        <span className="hero-badge">FastAPI · LangGraph · Redis · Supabase</span>
+        <span className="hero-badge">FastAPI · LangGraph · Groq · Supabase</span>
         <h1 className="display" style={{ fontSize: 42, marginBottom: 18 }}>
           AI Agent Server<br />
           <em>built for FileO</em>

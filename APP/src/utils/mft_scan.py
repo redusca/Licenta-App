@@ -24,11 +24,52 @@ from ctypes import wintypes
 # ──────────────────────────────────────────────────────────────────────────────
 # Win32 constants
 # ──────────────────────────────────────────────────────────────────────────────
-GENERIC_READ                = 0x80000000
-FILE_SHARE_READ             = 0x00000001
-FILE_SHARE_WRITE            = 0x00000002
-OPEN_EXISTING               = 3
-FSCTL_GET_NTFS_VOLUME_DATA  = 0x00090064
+GENERIC_READ                    = 0x80000000
+FILE_SHARE_READ                 = 0x00000001
+FILE_SHARE_WRITE                = 0x00000002
+OPEN_EXISTING                   = 3
+FSCTL_GET_NTFS_VOLUME_DATA      = 0x00090064
+FSCTL_ALLOW_EXTENDED_DASD_IO    = 0x00090083   # required on Win10/11 for raw volume reads
+INVALID_HANDLE_VALUE            = ctypes.c_void_p(-1).value
+
+# ── Typed Win32 function bindings (prevents wrong calling convention on x64) ──
+_k32 = ctypes.windll.kernel32
+
+_CreateFileW = _k32.CreateFileW
+_CreateFileW.restype  = ctypes.c_void_p   # HANDLE is pointer-sized on x64
+_CreateFileW.argtypes = [
+    ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32,
+    ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_void_p,
+]
+
+_DeviceIoControl = _k32.DeviceIoControl
+_DeviceIoControl.restype  = wintypes.BOOL
+_DeviceIoControl.argtypes = [
+    ctypes.c_void_p, wintypes.DWORD,
+    ctypes.c_void_p, wintypes.DWORD,
+    ctypes.c_void_p, wintypes.DWORD,
+    ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p,
+]
+
+_SetFilePointerEx = _k32.SetFilePointerEx
+_SetFilePointerEx.restype  = wintypes.BOOL
+_SetFilePointerEx.argtypes = [
+    ctypes.c_void_p,                    # hFile
+    ctypes.c_int64,                     # liDistanceToMove (LARGE_INTEGER by value)
+    ctypes.POINTER(ctypes.c_int64),     # lpNewFilePointer (optional, can be NULL)
+    wintypes.DWORD,                     # dwMoveMethod
+]
+
+_ReadFile = _k32.ReadFile
+_ReadFile.restype  = wintypes.BOOL
+_ReadFile.argtypes = [
+    ctypes.c_void_p, ctypes.c_void_p, wintypes.DWORD,
+    ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p,
+]
+
+_CloseHandle = _k32.CloseHandle
+_CloseHandle.restype  = wintypes.BOOL
+_CloseHandle.argtypes = [ctypes.c_void_p]
 
 # MFT Attribute type codes
 ATTR_STANDARD_INFORMATION   = 0x10
@@ -117,7 +158,7 @@ def _filetime_to_unix(filetime: int) -> float:
 
 
 def _get_drive_handle(drive_letter: str):
-    handle = ctypes.windll.kernel32.CreateFileW(
+    handle = _CreateFileW(
         f"\\\\.\\{drive_letter}:",
         GENERIC_READ,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
@@ -126,19 +167,56 @@ def _get_drive_handle(drive_letter: str):
         0,
         None,
     )
-    return None if handle == -1 else handle
+    if handle is None or handle == INVALID_HANDLE_VALUE:
+        return None
+    # Required on Windows 10/11: enables raw reads beyond the partition boundary.
+    # Without this, SetFilePointerEx succeeds but ReadFile returns 0 bytes.
+    returned = wintypes.DWORD()
+    _DeviceIoControl(handle, FSCTL_ALLOW_EXTENDED_DASD_IO, None, 0, None, 0, ctypes.byref(returned), None)
+    return handle
 
 
 def _get_ntfs_volume_data(handle) -> NTFS_VOLUME_DATA_BUFFER | None:
     buf      = NTFS_VOLUME_DATA_BUFFER()
     returned = wintypes.DWORD()
-    ok = ctypes.windll.kernel32.DeviceIoControl(
+    ok = _DeviceIoControl(
         handle, FSCTL_GET_NTFS_VOLUME_DATA,
         None, 0,
         ctypes.byref(buf), ctypes.sizeof(buf),
         ctypes.byref(returned), None,
     )
     return buf if ok else None
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# NTFS Update Sequence Array (USA) fixup
+# ──────────────────────────────────────────────────────────────────────────────
+def _apply_usa_fixup(data: bytearray, record_size: int) -> None:
+    """
+    Restore bytes overwritten by NTFS's sector-end fixup mechanism.
+
+    NTFS replaces the last 2 bytes of every 512-byte sector in an MFT record
+    with a sequence tag (USN).  The original values are stored in the Update
+    Sequence Array (USA) in the record header.  Without this restoration,
+    any attribute whose data straddles a sector boundary will be garbled.
+    """
+    try:
+        if len(data) < 8:
+            return
+        usa_off   = struct.unpack_from("<H", data, 4)[0]   # USA offset in record
+        usa_count = struct.unpack_from("<H", data, 6)[0]   # sectors + 1
+        if usa_off < 8 or usa_count <= 1 or usa_off + usa_count * 2 > len(data):
+            return
+        usn = struct.unpack_from("<H", data, usa_off)[0]   # current tag value
+        for i in range(usa_count - 1):
+            sec_end = (i + 1) * 512 - 2                    # offset of last 2 bytes in sector i
+            if sec_end + 2 > record_size:
+                break
+            if struct.unpack_from("<H", data, sec_end)[0] == usn:
+                orig = struct.unpack_from("<H", data, usa_off + 2 + i * 2)[0]
+                struct.pack_into("<H", data, sec_end, orig)
+    except Exception:
+        pass
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -313,7 +391,86 @@ def build_path_map(records: list, drive_letter: str) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Core scan  (raw MFT sequential read)
+# NTFS run-list parser  (handles fragmented MFT)
+# ──────────────────────────────────────────────────────────────────────────────
+def _parse_runlist(data: bytes, start_off: int) -> list:
+    """
+    Parse an NTFS attribute run list starting at *start_off*.
+
+    Returns [(start_lcn, cluster_count), ...].
+    Sparse runs (offset nibble == 0) are returned as (-1, cluster_count).
+    """
+    runs    = []
+    off     = start_off
+    prev_lcn = 0
+    while off < len(data):
+        header = data[off]
+        if header == 0:
+            break
+        len_size = (header >> 4) & 0xF
+        off_size = header & 0xF
+        off += 1
+        if len_size == 0 or off + len_size > len(data):
+            break
+        n_clusters = int.from_bytes(data[off: off + len_size], "little", signed=False)
+        off += len_size
+        if off_size == 0:
+            runs.append((-1, n_clusters))
+        else:
+            if off + off_size > len(data):
+                break
+            delta = int.from_bytes(data[off: off + off_size], "little", signed=True)
+            off += off_size
+            prev_lcn += delta
+            runs.append((prev_lcn, n_clusters))
+    return runs
+
+
+def _read_mft_runlist(handle, mft_offset: int, bytes_per_record: int) -> list:
+    """
+    Read MFT record 0 ($MFT) and return its $DATA run list.
+
+    Without this, a fragmented MFT is read only from its first extent and files
+    whose records live in later extents are silently missed.
+    Returns [] on any failure (caller falls back to single-run assumption).
+    """
+    ok = _SetFilePointerEx(handle, mft_offset, None, 0)
+    if not ok:
+        return []
+    buf        = ctypes.create_string_buffer(bytes_per_record)
+    bytes_read = wintypes.DWORD()
+    ok = _ReadFile(handle, buf, bytes_per_record, ctypes.byref(bytes_read), None)
+    if not ok or bytes_read.value < bytes_per_record:
+        return []
+    rec = bytearray(buf.raw[: bytes_per_record])
+    _apply_usa_fixup(rec, bytes_per_record)
+    if rec[:4] != b"FILE":
+        return []
+    try:
+        first_attr_off = struct.unpack_from("<H", rec, 0x14)[0]
+    except Exception:
+        return []
+    offset = first_attr_off
+    while offset + 8 <= bytes_per_record:
+        try:
+            attr_type, attr_len = struct.unpack_from("<II", rec, offset)
+        except Exception:
+            break
+        if attr_type == 0xFFFFFFFF or attr_len == 0:
+            break
+        # Unnamed, non-resident $DATA attribute
+        if attr_type == ATTR_DATA and rec[offset + 8] == 1 and rec[offset + 9] == 0:
+            try:
+                rl_off = struct.unpack_from("<H", rec, offset + 0x20)[0]
+                return _parse_runlist(bytes(rec), offset + rl_off)
+            except Exception:
+                return []
+        offset += attr_len
+    return []
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Core scan  (run-list-aware MFT read)
 # ──────────────────────────────────────────────────────────────────────────────
 def scan_drive(drive_letter: str = "C") -> list:
     """
@@ -323,66 +480,136 @@ def scan_drive(drive_letter: str = "C") -> list:
     Full paths are NOT resolved here — call build_path_map() afterwards.
     """
     if not is_admin():
-        print(f"[mft_scan] Not running as admin; scan for {drive_letter}: may fail.")
+        print(f"[mft_scan] Not running as admin; scan for {drive_letter}: will fail.")
 
     handle = _get_drive_handle(drive_letter)
     if not handle:
-        print(f"[mft_scan] Cannot open handle for {drive_letter}:")
+        err = ctypes.windll.kernel32.GetLastError()
+        print(f"[mft_scan] Cannot open volume handle for {drive_letter}: Win32 error {err}")
         return []
 
     ntfs = _get_ntfs_volume_data(handle)
     if not ntfs:
-        ctypes.windll.kernel32.CloseHandle(handle)
-        print(f"[mft_scan] Cannot read NTFS volume data for {drive_letter}:")
+        err = ctypes.windll.kernel32.GetLastError()
+        _CloseHandle(handle)
+        print(f"[mft_scan] Cannot read NTFS volume data for {drive_letter}: Win32 error {err}")
         return []
 
-    mft_offset       = ntfs.MftStartLcn * ntfs.BytesPerCluster
-    bytes_per_record = ntfs.BytesPerFileRecordSegment
-    total_records    = ntfs.MftValidDataLength // bytes_per_record
+    mft_offset        = int(ntfs.MftStartLcn) * int(ntfs.BytesPerCluster)
+    bytes_per_record  = int(ntfs.BytesPerFileRecordSegment)
+    bytes_per_cluster = int(ntfs.BytesPerCluster)
+    total_records     = int(ntfs.MftValidDataLength) // bytes_per_record
 
-    pos = wintypes.LARGE_INTEGER(mft_offset)
-    ctypes.windll.kernel32.SetFilePointerEx(handle, pos, None, 0)
+    print(f"[mft_scan] {drive_letter}: MFT offset={mft_offset} bpr={bytes_per_record} total_records~={total_records}")
 
-    CHUNK = 1024 * 1024                     # 1 MB read at a time
-    MAX   = total_records + 1_000           # safety cap
+    # Read the $MFT run list so fragmented MFTs are covered in full.
+    # If parsing fails we fall back to a single contiguous run from MftStartLcn.
+    mft_runs = _read_mft_runlist(handle, mft_offset, bytes_per_record)
+    if mft_runs:
+        print(f"[mft_scan] {drive_letter}: $MFT has {len(mft_runs)} run(s)")
+    else:
+        n_clusters = (int(ntfs.MftValidDataLength) + bytes_per_cluster - 1) // bytes_per_cluster
+        mft_runs   = [(int(ntfs.MftStartLcn), n_clusters)]
+        print(f"[mft_scan] {drive_letter}: using single-run fallback ({n_clusters} clusters)")
 
+    CHUNK      = 1024 * 1024
     buf        = ctypes.create_string_buffer(CHUNK)
     bytes_read = wintypes.DWORD()
 
-    files:       list = []
-    sequential:  int  = 0
-    empty_streak: int = 0
+    files:      list = []
+    sequential: int  = 0
 
     try:
-        while sequential < MAX:
-            ok = ctypes.windll.kernel32.ReadFile(handle, buf, CHUNK, ctypes.byref(bytes_read), None)
-            if not ok or bytes_read.value == 0:
+        for run_lcn, run_clusters in mft_runs:
+            if sequential >= total_records:
                 break
 
-            chunk = buf.raw[: bytes_read.value]
-            for i in range(0, len(chunk), bytes_per_record):
-                rec = chunk[i: i + bytes_per_record]
-                if len(rec) < bytes_per_record:
+            if run_lcn < 0:
+                # Sparse run — advance sequential counter without reading
+                sequential += (run_clusters * bytes_per_cluster) // bytes_per_record
+                continue
+
+            run_byte_offset = run_lcn * bytes_per_cluster
+            run_bytes_total = run_clusters * bytes_per_cluster
+
+            ok = _SetFilePointerEx(handle, run_byte_offset, None, 0)
+            if not ok:
+                err = ctypes.windll.kernel32.GetLastError()
+                print(f"[mft_scan] SetFilePointerEx failed for run LCN={run_lcn}: err={err}")
+                continue
+
+            remaining = run_bytes_total
+            while remaining > 0 and sequential < total_records:
+                to_read = min(CHUNK, remaining)
+                ok = _ReadFile(handle, buf, to_read, ctypes.byref(bytes_read), None)
+                if not ok or bytes_read.value == 0:
+                    err = ctypes.windll.kernel32.GetLastError()
+                    print(f"[mft_scan] ReadFile stopped in run LCN={run_lcn} seq={sequential}: err={err}")
                     break
+                chunk      = buf.raw[: bytes_read.value]
+                remaining -= bytes_read.value
 
-                info = _parse_mft_record(rec, bytes_per_record, sequential)
-                if info:
-                    files.append(info)
-                    empty_streak = 0
-                else:
-                    empty_streak += 1
-
-                sequential += 1
-
-            if empty_streak > 50_000:
-                break
+                for i in range(0, len(chunk), bytes_per_record):
+                    rec = bytearray(chunk[i: i + bytes_per_record])
+                    if len(rec) < bytes_per_record:
+                        break
+                    _apply_usa_fixup(rec, bytes_per_record)
+                    info = _parse_mft_record(bytes(rec), bytes_per_record, sequential)
+                    if info:
+                        files.append(info)
+                    sequential += 1
 
     except Exception as exc:
-        print(f"[mft_scan] Error: {exc}")
+        print(f"[mft_scan] Error during read: {exc}")
     finally:
-        ctypes.windll.kernel32.CloseHandle(handle)
+        _CloseHandle(handle)
 
+    print(f"[mft_scan] {drive_letter}: scan complete — {len(files)} records found")
     return files
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Junction-safe directory resolver
+# ──────────────────────────────────────────────────────────────────────────────
+def resolve_dir_mft_prefix(path_map: dict, dir_path: str) -> str | None:
+    """
+    Return the canonical MFT path prefix for *dir_path*, handling junctions.
+
+    Problem: a user-provided path like C:\\Users\\X\\Desktop\\Folder may reach
+    files that physically live at C:\\Users\\X\\OneDrive\\Desktop\\Folder when
+    OneDrive Known Folder Move is active.  MFT path_map stores physical paths,
+    so a plain string comparison fails.
+
+    Fix: use os.stat().st_ino to obtain the NTFS MFT record number for the
+    directory.  The OS follows junctions transparently, so the returned inode
+    IS the record number of the physical directory.  We then look up that
+    record in path_map to get the true physical prefix.
+
+    Falls back to string matching (original + realpath) if stat lookup fails.
+    Returns None if the directory cannot be located in path_map at all.
+    """
+    # --- stat-based lookup (handles junctions) ---
+    try:
+        ino = os.stat(dir_path).st_ino & 0xFFFF_FFFF  # match 32-bit record_num
+        if ino in path_map:
+            prefix = path_map[ino].rstrip("\\") + "\\"
+            return prefix
+    except Exception:
+        pass
+
+    # --- string fallback: try original path and realpath ---
+    candidates: set[str] = set()
+    candidates.add(os.path.normpath(dir_path).lower().rstrip("\\"))
+    try:
+        candidates.add(os.path.normpath(os.path.realpath(dir_path)).lower().rstrip("\\"))
+    except Exception:
+        pass
+
+    for rn, path in path_map.items():
+        if path.lower().rstrip("\\") in candidates:
+            return path.rstrip("\\") + "\\"
+
+    return None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -623,10 +850,16 @@ def get_space_analyzer_data(drive_letter: str, dir_path: str = None) -> dict:
     if dir_path and dir_path.strip("\\/"):
         norm_target = dir_path.rstrip("\\/").replace("/", "\\").lower()
         if not norm_target.endswith(":"):
+            found = False
             for rn, path in path_map.items():
                 if path.rstrip("\\/").replace("/", "\\").lower() == norm_target:
                     target_rn = rn
+                    found = True
                     break
+            if not found:
+                # MFT path resolution failed (e.g. C: junction points corrupt some paths).
+                # Fall back to direct filesystem scan so the correct folder is always shown.
+                return _fallback_space_analyzer(dir_path)
 
     children = []
     for r in records:

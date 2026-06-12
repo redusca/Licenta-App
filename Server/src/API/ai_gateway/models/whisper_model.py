@@ -102,7 +102,9 @@ class WhisperModel(BaseAIModel):
             if torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
 
-            generate_kwargs: dict[str, Any] = {"max_new_tokens": max_new_tokens}
+            # Whisper's max_target_positions is 448; 3 are used by special start tokens
+            safe_max_new_tokens = min(max_new_tokens, 444)
+            generate_kwargs: dict[str, Any] = {"max_new_tokens": safe_max_new_tokens}
             if language:
                 generate_kwargs["language"] = language
 
@@ -110,7 +112,9 @@ class WhisperModel(BaseAIModel):
             output = self._pipeline(
                 {"array": audio, "sampling_rate": sample_rate},
                 generate_kwargs=generate_kwargs,
-                return_timestamps=False,
+                return_timestamps=True,
+                chunk_length_s=30,
+                stride_length_s=6,
             )
             inference_time = time.perf_counter() - t0
 

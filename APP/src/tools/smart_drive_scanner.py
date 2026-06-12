@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 # ── Extension categories ──────────────────────────────────────────────────────
 
-_IMAGE_EXTS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".heic", ".heif"})
-_AUDIO_EXTS = frozenset({".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".opus", ".aiff"})
-_DOC_EXTS   = frozenset({".pdf", ".docx", ".doc", ".txt", ".md", ".html", ".htm"})
-_VIDEO_EXTS = frozenset({".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v"})
+_IMAGE_EXTS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".heic", ".heif", ".avif", ".raw", ".cr2", ".cr3", ".nef", ".dng", ".arw"})
+_AUDIO_EXTS = frozenset({".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".mka", ".opus", ".aiff", ".aif", ".ape", ".wv", ".alac"})
+_DOC_EXTS   = frozenset({".pdf", ".docx", ".doc", ".txt", ".md", ".html", ".htm", ".xls", ".xlsx", ".ppt", ".pptx", ".odt", ".ods", ".odp", ".csv", ".rtf", ".epub"})
+_VIDEO_EXTS = frozenset({".mp4", ".avi", ".mkv", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".ts", ".m2ts", ".mts", ".3gp", ".vob", ".ogv", ".rm", ".rmvb"})
 
 _MAX_FILES   = 500   # hard cap on files collected by the scan
 _DEFAULT_MAX_ANALYZE = 50
@@ -124,14 +124,20 @@ def _analyze_document(path: str) -> dict[str, Any]:
 
 def _scan_with_mft(source_folder: str, target_extensions: set[str]) -> list[str]:
     """Scan using NTFS MFT (primary). Returns list of absolute file paths."""
-    from utils.mft_scan import _ensure_cached, invalidate_cache
+    from utils.mft_scan import _ensure_cached, invalidate_cache, is_admin as _mft_is_admin
 
     drive_letter = os.path.splitdrive(source_folder)[0].replace(":", "") or "C"
     invalidate_cache(drive_letter)
     cached = _ensure_cached(drive_letter)
 
-    if not cached or len(cached.get("records", [])) == 0:
+    n_records = len(cached.get("records", [])) if cached else 0
+    if not cached or n_records == 0:
         raise RuntimeError("MFT scan returned 0 records — run as Administrator")
+    if n_records < 50 or not _mft_is_admin():
+        raise RuntimeError(
+            f"MFT scan requires Administrator privileges "
+            f"(only {n_records} records readable, expected thousands)"
+        )
 
     records  = cached["records"]
     path_map = cached["path_map"]
@@ -157,17 +163,6 @@ def _scan_with_mft(source_folder: str, target_extensions: set[str]) -> list[str]
     return matched
 
 
-def _scan_with_walk(source_folder: str, target_extensions: set[str]) -> list[str]:
-    """Fallback: os.walk scan when MFT is unavailable."""
-    matched: list[str] = []
-    for root, _dirs, files in os.walk(source_folder):
-        for f in files:
-            if os.path.splitext(f)[1].lower() in target_extensions:
-                matched.append(os.path.join(root, f))
-                if len(matched) >= _MAX_FILES:
-                    return matched
-    return matched
-
 
 # ── Tool definition and executor ─────────────────────────────────────────────
 
@@ -183,10 +178,10 @@ DEFINITION = {
     "input_instructions": (
         "sourceFolder: the root directory to scan — use ask_user(input_type='folder') to let the user pick it. "
         "extensions: list of file extensions to search for — choose based on the user's intent:\n"
-        "  Photos/Images: ['.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp', '.gif', '.bmp', '.tiff', '.tif']\n"
-        "  Music/Audio:   ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma', '.opus', '.aiff']\n"
-        "  Videos:        ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v']\n"
-        "  Documents:     ['.pdf', '.docx', '.doc', '.pptx', '.xlsx', '.xls', '.txt', '.md']\n"
+        "  Photos/Images: ['.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp', '.gif', '.bmp', '.tiff', '.tif', '.avif', '.raw', '.cr2', '.nef', '.dng']\n"
+        "  Music/Audio:   ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma', '.mka', '.opus', '.aiff', '.aif', '.ape', '.alac']\n"
+        "  Videos:        ['.mp4', '.avi', '.mkv', '.mov', '.wmv', '.flv', '.webm', '.m4v', '.ts', '.m2ts', '.3gp', '.vob']\n"
+        "  Documents:     ['.pdf', '.docx', '.doc', '.pptx', '.xlsx', '.xls', '.txt', '.md', '.odt', '.epub', '.csv']\n"
         "  All media:     combine Photos + Music + Videos lists above.\n"
         "maxAnalyze: max number of files to AI-analyze (default 50, max 200). "
         "The tool uses NTFS MFT for fast full-drive scanning — run the app as Administrator."
@@ -249,14 +244,19 @@ def execute(input_data: dict) -> str:
         for ext in extensions
     )
 
-    # 1. Scan — try NTFS MFT first, fall back to os.walk
+    # 1. Scan via NTFS MFT (requires admin — no fallback).
     try:
         matched = _scan_with_mft(source_folder, target_exts)
         scan_method = "mft"
     except Exception as mft_err:
-        logger.warning("MFT scan failed (%s), falling back to os.walk", mft_err)
-        matched = _scan_with_walk(source_folder, target_exts)
-        scan_method = "walk"
+        return json.dumps({
+            "success": False,
+            "error": (
+                f"NTFS MFT scan failed: {mft_err}. "
+                "The app must run as Administrator for file scanning. "
+                "Please restart the app — it will prompt for elevation automatically."
+            ),
+        })
 
     if not matched:
         return json.dumps({

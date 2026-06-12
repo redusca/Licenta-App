@@ -51,7 +51,32 @@ type FieldKind =
   | 'number'
   | 'file_list'
   | 'tag_list'
+  | 'name'
   | 'text';
+
+// Extract a real filesystem path from an agent-supplied value that may be
+// a JSON object/array (e.g. the serialised result of a previous tool).
+function extractPathFromJson(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return raw;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      const found = parsed.find(v => typeof v === 'string' && /^[A-Za-z]:[/\\]/.test(v));
+      return typeof found === 'string' ? found : raw;
+    }
+    if (typeof parsed === 'object' && parsed !== null) {
+      const obj = parsed as Record<string, unknown>;
+      const pathKeys = ['outputPath', 'path', 'drivePath', 'virtualDrivePath',
+                        'srtPath', 'filePath', 'outputFile', 'location', 'destinationPath'];
+      for (const key of pathKeys) {
+        const v = obj[key];
+        if (typeof v === 'string' && v.trim()) return v;
+      }
+    }
+  } catch { /* not valid JSON */ }
+  return raw;
+}
 
 function inferKind(
   key: string,
@@ -78,18 +103,23 @@ function inferKind(
   if (schema?.type === 'integer' || schema?.type === 'number') return 'number';
   if (schema?.type === 'array') {
     const k = key.toLowerCase();
-    if (k === 'files' || k === 'paths' || k === 'items') return 'file_list';
+    if (k === 'files' || k === 'inputfiles' || k === 'paths' || k === 'items') return 'file_list';
     return 'tag_list';
   }
 
   const k = key.toLowerCase();
+  // Key-name heuristics — run even when schema is absent
+  if (k === 'files' || k === 'inputfiles') return 'file_list';
   if (k === 'driveletter' || k === 'drive') return 'drive';
   if (
     k.includes('folder') || k.endsWith('dir') ||
     k === 'outputpath' || k === 'sourcepath' || k === 'targetdir' ||
-    k === 'sourcefolder' || k === 'outputfolder'
+    k === 'sourcefolder' || k === 'outputfolder' ||
+    k === 'sourcedrive' || k === 'destinationdrive' ||
+    k === 'location'
   ) return 'folder';
   if (k === 'filepath' || (k.includes('file') && k.includes('path'))) return 'file';
+  if (k === 'drivename' || k === 'newname' || k === 'outputfilename') return 'name';
 
   return 'text';
 }
@@ -357,10 +387,47 @@ interface FieldProps {
   onFileListPickerOpen: (key: string, itemIndex: number) => void;
 }
 
+function isAbsolutePath(s: string): boolean {
+  return /^[A-Za-z]:[/\\]/.test(s) || s.startsWith('\\\\');
+}
+
 const FieldInput: React.FC<FieldProps> = ({
   fieldKey, value, schema, kind, drives, optionsList, onChange, onPickerOpen, onFileListPickerOpen,
 }) => {
   const str = valueToString(value);
+
+  const [pathError, setPathError] = useState('');
+
+  // Sanitize and validate path fields on mount.
+  // If the agent passed a JSON blob (previous tool result) extract the real path from it.
+  useEffect(() => {
+    if (kind === 'folder' || kind === 'file') {
+      if (str) {
+        const sanitized = extractPathFromJson(str);
+        if (sanitized !== str) {
+          onChange(fieldKey, sanitized);
+          return;
+        }
+        if (!isAbsolutePath(str)) {
+          setPathError('Enter a valid absolute path (e.g. C:\\Users\\...)');
+        }
+      }
+    }
+  }, []);
+
+  // Strip agent-prefilled paths from name fields on mount — keep only the last segment.
+  useEffect(() => {
+    if (kind === 'name' && str && /[/\\]/.test(str)) {
+      const parts = str.split(/[/\\]/).filter(Boolean);
+      const last = parts[parts.length - 1] ?? str;
+      if (last !== str) onChange(fieldKey, last);
+    }
+  }, []);
+
+  const validatePath = (v: string) => {
+    if (!v) { setPathError(''); return; }
+    setPathError(isAbsolutePath(v) ? '' : 'Enter a valid absolute path (e.g. C:\\Users\\...)');
+  };
 
   switch (kind) {
     case 'hidden':  return null;
@@ -414,34 +481,37 @@ const FieldInput: React.FC<FieldProps> = ({
 
     case 'folder':
     case 'file': {
-      const mode = kind === 'folder' ? 'folder' : 'file';
+      const isFolder = kind === 'folder';
       const pickNative = async () => {
         try {
-          const res = await fetch(`${FLASK}/api/tools/pick-folder`);
+          const endpoint = isFolder ? 'pick-folder' : 'pick-file';
+          const res = await fetch(`${FLASK}/api/tools/${endpoint}`);
           const data = await res.json();
-          if (data.path) onChange(fieldKey, data.path);
+          if (data.path) { onChange(fieldKey, data.path); setPathError(''); }
         } catch { /* ignore */ }
       };
       return (
-        <div className="flex gap-2">
-          <input type="text" value={str} onChange={e => onChange(fieldKey, e.target.value)}
-            placeholder={kind === 'folder' ? 'Choose a folder…' : 'Choose a file…'}
-            spellCheck={false}
-            className="flex-1 text-sm font-mono bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors min-w-0" />
-          {kind === 'folder' && (
+        <div className="space-y-1">
+          <div className="flex gap-2">
+            <input type="text" value={str}
+              onChange={e => { onChange(fieldKey, e.target.value); validatePath(e.target.value); }}
+              onBlur={e => validatePath(e.target.value)}
+              placeholder={isFolder ? 'Choose a folder…' : 'Choose a file…'}
+              spellCheck={false}
+              className={`flex-1 text-sm font-mono bg-slate-100 dark:bg-slate-700 border rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 transition-colors min-w-0 ${
+                pathError
+                  ? 'border-red-400 dark:border-red-500 focus:ring-red-400/50'
+                  : 'border-slate-200 dark:border-slate-600 focus:ring-blue-500/50'
+              }`} />
             <button type="button" onClick={pickNative}
-              title="Open Windows folder picker"
+              title={isFolder ? 'Open Windows folder picker' : 'Open Windows file picker'}
               className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm transition-colors">
               <FolderOpen className="w-4 h-4" />
               Browse
             </button>
-          )}
-          {kind !== 'folder' && (
-            <button type="button" onClick={() => onPickerOpen(fieldKey, mode)}
-              className="shrink-0 flex items-center gap-1.5 px-3 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-xl text-sm text-slate-600 dark:text-slate-300 transition-colors">
-              <HardDrive className="w-4 h-4" />
-              Browse
-            </button>
+          </div>
+          {pathError && (
+            <p className="text-xs text-red-500 dark:text-red-400 px-1">{pathError}</p>
           )}
         </div>
       );
@@ -474,11 +544,20 @@ const FieldInput: React.FC<FieldProps> = ({
         />
       );
 
+    case 'name':
+      return (
+        <input type="text" value={str}
+          onChange={e => onChange(fieldKey, e.target.value)}
+          spellCheck={false}
+          placeholder="Enter a name…"
+          className="w-full text-sm bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors" />
+      );
+
     default:
       return (
         <input type="text" value={str} onChange={e => onChange(fieldKey, e.target.value)}
           spellCheck={false}
-          className="w-full text-sm font-mono bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors" />
+          className="w-full text-sm bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-colors" />
       );
   }
 };
@@ -853,7 +932,38 @@ const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject, lastT
   const paramProps = tool.definition.parameters?.properties ?? {};
 
   useEffect(() => {
-    const base = { ...tool.input };
+    const base: Record<string, any> = { ...tool.input };
+
+    // If the agent sent any field as a JSON-encoded string (e.g. "[{\"path\":\"...\"}]"),
+    // parse it into its native type so array fields render as file lists, not raw text.
+    // Then for folder/file string fields, also extract the path from a parsed object.
+    const _pathKeys = ['outputPath', 'path', 'drivePath', 'virtualDrivePath',
+                       'srtPath', 'filePath', 'outputFile', 'location', 'destinationPath'];
+    for (const k of Object.keys(base)) {
+      const v = base[k];
+      if (typeof v === 'string') {
+        const trimmed = v.trim();
+        if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+          try { base[k] = JSON.parse(trimmed); } catch { /* leave as string */ }
+        }
+      }
+      // After possible parse: if a folder/file field is still an object, extract the path string.
+      const parsed = base[k];
+      if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const schema = paramProps[k];
+        const kind = inferKind(k, schema, isAskUser);
+        if (kind === 'folder' || kind === 'file') {
+          for (const pk of _pathKeys) {
+            const candidate = (parsed as Record<string, unknown>)[pk];
+            if (typeof candidate === 'string' && candidate.trim()) {
+              base[k] = candidate.trim();
+              break;
+            }
+          }
+        }
+      }
+    }
+
     if (!isAskUser && lastToolOutputPaths && lastToolOutputPaths.length > 0) {
       const currentFiles: any[] = Array.isArray(base.files) ? base.files : [];
       const realPathRe = /^([A-Za-z]:[/\\]|\\\\|\/[^/])/;
@@ -871,6 +981,7 @@ const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject, lastT
           : resolved;
       }
     }
+    if (isAskUser && !('answer' in base)) base.answer = '';
     setFields(base);
     fetch(`${FLASK}/api/tools/space-analyzer/drives`)
       .then(r => r.json())
@@ -938,7 +1049,12 @@ const GenericApprovalCard: React.FC<Props> = ({ tool, onApprove, onReject, lastT
                 <div className="space-y-4">
                   {fieldEntries.map(([key, value]) => {
                     const schema = paramProps[key];
-                    const kind = inferKind(key, schema, isAskUser, askUserInputType);
+                    let kind = inferKind(key, schema, isAskUser, askUserInputType);
+                    // Value-based override: any array whose items have a 'path' key is a file list
+                    if (kind !== 'file_list' && Array.isArray(value) && value.length > 0
+                        && typeof value[0] === 'object' && value[0] !== null && 'path' in value[0]) {
+                      kind = 'file_list';
+                    }
                     if (isAskUser && key === 'question') return null;
                     if (kind === 'hidden') return null;
 
