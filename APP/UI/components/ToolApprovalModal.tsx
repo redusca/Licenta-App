@@ -392,7 +392,7 @@ function isAbsolutePath(s: string): boolean {
 }
 
 const FieldInput: React.FC<FieldProps> = ({
-  fieldKey, value, schema, kind, drives, optionsList, onChange, onPickerOpen, onFileListPickerOpen,
+  fieldKey, value, schema, kind, drives, optionsList, onChange, onFileListPickerOpen,
 }) => {
   const str = valueToString(value);
 

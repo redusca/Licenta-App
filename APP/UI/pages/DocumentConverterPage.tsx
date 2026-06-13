@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, FileText, ChevronRight, HardDrive, FolderOpen,
     X, CheckCircle, AlertCircle,
-    Check, Minus, Play, Loader2, ExternalLink, Files, FolderSearch,
+    Check, Minus, Play, Loader2, Files, FolderSearch,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 

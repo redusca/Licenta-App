@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
     ArrowLeft, ChevronRight, BarChart2, FolderOpen, Files, FolderSearch,
     CheckCircle, AlertCircle, FileText,
     Brain, Hash,
     Clock, BookOpen, AlignLeft, Tag, Search,
+    RefreshCw,
 } from 'lucide-react';
 import { FolderPickerModal } from '../components/FolderPickerModal';
 

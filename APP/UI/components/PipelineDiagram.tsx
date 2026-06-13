@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
   ChevronDown, ChevronRight,
-  Search, FolderPlus, FolderOpen, ArrowRight, List,
+  Search, FolderPlus, FolderOpen, List,
   Pencil, Trash2, Image, Video, Music, FileText,
   Zap, GitBranch, HardDrive, ScanLine, MoveRight,
-  CheckCircle2, XCircle,
+  CheckCircle2, XCircle, Eye
 } from 'lucide-react';
 
 export interface PipelineStep {
@@ -14,7 +14,7 @@ export interface PipelineStep {
   status: 'done' | 'error';
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── helpers ─
 
 function getToolLabel(tool: string): string {
   const map: Record<string, string> = {
