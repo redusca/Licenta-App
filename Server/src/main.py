@@ -18,7 +18,6 @@ from config import settings
 from Database.session import engine
 from Database.models import Base
 from API.auth_routes import router as auth_router
-from API.releases_routes import router as releases_router
 from API.agent_routes import router as agent_router
 from API.ai_gateway.router import router as ai_gateway_router
 
@@ -36,11 +35,6 @@ async def lifespan(app: FastAPI):
         logger.warning(
             "CORS is set to allow all origins ('*'). "
             "Set ALLOWED_ORIGINS in .env for production deployments."
-        )
-    if not settings.GITHUB_TOKEN:
-        logger.warning(
-            "GITHUB_TOKEN is not set — GET /api/releases will return 503. "
-            "Set GITHUB_TOKEN in .env to enable release downloads."
         )
     if not settings.GROQ_API_KEY:
         logger.warning(
@@ -70,7 +64,6 @@ app.add_middleware(
 )
 
 app.include_router(auth_router)
-app.include_router(releases_router)
 app.include_router(agent_router)
 app.include_router(ai_gateway_router)
 

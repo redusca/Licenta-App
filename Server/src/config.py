@@ -20,9 +20,6 @@ class Settings(BaseSettings):
 
     ALLOWED_ORIGINS: list[str] = ["*"]
 
-    GITHUB_TOKEN: str = ""
-    GITHUB_REPO: str = "redusca/Licenta-App"
-
     model_config = SettingsConfigDict(env_file=_ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
     @model_validator(mode="after")
