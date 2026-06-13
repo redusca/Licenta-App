@@ -1,15 +1,5 @@
-"""
-Hello tool — connectivity test.
-
-This is the APP-side implementation.  The agent container knows this tool
-exists via its ToolDefinition (registered at /api/agent/init).  When the
-LLM decides to call it, the container POSTs to the APP's
-/api/tools/execute endpoint, which dispatches to this function.
-"""
 from __future__ import annotations
 
-
-# ── Tool definition (sent to agent at init) ───────────────────────────────────
 
 DEFINITION = {
     "name": "hello",
@@ -37,10 +27,9 @@ DEFINITION = {
 }
 
 
-# ── Tool executor (called by /api/tools/execute) ───────────────────────────────
+
 
 def execute(input: dict) -> str:
-    """Run the hello tool and return a greeting string."""
     name = input.get("name") or "world"
     return (
         f"Hello, {name}! "

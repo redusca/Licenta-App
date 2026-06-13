@@ -1,12 +1,3 @@
-"""
-Document Analytics — extract text from a document, compute statistics,
-and use the LLM gateway for AI-powered insights.
-
-Supports: PDF, DOCX, TXT, MD, HTML
-Local stats: word count, sentence count, paragraph count, unique words,
-             reading time, top keywords, avg sentence length.
-AI insights: summary, main topics, tone, key entities — via Groq LLM gateway.
-"""
 from __future__ import annotations
 
 import json
@@ -22,8 +13,6 @@ from typing import Any
 import utils.ai_gateway as ai_gateway
 
 logger = logging.getLogger(__name__)
-
-# ── Stopwords (English) ───────────────────────────────────────────────────────
 
 _STOPWORDS: frozenset[str] = frozenset({
     "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
@@ -44,10 +33,9 @@ _STOPWORDS: frozenset[str] = frozenset({
 _SENTENCE_RE = re.compile(r'[.!?]+\s+')
 
 
-# ── Text extraction ───────────────────────────────────────────────────────────
+
 
 def extract_text(file_path: str) -> str:
-    """Extract plain text from a document file."""
     path = Path(file_path)
     ext = path.suffix.lower()
 
@@ -113,28 +101,23 @@ def _extract_docx(path: Path) -> str:
         raise RuntimeError("DOCX extraction requires python-docx. Install with: pip install python-docx")
 
 
-# ── Local statistics ──────────────────────────────────────────────────────────
+
 
 def compute_stats(text: str) -> dict[str, Any]:
-    """Compute document statistics from extracted plain text."""
     words_raw = text.split()
     word_count = len(words_raw)
 
-    # Clean tokens for keyword/unique analysis
     clean = [w.strip(string.punctuation).lower() for w in words_raw]
     clean = [w for w in clean if w and not w.isdigit()]
 
     unique_words = len(set(clean))
 
-    # Sentences (heuristic)
     sentences = [s.strip() for s in _SENTENCE_RE.split(text) if s.strip()]
     sentence_count = max(len(sentences), 1)
 
-    # Paragraphs (blank-line separated)
     paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
     paragraph_count = max(len(paragraphs), 1)
 
-    # Averages
     avg_words_per_sentence = round(word_count / sentence_count, 1)
     avg_word_length = round(
         sum(len(w) for w in clean) / max(len(clean), 1), 2
@@ -146,15 +129,12 @@ def compute_stats(text: str) -> dict[str, Any]:
     # Estimated pages (250 words per page — standard manuscript)
     estimated_pages = round(word_count / 250, 2)
 
-    # Character count (no spaces)
     char_count_no_spaces = len(text.replace(" ", "").replace("\n", ""))
     char_count = len(text)
 
-    # Top 15 keywords (most frequent non-stopword tokens)
     keyword_tokens = [w for w in clean if w not in _STOPWORDS and len(w) > 2]
     top_keywords = [word for word, _ in Counter(keyword_tokens).most_common(15)]
 
-    # Flesch reading ease approximation
     syllables = sum(_count_syllables(w) for w in clean)
     flesch = 206.835 - 1.015 * avg_words_per_sentence - 84.6 * (syllables / max(word_count, 1))
     flesch = round(max(0.0, min(100.0, flesch)), 1)
@@ -177,7 +157,6 @@ def compute_stats(text: str) -> dict[str, Any]:
 
 
 def _count_syllables(word: str) -> int:
-    """Rough English syllable counter using vowel-group heuristic."""
     word = word.lower().strip(string.punctuation)
     if not word:
         return 0
@@ -204,7 +183,6 @@ def _flesch_grade(score: float) -> str:
     return "Very Difficult (Professional)"
 
 
-# ── LLM insight via gateway ───────────────────────────────────────────────────
 
 _INSIGHT_WORD_LIMIT = 1500  # words sent to LLM — keeps context short so the model has room to respond
 
@@ -218,16 +196,13 @@ _JSON_OBJECT_RE = re.compile(r'\{[\s\S]*\}', re.DOTALL)
 
 
 def _extract_json(text: str) -> dict:
-    """Try to extract and parse a JSON object from LLM response text."""
     text = text.strip()
 
-    # 1. Try direct parse first
     try:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
 
-    # 2. Strip markdown fences
     text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.I)
     text = re.sub(r'\s*```$', '', text)
     try:
@@ -235,7 +210,6 @@ def _extract_json(text: str) -> dict:
     except json.JSONDecodeError:
         pass
 
-    # 3. Find the first {...} block in the response
     m = _JSON_OBJECT_RE.search(text)
     if m:
         return json.loads(m.group())
@@ -244,10 +218,6 @@ def _extract_json(text: str) -> dict:
 
 
 def get_llm_insights(text: str, word_count: int) -> dict[str, Any]:
-    """
-    Call the Groq LLM gateway to get AI-powered document insights.
-    Returns a dict with keys: summary, topics, tone, entities, error.
-    """
     words = text.split()
     excerpt = " ".join(words[:_INSIGHT_WORD_LIMIT])
     truncated = word_count > _INSIGHT_WORD_LIMIT
@@ -297,22 +267,9 @@ def get_llm_insights(text: str, word_count: int) -> dict[str, Any]:
         return {"error": str(exc), "summary": "", "topics": [], "tone": "", "entities": [], "truncated": truncated}
 
 
-# ── Public execute() ─────────────────────────────────────────────────────────
+
 
 def execute(params: dict) -> str:
-    """
-    Execute document analytics.
-
-    Parameters
-    ----------
-    params : dict
-        filePath      — absolute path to the document
-        includeLLM    — bool, whether to call the LLM gateway (default True)
-
-    Returns
-    -------
-    JSON string with keys: success, stats, llm_insights, text_preview, error
-    """
     file_path: str = params.get("filePath", "")
     include_llm: bool = params.get("includeLLM", True)
 
@@ -333,7 +290,6 @@ def execute(params: dict) -> str:
     if include_llm:
         llm_insights = get_llm_insights(text, stats["word_count"])
 
-    # Short preview for the frontend (first 500 chars)
     text_preview = text[:500].strip() + ("…" if len(text) > 500 else "")
 
     return json.dumps({
@@ -348,7 +304,6 @@ def execute(params: dict) -> str:
     }, ensure_ascii=False)
 
 
-# ── Agent DEFINITION ──────────────────────────────────────────────────────────
 
 DEFINITION = {
     "name": "document_analytics",

@@ -75,7 +75,6 @@ function createWindow() {
   });
 }
 
-// IPC Handlers — window controls
 ipcMain.on('window:close',    () => mainWindow?.close());
 ipcMain.on('window:minimize', () => mainWindow?.minimize());
 ipcMain.on('window:maximize', () => {
@@ -143,7 +142,6 @@ function startPythonBackend() {
     scriptPath = path.join(__dirname, '../src/main.py');
     args = [scriptPath];
   } else {
-    // In production, the backend is a compiled executable in resources
     scriptPath = path.join(process.resourcesPath, 'backend/backend.exe');
     command = scriptPath;
     args = [];

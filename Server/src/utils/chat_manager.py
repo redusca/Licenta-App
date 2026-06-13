@@ -1,19 +1,3 @@
-"""
-Chat manager — in-memory per-user conversation store.
-
-Each user (identified by their agent api_key) can hold multiple chats.
-Chats are lost on server restart; they are intentionally not persisted to
-the database to keep the schema simple during development.
-
-Key operations:
-  create_chat  → new Chat object, registered under api_key
-  get_chat     → lookup by (api_key, chat_id)
-  list_chats   → all chats for an api_key, newest first
-  delete_chat  → remove one chat
-  delete_all_chats → wipe everything for an api_key (called on key deletion)
-  add_message  → append a Message to a chat
-  update_chat_tools → replace the tool list for a chat
-"""
 from __future__ import annotations
 
 import threading
@@ -22,10 +6,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-
-# ---------------------------------------------------------------------------
-# Data types
-# ---------------------------------------------------------------------------
 
 @dataclass
 class Message:
@@ -64,10 +44,6 @@ class Chat:
         return d
 
 
-# ---------------------------------------------------------------------------
-# Storage — api_key → {chat_id → Chat}
-# ---------------------------------------------------------------------------
-
 # All callers run as asyncio coroutines in a single event loop (no preemption
 # between synchronous operations), so the dict is safe without locks in the
 # current architecture. The lock below is defensive: it prevents data races
@@ -75,10 +51,6 @@ class Chat:
 _store: dict[str, dict[str, Chat]] = {}
 _lock = threading.Lock()
 
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 def create_chat(
     api_key: str,

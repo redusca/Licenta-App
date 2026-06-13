@@ -1,13 +1,3 @@
-"""
-Smart Drive Builder — agent tool that creates a virtual drive from a list of
-files selected by the agent after scanning and AI analysis.
-
-Supports flat structure (all files in one folder) and hierarchical structure
-(files organized into named sub-folders within the drive).
-
-Requires user approval — the frontend renders a rich SmartDriveBuildApproval
-card so the user can review, add, or remove files before the drive is built.
-"""
 from __future__ import annotations
 
 import json
@@ -94,7 +84,6 @@ def execute(input_data: dict) -> str:
 
     drive_type = "move" if action == "move" else "shortcut"
 
-    # 1. Create (or reuse) the root virtual drive folder
     config_path = os.path.join(output_path, ".drive_config.json")
     if os.path.isfile(config_path):
         # outputPath is already a virtual drive — use it directly
@@ -113,7 +102,6 @@ def execute(input_data: dict) -> str:
         except Exception as exc:
             return json.dumps({"success": False, "error": f"Failed to create virtual drive: {exc}"})
 
-    # 2. Register in known_drives.json
     try:
         normalized_new = os.path.normcase(os.path.normpath(drive_path))
         drives = load_registry()
@@ -123,7 +111,6 @@ def execute(input_data: dict) -> str:
     except Exception as exc:
         logger.error("Failed to register drive: %s", exc)
 
-    # 3. Process each file — create sub-folders on demand
     created_folders: set[str] = set()
     results: list[dict] = []
 
@@ -135,7 +122,6 @@ def execute(input_data: dict) -> str:
             results.append({"path": fpath, "folder": subfolder, "success": False, "error": "File not found"})
             continue
 
-        # Determine target directory
         if subfolder:
             target_dir = os.path.join(drive_path, subfolder)
             if target_dir not in created_folders:

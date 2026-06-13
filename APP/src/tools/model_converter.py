@@ -1,17 +1,3 @@
-"""
-3D Model Converter — convert between OBJ, FBX, GLB, GLTF, STL, PLY, DAE formats.
-
-Uses *trimesh* for geometry I/O.  Trimesh can import all common 3D formats and
-export to OBJ, STL, PLY, GLB, and GLTF.  For FBX and DAE import it relies on
-the optional `pyassimp` backend (falls back gracefully if not installed).
-
-Execution modes
----------------
-replace        : overwrite the original file with the converted version.
-copy           : place the converted file alongside the original (same folder).
-virtual_drive  : copy converted files into the ModelConversionResults virtual drive
-                 located at <output_path>/ModelConversionResults.
-"""
 from __future__ import annotations
 
 import json
@@ -208,12 +194,10 @@ def _convert_model(src_path: str, out_format: str, dst_path: str) -> None:
             if isinstance(scene, trimesh.Scene):
                 scene.export(dst_path, file_type=out_format)
             else:
-                # Wrap single mesh in scene for GLTF export
                 s = trimesh.Scene(geometry={"mesh": scene})
                 s.export(dst_path, file_type=out_format)
         elif out_format == "obj":
             if isinstance(scene, trimesh.Scene):
-                # Concatenate all meshes for OBJ
                 combined = scene.to_geometry()
                 if isinstance(combined, trimesh.Scene):
                     combined = trimesh.util.concatenate(
@@ -308,7 +292,7 @@ def execute(input_data: dict) -> str:
                 final = _unique_path(candidate)
                 _convert_model(src, raw_fmt, final)
 
-            else:  # virtual_drive
+            else:
                 dest = os.path.join(virtual_drive_path, f"{stem}.{ext}")  # type: ignore[arg-type]
                 dest = _unique_path(dest)
                 _convert_model(src, raw_fmt, dest)

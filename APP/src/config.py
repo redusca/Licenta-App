@@ -2,15 +2,10 @@ import os
 import json
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-# Expecting .env to be in the same directory as this file or parent
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(basedir, '.env'))
 
-# ---------------------------------------------------------------------------
-# App version — read from package.json one level up (APP/package.json).
-# This is the ground truth for versioning; bump it there to version the app.
-# ---------------------------------------------------------------------------
+
 def _read_app_version() -> str:
     try:
         pkg_path = os.path.join(basedir, '..', 'package.json')

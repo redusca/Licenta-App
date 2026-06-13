@@ -1,12 +1,3 @@
-"""
-Video Compressor tool — reduce video file size using H.264 / H.265 encoding with configurable CRF.
-
-Execution modes
----------------
-replace        : overwrite the original file with the converted version.
-copy           : place the converted file alongside the original (same folder).
-virtual_drive  : copy converted files into the VideoCompressionResults virtual drive.
-"""
 from __future__ import annotations
 
 import json
@@ -211,7 +202,7 @@ def _process_single_item(
             final = _unique_path(candidate)
             _compress_video(src, final, codec, crf, max_resolution, strip_audio)
 
-        else:  # virtual_drive
+        else:
             dest = os.path.join(virtual_drive_path, f"{stem}_compressed.mp4")  # type: ignore[arg-type]
             dest = _unique_path(dest)
             _compress_video(src, dest, codec, crf, max_resolution, strip_audio)

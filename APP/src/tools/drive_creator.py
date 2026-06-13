@@ -1,6 +1,3 @@
-"""
-Drive Creator tool - group files from a folder into a Virtual Drive by category/extensions.
-"""
 from __future__ import annotations
 
 import json
@@ -129,14 +126,12 @@ def execute(input_data: dict) -> str:
             "error": f"No files matched the selected extensions in '{source_folder}'.",
         })
 
-    # 2. Create the virtual drive folder
     drive_type = "move" if action == "move" else "shortcut"
     try:
         drive_path = create_drive(output_path, drive_name, drive_type)
     except Exception as exc:
         return json.dumps({"success": False, "error": f"Failed to create Virtual Drive: {exc}"})
 
-    # Register in known_drives.json so it is visible immediately in drives UI
     try:
         normalized_new = os.path.normcase(os.path.normpath(drive_path))
         drives = load_registry()
@@ -150,7 +145,6 @@ def execute(input_data: dict) -> str:
     except Exception as exc:
         logger.error(f"Failed to register drive in known_drives: {exc}")
 
-    # 3. Add files to drive
     results = []
     for fpath in matched_files:
         try:

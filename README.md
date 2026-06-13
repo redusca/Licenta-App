@@ -4,7 +4,7 @@
 
 It consists of two components that work together:
 
-- **Server** — a FastAPI + Python backend that hosts AI models (image super-resolution via Swin2SR, audio transcription via Whisper Large V3) and a LangGraph-powered planning agent.
+- **Server** — a FastAPI + PostgreSQL backend that hosts AI models (image super-resolution via Swin2SR, audio transcription via Whisper Large V3, vision via Llama 4 Scout on Groq) and a custom Groq-backed planning agent. Comes with a React web interface for account and API-key management.
 - **Desktop app** — an Electron + React + TypeScript application with a Flask micro-backend bundled inside, providing virtual drives, a tool catalogue, and a chat interface to the planning agent.
 
 ---
@@ -12,7 +12,7 @@ It consists of two components that work together:
 ## Table of Contents
 
 - [Getting Started](#getting-started)
-  - [1. Create a server account](#1-create-a-server-account)
+  - [1. Run the server](#1-run-the-server)
   - [2. Install the desktop app](#2-install-the-desktop-app)
   - [3. Connect the app to the server](#3-connect-the-app-to-the-server)
 - [Initial Settings](#initial-settings)
@@ -24,13 +24,10 @@ It consists of two components that work together:
   - [Image](#image)
   - [Audio](#audio)
   - [Video](#video)
-  - [Documents & Archives](#documents--archives)
+  - [Documents](#documents)
   - [3D & Modeling](#3d--modeling)
-  - [Database](#database)
-  - [Programming](#programming)
   - [Computer Tools](#computer-tools)
-  - [Testing](#testing)
-- [Running the Planning Agent Locally (Docker)](#running-the-planning-agent-locally-docker)
+- [Server Setup (Docker)](#server-setup-docker)
 - [Developer Setup](#developer-setup)
 - [Project Structure](#project-structure)
 
@@ -38,23 +35,44 @@ It consists of two components that work together:
 
 ## Getting Started
 
-### 1. Create a server account
+### 1. Run the server
 
-1. Open the server address in your browser (e.g. `http://localhost:8000`).
-2. Click **Register**, enter your e-mail and a password of at least 8 characters, then confirm.
-3. After registration you are redirected to the home page automatically.
-4. On subsequent visits use **Login** with the same credentials.
+The server hosts AI models, the planning agent, and the account web interface.
+
+**Option A — Docker (recommended for production):**
+
+```bash
+# Copy and fill in the environment file
+cp Server/src/.env.example Server/src/.env
+# Edit Server/src/.env and set at minimum:
+#   JWT_SECRET=<strong random string>
+#   GROQ_API_KEY=<your key from https://console.groq.com>
+
+# Build the React web interface
+cd Server/Interface && npm install && npm run build && cd ../..
+
+# Start PostgreSQL + server
+docker compose -f Server/docker/docker-compose.yml up --build
+```
+
+**Option B — locally (development):**
+
+```bash
+cd Server/src
+pip install -r requirements.txt
+python main.py        # starts on http://localhost:8000
+```
 
 ### 2. Install the desktop app
 
-1. In the web interface navigate to **Downloads** and download the application archive.
+1. In the server web interface navigate to **Downloads** and download the application archive.
 2. Extract the contents to any folder (e.g. `C:\FileO`).
 3. Run **FileO.exe**. On first launch Windows SmartScreen may warn you — choose *Run anyway*.
 4. The main window opens; the bundled Python backend starts in the background automatically.
 
 ### 3. Connect the app to the server
 
-1. In the web interface go to **Account → API Key** and press **Generate API Key**. Copy the key immediately — it is shown only once.
+1. In the server web interface go to **Account → API Key** and press **Generate API Key**. Copy the key immediately — it is shown only once.
 2. In the FileO desktop app open **Settings** (gear icon in the sidebar).
 3. Paste the key into the *API Key* field and set *Server URL* to the server address (e.g. `http://localhost:8000`), then press **Save**.
 4. The status indicator in the Agent section turns green when the connection is confirmed.
@@ -90,7 +108,7 @@ Organise files on your disk into named virtual drives grouped by file category �
 4. Press **Create**. The drive appears in the list with the number of files found.
 5. Click any drive to browse its contents and open individual files.
 
-> The MFT (Master File Table) scanner is used for fast, low-overhead indexing on NTFS drives — similar to WizTree. This means even large drives are scanned in seconds.
+> The MFT (Master File Table) scanner is used for fast, low-overhead indexing on NTFS drives — similar to WizTree. Even large drives are scanned in seconds.
 
 ### Agent
 
@@ -99,11 +117,11 @@ Describe complex, multi-step tasks in plain language and let the planning agent 
 1. Make sure the server is running and the status indicator in the Agent tab is green.
 2. Type your request in the message field and press *Enter*.
    - Example: *"Convert all images in my Downloads folder to WebP, remove the backgrounds, and move the results to the Project Images drive."*
-3. The agent streams its reasoning in real time (collapsible thinking panel) and lists each tool it intends to call before executing.
-4. When a tool requires human approval a dialog appears showing the proposed parameters. You can edit any parameter, then press **Approve** or **Reject**.
+3. The agent streams its reasoning in real time and lists each tool it intends to call before executing.
+4. When a tool requires human input a dialog appears. You can edit any parameter, then press **Approve** or **Reject**.
 5. When finished the agent displays a summary of all actions taken and their results.
 
-The agent uses a **Plan-and-Execute** architecture (LangGraph): it first produces a step-by-step plan, then executes each step, and replans if a step fails or the goal changes.
+The agent uses a **Plan-and-Execute** architecture backed by Groq: it first produces a step-by-step plan, then executes each step (calling tools or reasoning with the LLM), and synthesizes a final answer from all results.
 
 ### Tools
 
@@ -116,7 +134,7 @@ Run any available tool manually, without involving the agent.
    - **Copy** — saves output alongside the originals.
    - **Replace** — overwrites the originals with the processed files.
    - **Virtual Drive** — sends results to the folder configured as Output Path.
-5. Press **Run** and wait. AI-powered tools (Image Enhancer, Audio Transcriber, Subtitle Generator) stream progress in real time. The results panel shows each file's status and any errors.
+5. Press **Run** and wait. AI-powered tools stream progress in real time. The results panel shows each file's status and any errors.
 
 ---
 
@@ -159,14 +177,9 @@ Converts raster images to clean, scalable SVG vector files using `vtracer`. Choo
 ---
 
 #### AI Image Enhancer
-> Formats: `.jpg` `.jpeg` `.png` `.webp` · **AI (Swin2SR super-resolution, on-device)**
+> Formats: `.jpg` `.jpeg` `.png` `.webp` · **AI (Swin2SR super-resolution, server-side)**
 
-Upscales images 2× or 4× using a locally-running super-resolution neural network (Swin2SR), simultaneously reducing noise and compression artefacts. No data is sent to external servers. Progress streams in real time while the model processes.
-
-| Option | Details |
-|---|---|
-| Upscale Factor | 2× or 4× |
-| Denoise | Optional denoising pass before upscaling |
+Upscales images ×2 using Swin2SR running on the server, simultaneously reducing noise and compression artefacts. Progress streams in real time while the model processes.
 
 ---
 
@@ -185,13 +198,12 @@ Batch-convert audio files between all common formats using FFmpeg. Supports Repl
 #### Audio Transcriber
 > Formats: `.mp3` `.wav` `.ogg` `.flac` `.m4a` `.aac` · **AI (Whisper Large V3, server-side)**
 
-Converts spoken audio into accurate text transcripts using Whisper Large V3 running on the agent server. Auto-detects language, supports speaker diarisation, and can export transcripts as plain text, SRT subtitles, or JSON.
+Converts spoken audio into accurate text transcripts using Whisper Large V3 running on the server. Auto-detects language and exports transcripts as plain text or SRT.
 
 | Option | Details |
 |---|---|
-| Language | Auto-detect or specify: EN, RO, FR, DE, ES, IT, PT |
-| Output Format | TXT, SRT, or JSON |
-| Speaker Diarisation | Identify and label individual speakers |
+| Language | Auto-detect or specify: EN, RO, FR, DE, ES, IT, PT, and more |
+| Output Format | TXT or SRT |
 
 ---
 
@@ -200,12 +212,11 @@ Converts spoken audio into accurate text transcripts using Whisper Large V3 runn
 #### Subtitle Generator
 > Formats: `.mp4` `.mkv` `.avi` `.mov` `.webm` `.flv` `.wmv` `.m4v` · **AI (Whisper Large V3, server-side)**
 
-Extracts audio from any video, transcribes it with Whisper Large V3 using word-level timestamps, and produces a ready-to-use SRT file compatible with VLC, MPC-HC, and other media players. Optionally translates subtitles into another language via the Google Translate API.
+Extracts audio from any video, transcribes it with Whisper Large V3 using word-level timestamps, and produces a ready-to-use SRT file compatible with VLC, MPC-HC, and other media players.
 
 | Option | Details |
 |---|---|
 | Video Language | Auto-detect or specify (16 languages supported) |
-| Translate To | Optional translation target (EN, RO, FR, DE, ES, IT, PT, RU, JA, ZH, KO, AR, TR, PL, NL) |
 
 ---
 
@@ -226,19 +237,19 @@ Re-encodes video files using FFmpeg-backed H.264 or H.265 with a configurable Co
 #### Video Converter
 > Formats: `.mp4` `.avi` `.mkv` `.mov` `.wmv` `.flv` `.webm` `.m4v` `.mpeg` `.mpg` · No AI
 
-Batch-convert video files between all major container formats using FFmpeg. Supports Replace, Copy, and Virtual Drive output modes.
+Batch-convert video files between all major container formats using FFmpeg.
 
 | Output formats | MP4, AVI, MKV, MOV, WMV, FLV, WebM |
 |---|---|
 
 ---
 
-### Documents & Archives
+### Documents
 
 #### PDF Toolkit
 > Formats: `.pdf` `.docx` · No AI
 
-All-in-one PDF manipulation. Merge multiple PDFs into one with drag-and-drop reordering, extract specific page ranges, and convert between PDF and Word (`.docx`) — all processed locally using pure-Python libraries.
+All-in-one PDF manipulation. Merge multiple PDFs into one with drag-and-drop reordering, extract specific page ranges, and convert between PDF and Word (`.docx`) — all processed locally.
 
 | Action | Details |
 |---|---|
@@ -249,20 +260,20 @@ All-in-one PDF manipulation. Merge multiple PDFs into one with drag-and-drop reo
 ---
 
 #### Document Analytics
-> Formats: `.pdf` `.docx` `.txt` `.md` `.html` `.htm` · **AI (LLM insights, optional)**
+> Formats: `.pdf` `.docx` `.txt` `.md` `.html` `.htm` · **AI (Groq LLM, optional)**
 
-Extracts text from a document and computes a comprehensive set of statistics: word count, sentence and paragraph count, unique words, reading time, estimated page count, average sentence length, top keywords, and Flesch-Kincaid readability score. Optionally uses the Groq LLM (the same model as the planning agent) to generate a concise summary, identify main topics, classify writing tone, and extract named entities.
+Extracts text from a document and computes statistics: word count, sentence and paragraph count, unique words, reading time, estimated page count, average sentence length, top keywords, and Flesch-Kincaid readability score. Optionally uses the Groq LLM to generate a concise summary, identify main topics, classify writing tone, and extract named entities.
 
 | Option | Details |
 |---|---|
-| AI Insights | Toggle on/off — requires the AI Gateway to be running on port 8000 |
+| AI Insights | Toggle on/off — requires the server to be running |
 
 ---
 
 #### Document Converter
 > Formats: `.pdf` `.docx` `.doc` `.txt` `.html` `.htm` `.md` · No AI
 
-Versatile, fully local document format conversion. Convert PDFs to editable Word documents, extract plain text from any document, render PDFs as PNG images, turn Markdown into styled HTML or PDF, and more. Supports batch conversion with multiple files at once.
+Versatile, fully local document format conversion. Convert PDFs to editable Word documents, extract plain text from any document, render PDFs as PNG images, turn Markdown into styled HTML or PDF, and more. Supports batch conversion.
 
 | Output formats | PDF, DOCX, TXT, HTML, PNG |
 |---|---|
@@ -286,38 +297,7 @@ Converts 3D model files between widely-used formats using the Open Asset Import 
 #### 3D Visualizer
 > Formats: `.obj` `.fbx` `.glb` `.gltf` `.stl` · No AI
 
-An interactive in-app 3D model previewer with rotate, pan, and zoom camera controls. Load a 3D object file and optionally apply a custom image texture to its surface — no external software needed.
-
----
-
-### Database
-
-#### SQLite Viewer
-> Formats: `.sqlite` `.db` `.sqlite3` · No AI
-
-Browse, query, and export data from SQLite database files. Explore tables, run arbitrary SQL `SELECT` queries, view the schema (CREATE statements), and export results to CSV, JSON, or XLSX. The database file never leaves your machine.
-
-| Option | Details |
-|---|---|
-| SQL Query | Optional `SELECT` statement to run on open |
-| Export Format | CSV, JSON, or XLSX |
-
----
-
-### Programming
-
-#### AI Code Explainer
-> Formats: `.js` `.ts` `.tsx` `.jsx` `.py` `.go` `.rs` `.java` `.c` `.cpp` `.cs` `.rb` `.php` `.sh` · **AI (LLM, server-side)**
-
-Sends selected source code to the planning agent model and returns: a plain-English explanation of what the code does, auto-generated JSDoc/docstring comments for functions, and refactor/improvement suggestions. Supports all major programming languages.
-
-| Mode | Output |
-|---|---|
-| **Explain** | Plain-English description of the code |
-| **Document** | Generated doc comments for functions and classes |
-| **Refactor** | Improvement suggestions and cleaner alternatives |
-| **All** | All three outputs in one pass |
-| Detail Level | Brief, Standard, or Detailed |
+An interactive in-app 3D model previewer with rotate, pan, and zoom camera controls. Load a 3D object file and optionally apply a custom image texture to its surface.
 
 ---
 
@@ -333,57 +313,55 @@ Quickly scans any folder by file category (Images, Audio, Video, 3D Objects, Doc
 #### Space Analyzer
 > No AI
 
-Scans a selected drive using the NTFS Master File Table, calculates recursive folder sizes, and displays disk usage in an interactive squarified treemap (similar to WizTree). Click into blocks to drill down through the folder hierarchy and identify what's using the most space.
+Scans a selected drive using the NTFS Master File Table, calculates recursive folder sizes, and displays disk usage in an interactive squarified treemap (similar to WizTree). Click into blocks to drill down through the folder hierarchy and identify what is using the most space.
 
 ---
-
-### Testing
 
 #### Hello Agent
 > No AI
 
-A connectivity diagnostic tool. Sends a fixed test prompt to the configured agent container and displays the full response including any intermediate tool-call records. Use this to verify that your API key, Server URL, and agent container are correctly wired up before running production tools.
+A connectivity diagnostic tool. Sends a fixed test prompt to the configured server and displays the full response. Use this to verify that your API key, Server URL, and server are correctly wired up before running production tools.
 
 ---
 
-## Running the Planning Agent Locally (Docker)
+## Server Setup (Docker)
 
-The planning agent runs inside a Docker container. See [`Container/docker/README.md`](Container/docker/README.md) for full setup instructions.
+The server can be run locally (see [Getting Started](#1-run-the-server)) or deployed via Docker Compose.
 
 **Prerequisites:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
 
 ```bash
-# 1. Copy and fill in the environment file
-cp Container/docker/.env.example Container/docker/.env
-# Edit .env and set:
-#   GOOGLE_API_KEY=<your key from https://aistudio.google.com/app/apikey>
-#   CONTAINER_API_KEY=<any secret you choose>
+# 1. Configure environment
+cp Server/src/.env.example Server/src/.env
+# Required keys in .env:
+#   JWT_SECRET=<strong random string, e.g. openssl rand -hex 32>
+#   GROQ_API_KEY=<from https://console.groq.com>
+#   GITHUB_TOKEN=<personal access token with Contents:Read, for /api/releases>
 
-# 2a. Start — Windows (double-click or run from terminal)
-Container\docker\run.bat
+# 2. Build the web interface
+cd Server/Interface && npm install && npm run build && cd ../..
 
-# 2b. Start — Linux / macOS
-chmod +x Container/docker/run.sh && Container/docker/run.sh
+# 3. Start
+docker compose -f Server/docker/docker-compose.yml up --build -d
 ```
 
-The container exposes the agent on port **8001** by default. In FileO's **Settings**, set *Server URL* to `http://localhost:8001` and use the `CONTAINER_API_KEY` from your `.env` as the API key.
+The server exposes port **8000**. The web interface is served at `http://localhost:8000`.
 
-Useful Docker commands:
+Useful commands:
 
 ```bash
-docker logs licenta-agent       # view agent logs
-docker stop licenta-agent       # stop the container
-docker start licenta-agent      # restart (no image reload needed)
-docker rm licenta-agent         # remove the container entirely
+docker compose -f Server/docker/docker-compose.yml logs -f    # tail logs
+docker compose -f Server/docker/docker-compose.yml down       # stop
+docker compose -f Server/docker/docker-compose.yml restart    # restart
 ```
 
 ---
 
 ## Developer Setup
 
-See [`APP/README.md`](APP/README.md) for the full build guide. Quick reference:
-
 **Prerequisites:** Node.js 18+, Python 3.9+
+
+### Desktop app (APP/)
 
 ```bash
 cd APP
@@ -405,7 +383,26 @@ The build pipeline:
 3. Packages the Flask backend with PyInstaller → `resources/backend/backend.exe`
 4. Packages everything with Electron Builder → `release/Setup.exe`
 
-**Running tests:**
+### Server (Server/)
+
+```bash
+cd Server/src
+pip install -r requirements.txt
+
+# Copy and fill in the environment file
+cp .env.example .env
+
+# Run database migrations (first time)
+alembic upgrade head
+
+# Start the server
+python main.py       # http://localhost:8000
+
+# Build the web interface (optional, served by FastAPI)
+cd ../Interface && npm install && npm run build
+```
+
+**Running tests (desktop app):**
 
 ```bash
 cd APP/src
@@ -420,21 +417,26 @@ python -m pytest tests/ -v
 Licenta-App/
 ├── APP/                        # Desktop application
 │   ├── UI/                     # React + Vite + TypeScript frontend
-│   │   └── src/
-│   │       ├── pages/          # My Drives, Agent, Tools pages
-│   │       └── components/     # Shared UI components
+│   │   ├── pages/              # Page components (Tools, Chat, Files, etc.)
+│   │   ├── components/         # Shared UI components
+│   │   ├── hooks/              # Custom React hooks
+│   │   └── contexts/           # React context providers
 │   ├── src/                    # Python Flask backend
 │   │   ├── API/                # Blueprint routes (drive, tools, agent)
 │   │   ├── tools/              # Tool modules + catalog.py
-│   │   ├── services/           # MFT scanner, drive manager
-│   │   └── tests/              # PyUnit test suites
+│   │   ├── utils/              # MFT scanner, drive manager, AI gateway client
+│   │   ├── migrations/         # Virtual drive config schema migrations
+│   │   └── tests/              # PyTest suites
 │   ├── electron/               # Electron main process + preload
-│   └── resources/              # Build assets (icons, etc.)
-├── Container/
-│   └── docker/                 # Planning agent Docker image & run scripts
-│       ├── .env.example
-│       ├── run.bat
-│       ├── run.sh
-│       └── README.md
+│   └── resources/              # Build assets (icons, backend.exe)
+├── Server/                     # FastAPI server
+│   ├── src/                    # Server source
+│   │   ├── API/                # FastAPI routers (auth, agent, releases, ai_gateway)
+│   │   │   └── ai_gateway/     # Swin2SR, Whisper, Groq LLM/vision endpoints
+│   │   └── utils/              # Planning agent, chat manager, auth helpers
+│   ├── Interface/              # React web interface (served by FastAPI)
+│   ├── Database/               # SQLAlchemy models + session
+│   ├── migrations/             # Alembic database migrations
+│   └── docker/                 # Docker Compose configs + Dockerfiles
 └── README.md
 ```

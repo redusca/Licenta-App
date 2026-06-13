@@ -1,22 +1,4 @@
-"""
-Tool catalog — UI-facing metadata for every tool available in the application.
-
-This module is imported once on backend startup and served verbatim via
-GET /api/tools/catalog.  The frontend consumes it to render the Tools page,
-category grids, filter pills, and the detail view.
-
-Structure convention
---------------------
-Every tool entry mirrors the TypeScript ``ToolDefinition`` interface so the
-frontend can type-check the response without any transformation.
-
-Field descriptions are intentionally verbose because they are read by the
-agent when it decides which tool to invoke and which field values to supply.
-"""
-
 from __future__ import annotations
-
-# ── Category definitions ──────────────────────────────────────────────────
 
 CATEGORIES: list[dict] = [
     {
@@ -63,11 +45,7 @@ CATEGORIES: list[dict] = [
     },
 ]
 
-# ── Tool catalog ──────────────────────────────────────────────────────────
-
 TOOLS: list[dict] = [
-
-    # ── IMAGE ─────────────────────────────────────────────────────────────
 
     {
         "id": "image-converter",
@@ -306,8 +284,6 @@ TOOLS: list[dict] = [
         "tags": ["upscale", "super-resolution", "denoise", "AI", "enhance", "quality"],
     },
 
-    # ── AUDIO ─────────────────────────────────────────────────────────────
-
     {
         "id": "audio-converter",
         "name": "Audio Converter",
@@ -419,8 +395,6 @@ TOOLS: list[dict] = [
     },
 
 
-
-    # ── VIDEO ─────────────────────────────────────────────────────────────
 
     {
         "id": "subtitle-generator",
@@ -596,8 +570,6 @@ TOOLS: list[dict] = [
         ],
         "tags": ["convert", "format", "batch", "mp4", "avi", "mkv", "video"],
     },
-
-    # ── DOCUMENTS & ARCHIVES ──────────────────────────────────────────────
 
     {
         "id": "pdf-merger",
@@ -776,8 +748,6 @@ TOOLS: list[dict] = [
         ],
         "tags": ["convert", "pdf", "docx", "word", "txt", "html", "markdown", "png", "documents", "format"],
     },
-
-    # ── 3D & MODELING ─────────────────────────────────────────────────────
 
     {
         "id": "model-converter",

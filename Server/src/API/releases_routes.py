@@ -1,12 +1,3 @@
-"""
-GET /api/releases  — proxy to GitHub.
-Tries the formal Releases API first (assets attached).
-Falls back to the Tags API + constructing local /downloads/ URLs
-for repos that only have lightweight tags.
-
-GET /api/releases/check  — diagnostic endpoint to verify GitHub connectivity.
-"""
-
 import asyncio
 import httpx
 from fastapi import APIRouter, HTTPException
@@ -29,7 +20,6 @@ def _headers():
 
 
 def _exe_name(tag: str) -> str:
-    """v1.0.0  ->  LicentaApp-Setup-1.0.0.exe"""
     version = tag.lstrip("v")
     return f"LicentaApp-Setup-{version}.exe"
 
@@ -47,7 +37,6 @@ async def _commit_date(client: httpx.AsyncClient, sha: str) -> str:
 
 @router.get("/releases/check")
 async def check_github():
-    """Diagnostic: verify the GITHUB_TOKEN and repo access."""
     result: dict = {"token_configured": bool(settings.GITHUB_TOKEN), "repo": settings.GITHUB_REPO}
 
     if not settings.GITHUB_TOKEN:
@@ -56,7 +45,6 @@ async def check_github():
 
     headers = _headers()
     async with httpx.AsyncClient(timeout=10) as client:
-        # Check token is valid
         user_r = await client.get(f"{_BASE}/user", headers=headers)
         result["token_valid"] = user_r.status_code == 200
         if user_r.status_code == 200:
@@ -64,7 +52,6 @@ async def check_github():
         else:
             result["token_error"] = f"GitHub /user returned {user_r.status_code}: {user_r.text[:200]}"
 
-        # Check repo access
         repo_r = await client.get(f"{_BASE}/repos/{settings.GITHUB_REPO}", headers=headers)
         result["repo_accessible"] = repo_r.status_code == 200
         if repo_r.status_code == 200:
@@ -81,7 +68,6 @@ async def check_github():
         else:
             result["repo_error"] = f"GitHub returned {repo_r.status_code}: {repo_r.text[:200]}"
 
-        # Check releases endpoint
         rel_r = await client.get(f"{_BASE}/repos/{settings.GITHUB_REPO}/releases", headers=headers)
         result["releases_status"] = rel_r.status_code
         if rel_r.status_code == 200:
@@ -98,7 +84,6 @@ async def get_releases():
     repo = settings.GITHUB_REPO
 
     async with httpx.AsyncClient(timeout=15) as client:
-        # ── Try formal GitHub Releases first ─────────────────────────────
         r = await client.get(f"{_BASE}/repos/{repo}/releases", headers=headers)
 
         if r.status_code == 401:
@@ -118,11 +103,9 @@ async def get_releases():
         if r.status_code == 200:
             data = r.json()
             if data:
-                # Formal releases with assets — return as-is
                 return data
             # 200 + [] means the repo exists but has no formal releases → fall through to tags
 
-        # ── Fall back to lightweight Tags ────────────────────────────────
         r = await client.get(f"{_BASE}/repos/{repo}/tags", headers=headers)
         if r.status_code == 401:
             raise HTTPException(401, "GitHub token is invalid or expired.")
@@ -133,16 +116,14 @@ async def get_releases():
         if r.status_code != 200:
             raise HTTPException(r.status_code, f"GitHub API error: {r.text[:300]}")
 
-        tags = r.json()  # [{name, commit: {sha}, ...}]
+        tags = r.json()
         if not tags:
             return []
 
-        # Fetch commit dates in parallel
         dates = await asyncio.gather(
             *[_commit_date(client, t["commit"]["sha"]) for t in tags]
         )
 
-    # Build a releases-shaped response so the frontend needs no changes
     result = []
     for tag, date in zip(tags, dates):
         exe = _exe_name(tag["name"])
@@ -153,7 +134,6 @@ async def get_releases():
             "published_at": date,
             "prerelease": False,
             "html_url": f"https://github.com/{repo}/releases/tag/{tag['name']}",
-            # Lightweight tags have no attached assets — direct users to the GitHub page.
             "assets": [
                 {
                     "name": exe,

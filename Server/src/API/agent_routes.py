@@ -1,22 +1,3 @@
-"""
-Agent API routes.
-
-Authentication:
-  - JWT (Bearer)  → register / view / delete your agent API key
-  - X-API-Key     → chat endpoints (no JWT needed from the APP)
-
-── Key management (JWT) ────────────────────────────────────────────────────────
-  POST   /api/agent/register      — create an api_key for the authenticated user
-  GET    /api/agent/key           — return existing api_key
-  DELETE /api/agent/key           — delete api_key + all chats
-
-── Planning Agent — chat management (X-API-Key) ───────────────────────────────
-  POST   /api/agent/chats                      — create a new chat
-  GET    /api/agent/chats                      — list all chats for this key
-  GET    /api/agent/chats/{chat_id}            — get chat detail with messages
-  DELETE /api/agent/chats/{chat_id}            — delete a chat
-  POST   /api/agent/chats/{chat_id}/message    — send message (SSE streaming)
-"""
 from __future__ import annotations
 
 import json
@@ -48,15 +29,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agent", tags=["agent"])
 
 
-# ---------------------------------------------------------------------------
-# Pydantic schemas
-# ---------------------------------------------------------------------------
-
 class AgentKeyOut(BaseModel):
     api_key: str
 
-
-# ── Planning chat schemas ────────────────────────────────────────────────────
 
 class ChatCreateIn(BaseModel):
     tools: list[dict[str, Any]] = []
@@ -81,10 +56,6 @@ class MessageIn(BaseModel):
     message: str
     tools: list[dict[str, Any]] = []   # optional override — updates chat's tool list
 
-
-# ---------------------------------------------------------------------------
-# Auth helpers
-# ---------------------------------------------------------------------------
 
 def _get_user_by_api_key(api_key: str, db: Session) -> User:
     record = db.query(AgentKey).filter(AgentKey.api_key == api_key).first()
@@ -122,16 +93,11 @@ def _get_api_key_from_header(request: Request) -> str:
     return api_key
 
 
-# ---------------------------------------------------------------------------
-# Key management (JWT-protected)
-# ---------------------------------------------------------------------------
-
 @router.post("/register", response_model=AgentKeyOut, status_code=status.HTTP_201_CREATED)
 def register_agent_key(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Generate and store a new agent API key for the authenticated user."""
     existing = db.query(AgentKey).filter(AgentKey.user_id == current_user.id).first()
     if existing:
         raise HTTPException(
@@ -174,17 +140,12 @@ def delete_agent_key(
     logger.info("Deleted agent key for user %s", current_user.id)
 
 
-# ---------------------------------------------------------------------------
-# Planning Agent — chat management
-# ---------------------------------------------------------------------------
-
 @router.post("/chats", response_model=ChatInfoOut, status_code=status.HTTP_201_CREATED)
 def create_agent_chat(
     body: ChatCreateIn,
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Create a new planning-agent chat session."""
     api_key = _get_api_key_from_header(request)
     _get_user_by_api_key(api_key, db)
 
@@ -202,7 +163,6 @@ def list_agent_chats(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """List all chats for the authenticated API key (newest first)."""
     api_key = _get_api_key_from_header(request)
     _get_user_by_api_key(api_key, db)
 
@@ -216,7 +176,6 @@ def get_agent_chat(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Get a chat with its full message history."""
     api_key = _get_api_key_from_header(request)
     _get_user_by_api_key(api_key, db)
 
@@ -232,7 +191,6 @@ def delete_agent_chat(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Delete a chat and its message history."""
     api_key = _get_api_key_from_header(request)
     _get_user_by_api_key(api_key, db)
 
@@ -241,10 +199,6 @@ def delete_agent_chat(
     logger.info("Deleted chat %s for api_key=...%s", chat_id, api_key[-6:])
 
 
-# ---------------------------------------------------------------------------
-# Planning Agent — streaming message endpoint
-# ---------------------------------------------------------------------------
-
 @router.post("/chats/{chat_id}/message")
 async def send_message(
     chat_id: str,
@@ -252,17 +206,6 @@ async def send_message(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """
-    Send a message to the planning agent.
-    Returns a Server-Sent Events stream of execution events.
-
-    Each event line:
-        data: <json object>\\n\\n
-
-    Final event types: "final" (full response), "error" (on failure).
-    Stream ends with:
-        data: [DONE]\\n\\n
-    """
     api_key = _get_api_key_from_header(request)
     _get_user_by_api_key(api_key, db)
 
@@ -270,12 +213,10 @@ async def send_message(
     if chat is None:
         raise HTTPException(status_code=404, detail="Chat not found.")
 
-    # Update tool list if the caller sent tools with this message
     tools = body.tools if body.tools else chat.tool_definitions
     if body.tools:
         update_chat_tools(api_key, chat_id, body.tools)
 
-    # Record the user turn now so history is correct when the agent reads it
     add_message(api_key, chat_id, "user", body.message)
 
     async def event_stream():

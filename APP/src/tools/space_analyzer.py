@@ -1,6 +1,3 @@
-"""
-Space Analyzer tool - Analyze drive or folder space efficiently using MFT scan.
-"""
 from __future__ import annotations
 
 import json
@@ -81,7 +78,6 @@ def execute(input_data: dict) -> str:
                     "success": False,
                     "error": f"'{folder_path}' is not a directory.",
                 })
-            # Extract drive letter from path and use the folder as targetDir
             inferred_drive = os.path.splitdrive(folder_path)[0].replace(":", "").upper() or "C"
             data = get_space_analyzer_data(inferred_drive, folder_path)
 

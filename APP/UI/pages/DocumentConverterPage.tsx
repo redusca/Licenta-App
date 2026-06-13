@@ -352,15 +352,7 @@ export const DocumentConverterPage: React.FC = () => {
                                                 <p className="text-sm font-mono truncate" title={file.path}>{file.name}</p>
                                                 {result && !result.success && <p className="text-xs text-red-400 mt-0.5">{result.error}</p>}
                                                 {result?.outputPath && (
-                                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                                        <p className="text-xs text-green-500 truncate">→ {result.outputPath.split(/[\\/]/).pop()}</p>
-                                                        <button type="button"
-                                                            onClick={e => { e.stopPropagation(); (window as any).electronAPI?.showItemInFolder?.(result.outputPath); }}
-                                                            className="flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 hover:bg-green-500/25 transition-colors shrink-0">
-                                                            <ExternalLink className="w-2.5 h-2.5" />
-                                                            Open
-                                                        </button>
-                                                    </div>
+                                                    <p className="text-xs text-green-500 truncate mt-0.5">→ {result.outputPath.split(/[\\/]/).pop()}</p>
                                                 )}
                                             </div>
 
@@ -475,12 +467,6 @@ export const DocumentConverterPage: React.FC = () => {
                                             <p className="text-xs text-green-400 truncate flex-1">
                                                 → {r.outputPath!.split(/[\\/]/).pop()}
                                             </p>
-                                            <button type="button"
-                                                onClick={() => (window as any).electronAPI?.showItemInFolder?.(r.outputPath)}
-                                                className="flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-green-500/20 text-green-300 hover:bg-green-500/30 transition-colors shrink-0">
-                                                <ExternalLink className="w-3 h-3" />
-                                                Open
-                                            </button>
                                         </div>
                                     ))}
                                 </div>

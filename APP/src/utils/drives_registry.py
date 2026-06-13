@@ -1,14 +1,3 @@
-"""
-drives_registry.py
-==================
-
-Persists the list of known drives on the backend so localStorage loss doesn't
-wipe the user's drive list.
-
-Storage location: <src>/data/known_drives.json
-The file is created automatically on first write.
-"""
-
 import os
 import json
 import shutil
@@ -24,10 +13,6 @@ def _ensure_data_dir() -> None:
 
 
 def load_registry() -> list[dict]:
-    """
-    Return the full list of known drives stored on the backend.
-    Returns an empty list if the registry file doesn't exist yet.
-    """
     if not os.path.exists(_REGISTRY_FILE):
         return []
     try:
@@ -42,24 +27,10 @@ def load_registry() -> list[dict]:
 
 
 def resolve_drive(name_or_path: str) -> str | None:
-    """
-    Resolve a drive name or path string to an absolute directory path.
-
-    Resolution order:
-      1. Already an absolute path that exists on disk → return as-is.
-      2. Exact case-insensitive match on registry display name.
-      3. Exact case-insensitive match on the folder's basename.
-      4. Fuzzy: query is a substring of a name, OR a name is a substring of
-         the query — only when exactly one registry entry matches.
-      5. Fallback: relative/bare path that is a real directory.
-
-    Returns None if nothing matches.
-    """
     if not name_or_path:
         return None
     value = name_or_path.strip()
 
-    # 1 — absolute path
     if os.path.isabs(value) and os.path.isdir(value):
         return value
 
@@ -70,7 +41,6 @@ def resolve_drive(name_or_path: str) -> str | None:
     except Exception:
         registry = []
 
-    # 2 & 3 — exact matches
     for entry in registry:
         ep: str = entry.get("path", "")
         en: str = entry.get("name", "")
@@ -79,7 +49,6 @@ def resolve_drive(name_or_path: str) -> str | None:
         if en.lower() == norm or os.path.basename(ep).lower() == norm:
             return ep
 
-    # 4 — fuzzy substring match (unique hit only)
     candidates: list[str] = []
     for entry in registry:
         ep = entry.get("path", "")
@@ -95,7 +64,6 @@ def resolve_drive(name_or_path: str) -> str | None:
     if len(candidates) == 1:
         return candidates[0]
 
-    # 5 — bare relative path
     if os.path.isdir(value):
         return os.path.abspath(value)
 
@@ -103,13 +71,8 @@ def resolve_drive(name_or_path: str) -> str | None:
 
 
 def save_registry(drives: list[dict]) -> None:
-    """
-    Overwrite the registry with *drives*.
-    Keeps a timestamped backup of the previous file before writing.
-    """
     _ensure_data_dir()
 
-    # Rotate backup
     if os.path.exists(_REGISTRY_FILE):
         ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d_%H%M%S")
         backup = _REGISTRY_FILE + f".bak_{ts}"

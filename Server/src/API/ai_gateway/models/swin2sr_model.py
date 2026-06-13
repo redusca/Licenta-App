@@ -1,15 +1,3 @@
-"""
-Swin2SR Model — Image Super-Resolution ×2.
-
-Uses ``caidas/swin2SR-classical-sr-x2-64`` via HuggingFace Transformers.
-The model takes a low-resolution RGB image and outputs a ×2 upscaled result.
-
-Metrics exposed per call:
-    • inference_time_s
-    • input_size / output_size
-    • sharpness, entropy, contrast (no-reference quality)
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -30,8 +18,6 @@ SCALE_FACTOR = 2
 
 
 class Swin2SRModel(BaseAIModel):
-    """Swin2SR ×2 image super-resolution adapter."""
-
     def __init__(self) -> None:
         super().__init__(
             name="Swin2SR",
@@ -41,11 +27,7 @@ class Swin2SRModel(BaseAIModel):
         self._processor = None
         self._model = None
 
-    # ── Lifecycle ─────────────────────────────────────────────────────────
-
     async def wake_up(self) -> None:
-        """Download / load Swin2SR weights (runs blocking I/O in a thread)."""
-
         def _load():
             import torch
             from transformers import AutoImageProcessor, Swin2SRForImageSuperResolution
@@ -59,19 +41,6 @@ class Swin2SRModel(BaseAIModel):
         self._processor, self._model, self._device = await asyncio.to_thread(_load)
 
     async def process(self, *, image: Image.Image) -> dict[str, Any]:
-        """Super-resolve a single PIL Image.
-
-        Parameters
-        ----------
-        image : PIL.Image.Image
-            Low-resolution input (RGB).
-
-        Returns
-        -------
-        dict with keys:
-            sr_image   — PIL.Image (upscaled)
-            metrics    — dict of quality / perf numbers
-        """
         if not self._is_loaded:
             await self.ensure_loaded()
 
@@ -140,10 +109,7 @@ class Swin2SRModel(BaseAIModel):
         gc.collect()
 
 
-# ── No-Reference Quality Helpers ──────────────────────────────────────────────
-
 def _no_ref_metrics(img: Image.Image) -> dict[str, float]:
-    """Compute lightweight no-reference quality metrics."""
     gray = img.convert("L")
     arr = np.array(gray, dtype=np.float64)
 

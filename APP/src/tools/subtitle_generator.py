@@ -1,17 +1,7 @@
-"""
-Subtitle Generator — extract audio from a video, transcribe with Whisper (timestamps),
-optionally translate each segment, and produce an SRT subtitle file.
-
-This module holds the agent DEFINITION and the pure SRT utility functions used by
-the Flask streaming endpoint /api/tools/subtitle-generator/stream.
-"""
 from __future__ import annotations
 
 
-# ── Pure SRT helpers ──────────────────────────────────────────────────────────
-
 def srt_time(seconds: float) -> str:
-    """Convert float seconds to SRT timestamp format: HH:MM:SS,mmm"""
     seconds = max(0.0, float(seconds))
     ms = int(round((seconds % 1) * 1000))
     # Clamp milliseconds that round up to 1000
@@ -25,11 +15,6 @@ def srt_time(seconds: float) -> str:
 
 
 def build_srt(chunks: list[dict]) -> str:
-    """Convert a list of Whisper timestamp chunks to an SRT subtitle string.
-
-    Each chunk must have keys: ``text`` (str), ``start`` (float), ``end`` (float).
-    Chunks with empty text are silently skipped.
-    """
     lines: list[str] = []
     index = 1
     for seg in chunks:

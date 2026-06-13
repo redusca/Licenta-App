@@ -32,7 +32,6 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     logger.info("Database tables ensured")
 
-    # ── Startup configuration warnings ───────────────────────────────────────
     if settings.ALLOWED_ORIGINS == ["*"]:
         logger.warning(
             "CORS is set to allow all origins ('*'). "
@@ -49,7 +48,6 @@ async def lifespan(app: FastAPI):
             "Set GROQ_API_KEY in .env."
         )
     logger.info("Groq model: %s", settings.GROQ_MODEL)
-    # ─────────────────────────────────────────────────────────────────────────
 
     yield
 
@@ -63,8 +61,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── Middleware ────────────────────────────────────────────────────────────────
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -72,8 +68,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ── API Routers ───────────────────────────────────────────────────────────────
 
 app.include_router(auth_router)
 app.include_router(releases_router)
@@ -86,16 +80,11 @@ def health():
     return {"status": "ok", "version": "1.0.0"}
 
 
-# ── Static SPA ────────────────────────────────────────────────────────────────
-# Serve the built React interface from Interface/dist/
-# Falls back to index.html for client-side routing
 
 _interface_dist = Path(__file__).parent.parent / "Interface" / "dist"
 if _interface_dist.exists():
-    # Serve the built static assets (JS, CSS, images, etc.)
     app.mount("/assets", StaticFiles(directory=str(_interface_dist / "assets")), name="spa-assets")
 
-    # Catch-all: serve index.html for every path not matched above
     # This is what makes React Router work on hard reload / direct URL access
     # no-cache so the browser always re-validates index.html and picks up new bundle hashes
     @app.get("/{full_path:path}")

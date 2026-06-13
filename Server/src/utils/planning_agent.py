@@ -1,28 +1,3 @@
-"""
-Planning Agent — Groq-backed Plan-and-Execute agent with SSE streaming.
-
-Flow per request:
-  1. Plan     → Groq LLM receives the user task + tool descriptions
-                → returns a JSON execution plan (list of steps)
-  2. Execute  → for each step:
-                  • type "tool"  → POST to the tool's callback_url, yield result
-                  • type "llm"   → stream a Groq response, yield token chunks
-  3. Synthesize → Groq streams the final answer from all step results
-
-Events yielded (dicts — the route serialises them as SSE):
-  {"type": "status",       "message": "..."}
-  {"type": "plan",         "steps": [...]}
-  {"type": "step_start",   "step_id": N, "description": "...", "step_type": "tool"|"llm"}
-  {"type": "tool_call",    "step_id": N, "tool": "...", "input": {...}}
-  {"type": "tool_result",  "step_id": N, "tool": "...", "result": "..."}
-  {"type": "tool_error",   "step_id": N, "tool": "...", "error": "..."}
-  {"type": "llm_start",    "step_id": N}
-  {"type": "llm_chunk",    "step_id": N, "content": "..."}
-  {"type": "step_done",    "step_id": N, "result": "..."}
-  {"type": "final_chunk",  "content": "..."}
-  {"type": "final",        "response": "..."}
-  {"type": "error",        "message": "..."}
-"""
 from __future__ import annotations
 
 import json
@@ -37,10 +12,6 @@ from config import settings
 from utils.chat_manager import add_message, get_chat
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Groq client (lazy singleton)
-# ---------------------------------------------------------------------------
 
 _groq_client = None
 
@@ -57,10 +28,6 @@ def _get_groq():
         _groq_client = AsyncGroq(api_key=api_key)
     return _groq_client
 
-
-# ---------------------------------------------------------------------------
-# System prompts
-# ---------------------------------------------------------------------------
 
 _PLAN_SYSTEM = """\
 You are the AI assistant built into a desktop file-management application.
@@ -173,6 +140,8 @@ TOOL CHAINING — when a step needs output produced by a previous step, use {{st
   Example — remove background then vectorize to SVG:
     Step 1: remove_background(files=[{{"path": "C:/img.jpg"}}], outputMode="copy")
     Step 2: image_to_svg(files=[{{"path": "{{step_1.results[0].outputPath}}"}}], outputMode="copy")
+  Example — move the output file to a drive:
+    Step N: drive_file_mover(files=[{{"path": "{{step_N-1.results[0].outputPath}}"}}], destinationDrive="<drive name or path>", action="move")
   Use outputMode="copy" for intermediate steps so no outputPath folder is required.
   Only use outputMode="virtual_drive" on the LAST step, and only when the user explicitly asks for a virtual drive.
 
@@ -182,6 +151,9 @@ RULES:
 - Maximum 5 steps. Never create steps just to look thorough.
 - tool.input keys must exactly match the tool's parameter schema.
 - NEVER suggest internet searches or external services — you only use the listed tools.
+- ask_user step descriptions must describe what is being asked, not what the next step does.
+  Example: use "Ask user to select an image file" instead of "Remove background from the file".
+  Example: use "Ask user to choose a source folder" instead of "Scan folder for files".
 """
 
 _EXECUTOR_SYSTEM = """\
@@ -225,12 +197,8 @@ Use markdown formatting: **bold** for emphasis, bullet lists for multiple items,
 IMPORTANT: Do NOT call any tools — write the final answer directly in plain text or markdown.
 """
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _tools_desc(tools: list[dict]) -> str:
-    """Full descriptions used by the LLM executor step."""
     if not tools:
         return "(no external tools — use only llm steps)"
     lines = []
@@ -248,7 +216,6 @@ def _tools_desc(tools: list[dict]) -> str:
 
 
 def _tools_desc_short(tools: list[dict]) -> str:
-    """Compact descriptions for the planner — name + description + usage hints."""
     if not tools:
         return "(no external tools — use only llm steps)"
     lines = []
@@ -261,7 +228,6 @@ def _tools_desc_short(tools: list[dict]) -> str:
 
 
 def _history_messages(chat_messages: list, max_turns: int = 10) -> list[dict]:
-    """Convert the last N chat messages to Groq message dicts."""
     result = []
     for m in chat_messages[-max_turns:]:
         if m.role in ("user", "assistant", "system"):
@@ -270,7 +236,6 @@ def _history_messages(chat_messages: list, max_turns: int = 10) -> list[dict]:
 
 
 def _extract_json(raw: str) -> dict:
-    """Parse JSON from model output, stripping markdown fences if present."""
     text = raw.strip()
     # Strip ```json ... ``` or ``` ... ```
     text = re.sub(r"^```(?:json)?\s*", "", text)
@@ -327,10 +292,6 @@ def _resolve_templates(value: Any, step_outputs: dict[int, Any]) -> Any:
         return [_resolve_templates(item, step_outputs) for item in value]
     return value
 
-
-# ---------------------------------------------------------------------------
-# Groq calls
-# ---------------------------------------------------------------------------
 
 async def _plan(task: str, tools: list[dict], history: list[dict]) -> list[dict]:
     client = _get_groq()
@@ -420,12 +381,6 @@ async def _stream_llm_step(
 
 
 def _compact_result(result: str, max_len: int = 1200) -> str:
-    """
-    Shrink a step result for the synthesizer prompt.
-
-    For large JSON tool outputs we extract a human-readable summary so the
-    synthesizer gets the key facts without blowing the context window.
-    """
     if len(result) <= max_len:
         return result
     try:
@@ -560,16 +515,11 @@ async def _call_tool(tool: dict, input_data: dict) -> str:
         return f"[Error] Tool '{tool_name}' — {type(exc).__name__}: {exc or '(no message)'}"
 
 
-# ---------------------------------------------------------------------------
-# Human-readable label helpers
-# ---------------------------------------------------------------------------
-
 def _step_label(step_id: int, total: int, desc: str) -> str:
     return f"Step {step_id}/{total}: {desc}"
 
 
 def _input_preview(input_data: dict, max_len: int = 80) -> str:
-    """Short one-line summary of tool input arguments."""
     if not input_data:
         return "(no parameters)"
     parts = [f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in input_data.items()]
@@ -577,26 +527,12 @@ def _input_preview(input_data: dict, max_len: int = 80) -> str:
     return preview if len(preview) <= max_len else preview[:max_len] + "…"
 
 
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
-
 async def run_planning_agent(
     api_key: str,
     chat_id: str,
     message: str,
     tools: list[dict],
 ) -> AsyncGenerator[dict[str, Any], None]:
-    """
-    Core async generator.  The caller must have already called
-    add_message(api_key, chat_id, "user", message) before invoking this.
-
-    Every yielded dict always has a human-readable "message" key so the
-    client can display it directly without inspecting "type".
-
-    Yields SSE event dicts; the route handler serialises them as:
-        data: <json>\n\n
-    """
     chat = get_chat(api_key, chat_id)
     if chat is None:
         yield {"type": "error", "message": f"Chat {chat_id} not found."}
@@ -605,7 +541,6 @@ async def run_planning_agent(
     # History excludes the user message we just added (last item)
     history = _history_messages(chat.messages[:-1])
 
-    # ── 1. Planning ─────────────────────────────────────────────────────────
     yield {
         "type": "status",
         "message": "Analyzing request and creating execution plan…",
@@ -633,14 +568,11 @@ async def run_planning_agent(
     )
     yield {"type": "plan", "steps": steps, "message": plan_summary}
 
-    # ── 2. Execute ───────────────────────────────────────────────────────────
     step_results: list[dict] = []
 
-    # Context for Smart Drive workflow: carry values between steps at runtime
     ctx_source_folder: str = ""   # filled by ask_user(input_type='folder')
     ctx_scan_files: list = []     # filled by smart_drive_scan result
 
-    # Generic inter-step output store: step_id → parsed JSON result dict
     step_outputs: dict[int, Any] = {}
 
     for step in steps:
@@ -660,12 +592,10 @@ async def run_planning_agent(
             tool_name: str   = step.get("tool", "")
             tool_input: dict = dict(step.get("input", {}))   # shallow copy — safe to mutate
 
-            # Resolve {{step_N.field}} placeholders before execution
             tool_input = _resolve_templates(tool_input, step_outputs)
 
             tool_obj = _find_tool(tools, tool_name)
 
-            # ── Smart Drive: inject context into tool inputs ──────────────────
             if tool_name == "smart_drive_scan":
                 sf = (tool_input.get("sourceFolder") or "").strip()
                 if not sf:
@@ -716,7 +646,6 @@ async def run_planning_agent(
                     logger.info(
                         "Injected %d files → smart_drive_build.files", len(ctx_scan_files)
                     )
-            # ── end injection B ───────────────────────────────────────────────
 
             if tool_obj is None:
                 err = f"Tool '{tool_name}' not found in tool list."
@@ -750,7 +679,6 @@ async def run_planning_agent(
                     ),
                 }
 
-                # ── Store parsed result for {step_N.*} template resolution ──
                 if not result.startswith("[Error]") and not result.startswith("[Rejected]"):
                     try:
                         parsed = json.loads(result)
@@ -763,7 +691,6 @@ async def run_planning_agent(
                         # Plain string result (e.g. ask_user) — expose as .answer and .raw
                         step_outputs[step_id] = {"answer": result, "raw": result}
 
-                # ── Smart Drive: capture context from completed tool ───────────
                 if not result.startswith("[Error]") and not result.startswith("[Rejected]"):
                     if tool_name == "ask_user":
                         if step.get("input", {}).get("input_type") == "folder":
@@ -795,7 +722,6 @@ async def run_planning_agent(
                                 )
                         except (json.JSONDecodeError, TypeError):
                             pass
-                # ── end injection A ───────────────────────────────────────────
 
         else:  # llm step
             step_prompt: str = step.get("prompt", step_desc)
@@ -813,7 +739,6 @@ async def run_planning_agent(
             except Exception as exc:
                 logger.exception("LLM step %d failed", step_id)
                 result = f"[Error] LLM step failed: {exc}"
-                yield {"type": "error", "message": f"Error in LLM step {step_id}: {exc}"}
 
         step_results.append({"id": step_id, "description": step_desc, "result": result})
         yield {
@@ -823,7 +748,19 @@ async def run_planning_agent(
             "message": f"Step {step_id} complete",
         }
 
-    # ── 3. Synthesize ────────────────────────────────────────────────────────
+        if result.startswith("[Rejected]"):
+            yield {
+                "type": "error",
+                "message": f"Process stopped: step {step_id} was cancelled by the user.",
+            }
+            return
+        if result.startswith("[Error]"):
+            yield {
+                "type": "error",
+                "message": f"Process stopped: step {step_id} failed — {result[8:120]}",
+            }
+            return
+
     yield {
         "type": "status",
         "message": f"Completed all {total} steps. Writing final answer…",

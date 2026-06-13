@@ -1,14 +1,3 @@
-"""
-Remove Background tool — batch-remove image backgrounds using rembg.
-
-Execution modes
----------------
-replace        : overwrite the original file with the converted version.
-copy           : place the converted file alongside the original (same folder).
-virtual_drive  : copy converted files into the RemovedBackgrounds virtual drive
-                 located at <output_path>/RemovedBackgrounds; creates the drive
-                 (and registers it in tool_drives.json) if it does not already exist.
-"""
 from __future__ import annotations
 
 import json
@@ -31,13 +20,11 @@ _CONFIG_FILENAME = ".drive_config.json"
 SUPPORTED_INPUT_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 OUTPUT_FORMATS = {"png"}
 
-# Cached path to a system Python that has rembg+onnxruntime installed
 _PYTHON_EXE_CACHE: str | None = None
 _PYTHON_EXE_SEARCHED = False
 
 
 def _find_python_with_rembg() -> str | None:
-    """Find a Python interpreter (outside this bundle) that has rembg available."""
     global _PYTHON_EXE_CACHE, _PYTHON_EXE_SEARCHED
     if _PYTHON_EXE_SEARCHED:
         return _PYTHON_EXE_CACHE
@@ -51,19 +38,16 @@ def _find_python_with_rembg() -> str | None:
         _PYTHON_EXE_CACHE = sys.executable
         return _PYTHON_EXE_CACHE
 
-    # PATH lookup
     for name in ("python", "python3", "py"):
         found = shutil.which(name)
         if found:
             candidates.append(found)
 
-    # Common Windows per-user install locations
     local_app = os.environ.get("LOCALAPPDATA", "")
     for ver in ("Python313", "Python312", "Python311", "Python310", "Python39"):
         p = os.path.join(local_app, "Programs", "Python", ver, "python.exe")
         candidates.append(p)
 
-    # System-wide installs
     for ver in ("313", "312", "311", "310", "39"):
         candidates.append(rf"C:\Python{ver}\python.exe")
 
@@ -89,7 +73,7 @@ def _find_python_with_rembg() -> str | None:
     return None
 
 
-# The background-removal logic executed in the subprocess
+
 _REMBG_SCRIPT = """\
 import sys
 from PIL import Image
@@ -361,7 +345,7 @@ def execute(input: dict) -> str:
                 final = _unique_path(candidate)
                 _remove_background(src, final, preserve_metadata)
 
-            else:  # virtual_drive
+            else:
                 dest = os.path.join(virtual_drive_path, f"{stem}.{ext}")  # type: ignore[arg-type]
                 dest = _unique_path(dest)
                 _remove_background(src, dest, preserve_metadata)

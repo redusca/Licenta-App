@@ -9,22 +9,17 @@ _JWT_PLACEHOLDER = "change-me-in-production"
 
 
 class Settings(BaseSettings):
-    # Database
     DATABASE_URL: str = "postgresql://licenta:licenta@localhost:5432/licenta"
 
-    # JWT
     JWT_SECRET: str = _JWT_PLACEHOLDER
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
-    # Groq - planning agent
     GROQ_API_KEY: str = ""
     GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
-    # CORS
     ALLOWED_ORIGINS: list[str] = ["*"]
 
-    # GitHub (for serving private-repo release info)
     GITHUB_TOKEN: str = ""
     GITHUB_REPO: str = "redusca/Licenta-App"
 

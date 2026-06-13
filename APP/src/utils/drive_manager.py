@@ -10,12 +10,6 @@ from migrations import load_and_migrate, get_latest_schema_version
 CONFIG_FILENAME = ".drive_config.json"
 
 def create_drive(path, name, drive_type):
-    """
-    Creates a 'virtual drive' folder.
-    path: Parent directory where drive will be created (e.g. C:/Users/User/Desktop)
-    name: Name of the drive folder (e.g. MyVirtualDrive)
-    drive_type: 'move' or 'shortcut' (default preference for adding files)
-    """
     full_path = os.path.join(path, name)
     if not os.path.exists(full_path):
         os.makedirs(full_path)
@@ -30,22 +24,18 @@ def create_drive(path, name, drive_type):
     }
     
     config_path = os.path.join(full_path, CONFIG_FILENAME)
-    
-    # helper to hide file on windows
+
     with open(config_path, 'w') as f:
         json.dump(config, f)
-    
-    # Hide the config file
+
     subprocess.call(["attrib", "+h", config_path], shell=True)
     
     return full_path
 
 def create_shortcut(target, shortcut_path):
-    # Ensure shortcut_path ends in .lnk
     if not shortcut_path.lower().endswith('.lnk'):
         shortcut_path += '.lnk'
-        
-    # VBScript to create shortcut
+
     vbs_script = f"""
     Set oWS = WScript.CreateObject("WScript.Shell")
     Set oLink = oWS.CreateShortcut("{shortcut_path}")
@@ -72,14 +62,12 @@ def resolve_shortcut(lnk_path):
     try:
         with open(lnk_path, 'rb') as f:
             data = f.read()
-            # Try utf-16le first
             matches_u = re.findall(b'([a-zA-Z]\x00:\x00\\\x00(?:[^\x00]\x00)+)', data)
             if matches_u:
                  matches_u.sort(key=len, reverse=True)
                  target = matches_u[0].decode('utf-16le')
                  _LNK_CACHE[lnk_path] = target
                  return target
-            # Fallback to ascii/utf-8
             matches = re.findall(rb'[a-zA-Z]:\\[^\x00]+', data)
             if matches:
                  matches.sort(key=len, reverse=True)
@@ -88,8 +76,7 @@ def resolve_shortcut(lnk_path):
                  return target
     except Exception:
         pass
-        
-    # VBScript fallback if binary parse fails
+
     vbs = f'''
 Set sh = WScript.CreateObject("WScript.Shell")
 Set sc = sh.CreateShortcut("{lnk_path}")
@@ -113,9 +100,7 @@ def add_file(drive_path, file_path, mode='shortcut'):
     
     if mode == 'move':
         shutil.move(file_path, dest_path)
-    else: # shortcut
-        # Create shortcut to file
-        # Name should be filename.lnk
+    else:
         link_name = filename + ".lnk"
         link_path = os.path.join(drive_path, link_name)
         create_shortcut(file_path, link_path)
@@ -127,30 +112,26 @@ def add_folder(drive_path, folder_path, mode='shortcut'):
     if mode == 'move':
         shutil.move(folder_path, dest_folder)
     else:
-        # Recursive shortcut creation
         if not os.path.exists(dest_folder):
             os.makedirs(dest_folder)
-            
+
         for root, dirs, files in os.walk(folder_path):
-            # Calculate partial path relative to source root
             rel_path = os.path.relpath(root, folder_path)
             if rel_path == '.':
                 target_dir = dest_folder
             else:
                 target_dir = os.path.join(dest_folder, rel_path)
-            
+
             if not os.path.exists(target_dir):
                 os.makedirs(target_dir)
-            
+
             for file in files:
                 src_file = os.path.join(root, file)
-                # Create shortcut in target dir
                 link_name = file + ".lnk"
                 link_path = os.path.join(target_dir, link_name)
                 create_shortcut(src_file, link_path)
 
 def get_drive_config(drive_path):
-    """Load the drive config, auto-migrating to the latest schema if needed."""
     return load_and_migrate(drive_path, APP_VERSION)
 
 def delete_item(item_path):
@@ -173,10 +154,6 @@ def rename_item(item_path, new_name):
     return new_path
 
 def paste_items(source_paths, dest_dir, mode='copy'):
-    # Mode: 'copy' or 'cut'
-    # source_paths is list of absolute paths
-    # dest_dir is absolute path
-    
     if not os.path.exists(dest_dir):
         raise FileNotFoundError("Destination directory not found")
         
@@ -187,7 +164,6 @@ def paste_items(source_paths, dest_dir, mode='copy'):
         filename = os.path.basename(src)
         dst = os.path.join(dest_dir, filename)
         
-        # Handle collision
         if os.path.exists(dst):
             base, ext = os.path.splitext(filename)
             counter = 1
@@ -210,12 +186,6 @@ def open_item(path):
     return False
 
 def move_drive_contents(source_drive_path: str, dest_path: str) -> dict:
-    """
-    Move every item inside *source_drive_path* (except the hidden config file)
-    into *dest_path*.  If a file/folder with the same name already exists in
-    dest_path a numeric suffix is added to avoid collisions.
-    Returns a summary dict: {moved: [...], errors: [...]}.
-    """
     if not os.path.isdir(source_drive_path):
         raise FileNotFoundError(f"Source drive not found: {source_drive_path}")
     os.makedirs(dest_path, exist_ok=True)
@@ -240,10 +210,6 @@ def move_drive_contents(source_drive_path: str, dest_path: str) -> dict:
 
 
 def get_drive_tree(drive_path: str, max_depth: int = 6) -> dict:
-    """
-    Build a recursive file/folder tree for the given drive path.
-    Hidden config files are excluded from the output.
-    """
     def _build(path: str, depth: int) -> dict | None:
         if depth > max_depth:
             return None
@@ -265,10 +231,6 @@ def get_drive_tree(drive_path: str, max_depth: int = 6) -> dict:
     return _build(drive_path, 0)  # type: ignore[return-value]
 
 def rename_drive_config(drive_path: str, new_name: str) -> bool:
-    """
-    Update the display name stored in the drive's config file.
-    The folder itself is NOT renamed — the path remains the drive identifier.
-    """
     config_path = os.path.join(drive_path, CONFIG_FILENAME)
     if not os.path.exists(config_path):
         raise FileNotFoundError(f"Drive config not found in: {drive_path}")
@@ -283,16 +245,11 @@ def rename_drive_config(drive_path: str, new_name: str) -> bool:
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=2, ensure_ascii=False)
     finally:
-        # Re-apply hidden attribute regardless of success/failure
         subprocess.call(["attrib", "+h", config_path], shell=True)
     return True
 
 
 def delete_drive(drive_path: str) -> bool:
-    """
-    Permanently delete the entire virtual drive folder and all its contents.
-    Returns True if the folder existed and was removed.
-    """
     if not os.path.exists(drive_path):
         return False
     shutil.rmtree(drive_path)

@@ -1,16 +1,3 @@
-"""
-Whisper Large V3 — Automatic Speech Recognition (ASR).
-
-Uses ``openai/whisper-large-v3`` via HuggingFace Transformers.
-Accepts raw audio (numpy float32 array at 16 kHz) and returns a
-text transcription with timing metadata.
-
-Features:
-    • Multi-language (auto-detect or force via ``language`` param)
-    • Returns Real-Time Factor (RTF) — < 1.0 means faster than real-time
-    • Word Error Rate / Character Error Rate when ground-truth is provided
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -30,8 +17,6 @@ TARGET_SAMPLE_RATE = 16_000
 
 
 class WhisperModel(BaseAIModel):
-    """Whisper Large V3 speech-to-text adapter."""
-
     def __init__(self) -> None:
         super().__init__(
             name="Whisper-Large-V3",
@@ -40,11 +25,7 @@ class WhisperModel(BaseAIModel):
         )
         self._pipeline = None
 
-    # ── Lifecycle ─────────────────────────────────────────────────────────
-
     async def wake_up(self) -> None:
-        """Download / load Whisper weights."""
-
         def _load():
             import torch
             from transformers import pipeline
@@ -72,27 +53,6 @@ class WhisperModel(BaseAIModel):
         max_new_tokens: int = 256,
         expected_text: str | None = None,
     ) -> dict[str, Any]:
-        """Transcribe an audio array.
-
-        Parameters
-        ----------
-        audio : np.ndarray
-            Float32 waveform, mono, ideally 16 kHz.
-        sample_rate : int
-            Sample rate of the input audio.
-        language : str | None
-            ISO-639 language code (e.g. ``"ro"``).  ``None`` = auto-detect.
-        max_new_tokens : int
-            Maximum tokens the decoder will generate.
-        expected_text : str | None
-            Ground-truth transcription (for WER/CER computation).
-
-        Returns
-        -------
-        dict with keys:
-            transcription — str
-            metrics       — dict of perf / accuracy numbers
-        """
         if not self._is_loaded:
             await self.ensure_loaded()
 
@@ -104,7 +64,7 @@ class WhisperModel(BaseAIModel):
 
             # Whisper's max_target_positions is 448; 3 are used by special start tokens
             safe_max_new_tokens = min(max_new_tokens, 444)
-            generate_kwargs: dict[str, Any] = {"max_new_tokens": safe_max_new_tokens}
+            generate_kwargs: dict[str, Any] = {"max_new_tokens": safe_max_new_tokens, "max_length": safe_max_new_tokens + 4}
             if language:
                 generate_kwargs["language"] = language
 
@@ -115,6 +75,7 @@ class WhisperModel(BaseAIModel):
                 return_timestamps=True,
                 chunk_length_s=30,
                 stride_length_s=6,
+                ignore_warning=True,
             )
             inference_time = time.perf_counter() - t0
 
@@ -158,14 +119,6 @@ class WhisperModel(BaseAIModel):
         language: str | None = None,
         max_new_tokens: int = 444,
     ) -> dict[str, Any]:
-        """Transcribe audio returning timed chunks suitable for subtitle files.
-
-        Returns
-        -------
-        dict with keys:
-            chunks  — list of {"text": str, "start": float, "end": float}
-            metrics — dict of performance numbers
-        """
         if not self._is_loaded:
             await self.ensure_loaded()
 
@@ -175,7 +128,7 @@ class WhisperModel(BaseAIModel):
             if torch.cuda.is_available():
                 torch.cuda.reset_peak_memory_stats()
 
-            generate_kwargs: dict[str, Any] = {"max_new_tokens": max_new_tokens}
+            generate_kwargs: dict[str, Any] = {"max_new_tokens": max_new_tokens, "max_length": max_new_tokens + 4}
             if language:
                 generate_kwargs["language"] = language
 
@@ -184,8 +137,9 @@ class WhisperModel(BaseAIModel):
                 {"array": audio, "sampling_rate": sample_rate},
                 generate_kwargs=generate_kwargs,
                 return_timestamps=True,
-                chunk_length_s=30,   # sliding-window long-form: process full audio
-                stride_length_s=6,   # 6 s overlap so words at boundaries aren't lost
+                chunk_length_s=30,
+                stride_length_s=6,
+                ignore_warning=True,
             )
             inference_time = time.perf_counter() - t0
 
@@ -235,10 +189,7 @@ class WhisperModel(BaseAIModel):
         gc.collect()
 
 
-# ── Error-Rate Helpers ────────────────────────────────────────────────────────
-
 def _word_error_rate(ref: str, hyp: str) -> float:
-    """WER via Levenshtein distance on word tokens."""
     if not ref:
         return 0.0 if not hyp else 1.0
     r, h = ref.split(), hyp.split()
@@ -255,7 +206,6 @@ def _word_error_rate(ref: str, hyp: str) -> float:
 
 
 def _char_error_rate(ref: str, hyp: str) -> float:
-    """CER via Levenshtein distance on characters."""
     if not ref:
         return 0.0 if not hyp else 1.0
     r, h = list(ref), list(hyp)

@@ -88,20 +88,15 @@ _PENDING_LOCK = threading.Lock()
 _LAST_OUTPUT_PATHS: list[str] = []
 _LAST_OUTPUT_LOCK = threading.Lock()
 
-# Stores the full files list from the most recent smart_drive_scan result
 _LAST_SCAN_FILES: list[dict] = []
 _LAST_SCAN_LOCK = threading.Lock()
 
-# Pipeline log — one entry per tool execution within the current agent run
 _PIPELINE_LOG: list[dict] = []
 _PIPELINE_LOCK = threading.Lock()
 
-# Tracks the most recently created/operated-on virtual drive path so subsequent
-# tools can chain onto it without the agent needing to hard-code the path.
-_LAST_VIRTUAL_DRIVE: list[str] = []   # 0 or 1 element
+_LAST_VIRTUAL_DRIVE: list[str] = []
 _LAST_DRIVE_LOCK = threading.Lock()
 
-# Fields that refer to an existing virtual drive by name or path
 _DRIVE_FIELDS = frozenset({"sourceDrive", "destinationDrive", "driveName"})
 
 
@@ -142,14 +137,6 @@ def _substitute_placeholders(tool_input: dict, real_paths: list[str]) -> dict:
 
 
 def _patch_drive_fields(tool_name: str, tool_input: dict) -> dict:
-    """
-    For every drive-related string field in tool_input:
-      1. Try resolve_drive() — exact match, then fuzzy substring match.
-      2. If still unresolved, fall back to the last known virtual drive path.
-
-    Also, for drive_create_empty: if 'location' is blank/unresolvable,
-    inject the parent directory of the last known virtual drive.
-    """
     from utils.drives_registry import resolve_drive
 
     with _LAST_DRIVE_LOCK:
@@ -161,7 +148,6 @@ def _patch_drive_fields(tool_name: str, tool_input: dict) -> dict:
         value = result.get(field)
         if not isinstance(value, str) or not value.strip():
             continue
-        # Already a valid absolute dir path — leave it
         if _looks_like_real_path(value) and os.path.isdir(value):
             continue
         resolved = resolve_drive(value)
@@ -174,13 +160,11 @@ def _patch_drive_fields(tool_name: str, tool_input: dict) -> dict:
                         tool_name, field, value, last_drive)
             result[field] = last_drive
 
-    # Special case: drive_create_empty needs a 'location' (parent dir) not a drive path
     if tool_name == "drive_create_empty":
         loc = result.get("location", "")
         if not isinstance(loc, str):
             loc = ""
 
-        # If the agent passed a JSON blob (previous tool result), extract the real path.
         loc = loc.strip()
         if loc.startswith(("{", "[")):
             import json as _json
@@ -204,14 +188,12 @@ def _patch_drive_fields(tool_name: str, tool_input: dict) -> dict:
                 pass
 
         if not loc or not os.path.isdir(loc):
-            # 1st fallback: parent of the last known virtual drive
             if last_drive:
                 parent = os.path.dirname(last_drive)
                 if os.path.isdir(parent):
                     result["location"] = parent
                     logger.info("drive_create_empty: defaulting location to last drive parent %s", parent)
             else:
-                # 2nd fallback: parent of the last tool output file
                 with _LAST_OUTPUT_LOCK:
                     last_outputs = list(_LAST_OUTPUT_PATHS)
                 for out_path in last_outputs:
@@ -232,7 +214,6 @@ def _record_outputs(result_json: str, tool_name: str = "", tool_input: dict | No
     if not isinstance(parsed, dict):
         return
 
-    # Track outputPaths for file-chaining tools
     paths: list[str] = []
     if isinstance(parsed.get("results"), list):
         paths = [
@@ -246,13 +227,11 @@ def _record_outputs(result_json: str, tool_name: str = "", tool_input: dict | No
             _LAST_OUTPUT_PATHS.clear()
             _LAST_OUTPUT_PATHS.extend(paths)
 
-    # Track full file list from smart_drive_scan so build can inject it if needed
     if tool_name == "smart_drive_scan" and isinstance(parsed.get("files"), list):
         with _LAST_SCAN_LOCK:
             _LAST_SCAN_FILES.clear()
             _LAST_SCAN_FILES.extend(parsed["files"])
 
-    # Track the most recently produced virtual drive path for field chaining
     vdp = (parsed.get("virtualDrivePath") or parsed.get("drivePath")
            or parsed.get("destinationPath"))
     if not vdp and isinstance(parsed.get("drive"), dict):
@@ -262,7 +241,6 @@ def _record_outputs(result_json: str, tool_name: str = "", tool_input: dict | No
             _LAST_VIRTUAL_DRIVE.clear()
             _LAST_VIRTUAL_DRIVE.append(vdp)
 
-    # Append to pipeline log for diagram generation
     if tool_name and tool_name not in ("ask_user", "hello"):
         import datetime
         entry = {
@@ -333,19 +311,13 @@ def execute():
         or definition.get("requires_approval", False)
     )
 
-    # Resolve drive name/path fields and inject last-drive fallback before
-    # the approval card is shown (or before the tool runs for non-approval tools).
     tool_input = _patch_drive_fields(tool_name, tool_input)
 
     if needs_approval:
-        # Replace LLM-generated placeholder paths with the real paths from the
-        # previous tool's output before surfacing the approval card to the user.
         with _LAST_OUTPUT_LOCK:
             current_outputs = list(_LAST_OUTPUT_PATHS)
         tool_input = _substitute_placeholders(tool_input, current_outputs)
 
-        # If smart_drive_build received no files (agent failed to chain), inject
-        # the full scan result so the user can review/deselect in the approval card.
         if tool_name == "smart_drive_build":
             files = tool_input.get("files")
             if not isinstance(files, list) or len(files) == 0:
@@ -769,7 +741,7 @@ def show_in_folder():
     try:
         if sys.platform == "win32":
             if os.path.isfile(path):
-                subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])  # /select highlights the file
+                subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
             else:
                 subprocess.Popen(["explorer", os.path.normpath(path)])
         elif sys.platform == "darwin":

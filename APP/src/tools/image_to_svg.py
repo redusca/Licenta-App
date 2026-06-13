@@ -1,16 +1,3 @@
-"""
-Image to SVG Vectorizer — batch-convert raster images to SVG vector files using vtracer.
-
-Execution modes
----------------
-replace        : overwrite the original file with the SVG (removes original raster).
-copy           : place the SVG alongside the original (same folder).
-virtual_drive  : copy SVG files into the SVGVectorResults virtual drive
-                 located at <output_path>/SVGVectorResults; creates the drive
-                 (and registers it in tool_drives.json) if it does not already exist.
-
-Requires: pip install vtracer
-"""
 from __future__ import annotations
 
 import base64
@@ -233,13 +220,12 @@ def _process_single_item(
             final = _unique_path(candidate)
             svg_content = _vectorize_image(src, final, colormode, hierarchical, filter_speckle, color_precision)
 
-        else:  # virtual_drive
+        else:
             dest = os.path.join(virtual_drive_path, f"{stem}.svg")  # type: ignore[arg-type]
             dest = _unique_path(dest)
             svg_content = _vectorize_image(src, dest, colormode, hierarchical, filter_speckle, color_precision)
             final = dest
 
-        # Encode SVG as base64 for inline preview in the UI
         svg_b64 = base64.b64encode(svg_content.encode("utf-8")).decode("ascii")
 
         return {

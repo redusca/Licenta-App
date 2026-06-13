@@ -1,10 +1,3 @@
-"""
-Drive Create Empty — agent tool that creates a blank virtual drive folder.
-
-Use this when the user wants a new, empty virtual drive to move or copy files
-into later. Unlike drive_creator, this does NOT scan for files — it just
-creates the folder structure and registers the drive.
-"""
 from __future__ import annotations
 
 import json
@@ -85,7 +78,6 @@ def execute(input_data: dict) -> str:
     except Exception as exc:
         return json.dumps({"success": False, "error": f"Failed to create drive: {exc}"})
 
-    # Register in known_drives.json
     try:
         norm_new = os.path.normcase(os.path.normpath(drive_path))
         drives = load_registry()

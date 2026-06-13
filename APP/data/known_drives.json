@@ -1,9 +1,5 @@
 [
   {
-    "name": "photos",
-    "path": "D:\\\\DProjects\\\\Drives\\photos"
-  },
-  {
     "name": "ImageConversionResults",
     "path": "D:\\DProjects\\Drives\\ImageConversionResults"
   },
@@ -12,20 +8,8 @@
     "path": "D:\\DProjects\\licentaFiles\\RemovedBackgrounds"
   },
   {
-    "name": "SVGVectorResults",
-    "path": "D:\\DProjects\\Drives\\SVGVectorResults"
-  },
-  {
-    "name": "VideoConversionResults",
-    "path": "D:\\DProjects\\Drives\\VideoConversionResults"
-  },
-  {
     "name": "AudioConversionResults",
     "path": "D:\\DProjects\\Drives\\AudioConversionResults"
-  },
-  {
-    "name": "VideoCompressionResults",
-    "path": "D:\\DProjects\\Drives\\VideoCompressionResults"
   },
   {
     "name": "PdfToolResults",
@@ -34,14 +18,6 @@
   {
     "name": "ModelConversionResults",
     "path": "D:\\DProjects\\licentaFiles\\ModelConversionResults"
-  },
-  {
-    "name": "DocConvertResults",
-    "path": "D:\\DProjects\\licentaFiles\\DocConvertResults"
-  },
-  {
-    "name": "ModelConversionResults",
-    "path": "D:\\DProjects\\Drives\\ModelConversionResults"
   },
   {
     "name": "ImageConversionResults",
@@ -93,16 +69,6 @@
   {
     "name": "testestest",
     "path": "D:\\DProjects\\licentaFiles\\testestest",
-    "type": "shortcut"
-  },
-  {
-    "name": "audio",
-    "path": "D:\\DProjects\\licentaFiles\\audio",
-    "type": "shortcut"
-  },
-  {
-    "name": "anewaudiodrive",
-    "path": "D:\\DProjects\\licentaFiles\\anewaudiodrive",
     "type": "shortcut"
   }
 ]

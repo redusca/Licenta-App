@@ -1,9 +1,3 @@
-"""
-Smart Drive Scanner — agent tool that scans a directory using NTFS MFT and
-analyzes each file with AI (Groq Llama 4 Scout for images, Whisper for audio,
-text extraction for documents) so the agent can decide which files belong in
-a virtual drive.
-"""
 from __future__ import annotations
 
 import io
@@ -17,8 +11,6 @@ import requests
 import utils.ai_gateway as ai_gateway
 
 logger = logging.getLogger(__name__)
-
-# ── Extension categories ──────────────────────────────────────────────────────
 
 _IMAGE_EXTS = frozenset({".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", ".tif", ".heic", ".heif", ".avif", ".raw", ".cr2", ".cr3", ".nef", ".dng", ".arw"})
 _AUDIO_EXTS = frozenset({".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".mka", ".opus", ".aiff", ".aif", ".ape", ".wv", ".alac"})
@@ -38,10 +30,7 @@ def _file_type(ext: str) -> str:
     return "other"
 
 
-# ── AI analysis helpers ───────────────────────────────────────────────────────
-
 def _analyze_image(path: str) -> dict[str, Any]:
-    """Send image thumbnail to Groq Llama 4 Scout via the AI Gateway."""
     try:
         from PIL import Image
         img = Image.open(path).convert("RGB")
@@ -84,7 +73,6 @@ def _analyze_image(path: str) -> dict[str, Any]:
 
 
 def _analyze_audio(path: str) -> dict[str, Any]:
-    """Transcribe audio using the Whisper endpoint on the AI Gateway."""
     try:
         with open(path, "rb") as fh:
             raw = fh.read()
@@ -110,7 +98,6 @@ def _analyze_audio(path: str) -> dict[str, Any]:
 
 
 def _analyze_document(path: str) -> dict[str, Any]:
-    """Extract a short text snippet from a document using existing utilities."""
     try:
         from tools.document_analytics import extract_text
         text = extract_text(path)
@@ -120,10 +107,7 @@ def _analyze_document(path: str) -> dict[str, Any]:
         return {"ai_description": None, "ai_tags": [], "ai_error": str(exc)}
 
 
-# ── MFT / filesystem scan ─────────────────────────────────────────────────────
-
 def _scan_with_mft(source_folder: str, target_extensions: set[str]) -> list[str]:
-    """Scan using NTFS MFT (primary). Returns list of absolute file paths."""
     from utils.mft_scan import _ensure_cached, invalidate_cache, is_admin as _mft_is_admin
 
     drive_letter = os.path.splitdrive(source_folder)[0].replace(":", "") or "C"
@@ -163,8 +147,6 @@ def _scan_with_mft(source_folder: str, target_extensions: set[str]) -> list[str]
     return matched
 
 
-
-# ── Tool definition and executor ─────────────────────────────────────────────
 
 DEFINITION = {
     "name": "smart_drive_scan",
@@ -225,9 +207,7 @@ def execute(input_data: dict) -> str:
 
     if not source_folder:
         return json.dumps({"success": False, "error": "sourceFolder is required."})
-    # Normalise: accept C:/ C:\ C: and resolve to the real path
     source_folder = source_folder.replace("/", "\\").rstrip("\\")
-    # For root drives like "C:" add back the trailing backslash
     if len(source_folder) == 2 and source_folder[1] == ":":
         source_folder += "\\"
     try:
@@ -244,7 +224,6 @@ def execute(input_data: dict) -> str:
         for ext in extensions
     )
 
-    # 1. Scan via NTFS MFT (requires admin — no fallback).
     try:
         matched = _scan_with_mft(source_folder, target_exts)
         scan_method = "mft"
@@ -269,7 +248,6 @@ def execute(input_data: dict) -> str:
             "message": "No files matching the given extensions were found in the folder.",
         })
 
-    # 2. Analyze first `max_analyze` files with AI
     to_analyze = matched[:max_analyze]
     not_analyzed = matched[max_analyze:]
 
@@ -299,7 +277,6 @@ def execute(input_data: dict) -> str:
             entry.update(_analyze_audio(fpath))
         elif ftype == "document":
             entry.update(_analyze_document(fpath))
-        # video / other: no AI analysis, just metadata
 
         analyzed_files.append(entry)
 

@@ -1,7 +1,3 @@
-"""
-Shared AI Gateway utilities used by all tools that call the remote AI server.
-Import this module instead of reading agent_config.json directly in each tool.
-"""
 from __future__ import annotations
 
 import json
@@ -23,7 +19,6 @@ def _load_cfg() -> dict:
 
 
 def get_url() -> str:
-    """Return the AI Gateway base URL from agent_config.json, stripped of trailing slash."""
     try:
         url = _load_cfg().get("server_url", "").rstrip("/")
         if not url:
@@ -35,7 +30,6 @@ def get_url() -> str:
 
 
 def get_api_key() -> str:
-    """Return the API key from agent_config.json."""
     try:
         return _load_cfg().get("api_key", "")
     except Exception:
@@ -44,21 +38,11 @@ def get_api_key() -> str:
 
 
 def auth_headers() -> dict:
-    """Return the X-API-Key header dict for AI Gateway requests."""
     key = get_api_key()
     return {"X-API-Key": key} if key else {}
 
 
 def health_check(timeout: int = 3) -> tuple[bool, str]:
-    """
-    Check server reachability AND API key validity.
-
-    Uses GET /api/agent/chats — the lightest endpoint that actually validates
-    X-API-Key against the database (returns 401/403 for bad/inactive keys).
-    /api/ai/status has no auth, so it cannot be used for key validation.
-
-    Returns (True, "") on success, (False, human-readable error) otherwise.
-    """
     base = get_url()
     if not base:
         return False, "AI Gateway URL not configured. Go to Settings → Agent Connection."

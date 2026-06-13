@@ -11,11 +11,9 @@ drive_bp = Blueprint('drive', __name__)
 
 @drive_bp.route('/registry', methods=['GET'])
 def get_registry():
-    """Return known drives (user drives + tool-created drives), filtered to paths that exist."""
     try:
         drives = load_registry()
 
-        # Also include tool-created drives from tool_drives.json
         import json as _json
         _tool_drives_path = get_data_dir() / "tool_drives.json"
         tool_drives: list = []
@@ -25,7 +23,6 @@ def get_registry():
             except Exception:
                 pass
 
-        # Merge: user drives first, then tool drives not already in user list
         seen = {os.path.normcase(os.path.normpath(d.get("path", ""))) for d in drives if d.get("path")}
         for td in tool_drives:
             tp = td.get("path", "")
@@ -33,7 +30,6 @@ def get_registry():
                 drives.append({"path": tp, "name": td.get("name", os.path.basename(tp))})
                 seen.add(os.path.normcase(os.path.normpath(tp)))
 
-        # Filter to only paths that still exist on disk, and auto-clean the registry
         existing = [d for d in drives if os.path.isdir(d.get('path', ''))]
         user_existing = [d for d in load_registry() if os.path.isdir(d.get('path', ''))]
         if len(user_existing) != len(load_registry()):
@@ -46,10 +42,6 @@ def get_registry():
 
 @drive_bp.route('/registry', methods=['POST'])
 def post_registry():
-    """
-    Overwrite the backend registry with the list provided by the frontend.
-    Called every time the frontend mutates knownDrives.
-    """
     data = request.json or {}
     drives = data.get('drives')
     if not isinstance(drives, list):
@@ -64,11 +56,6 @@ def post_registry():
 
 @drive_bp.post('/startup-migrate')
 def startup_migrate():
-    """
-    Called once on app startup by the frontend.
-    Accepts a list of drive paths and upgrades every config that is behind
-    the latest schema version (including legacy drives with no schema_version).
-    """
     data = request.json or {}
     drive_paths = data.get('drivePaths', [])
     if not isinstance(drive_paths, list):
@@ -88,7 +75,6 @@ def startup_migrate():
 
 @drive_bp.route('/move-drive-contents', methods=['POST'])
 def move_drive_contents_route():
-    """Move all files out of a move-drive into another folder before deletion."""
     data = request.json or {}
     source = data.get('sourcePath')
     dest   = data.get('destPath')
@@ -103,7 +89,6 @@ def move_drive_contents_route():
 
 @drive_bp.route('/tree', methods=['GET'])
 def drive_tree():
-    """Return a recursive file/folder tree for a virtual drive (used before deletion)."""
     path = request.args.get('path')
     if not path or not os.path.exists(path):
         return jsonify({"error": "Invalid path"}), 400
@@ -116,7 +101,6 @@ def drive_tree():
 
 @drive_bp.route('/rename-drive', methods=['POST'])
 def rename_drive_route():
-    """Update the display name of a virtual drive (only updates config, not folder name)."""
     data = request.json or {}
     drive_path = data.get('path')
     new_name   = data.get('newName')
@@ -131,7 +115,6 @@ def rename_drive_route():
 
 @drive_bp.route('/delete-drive', methods=['POST'])
 def delete_drive_route():
-    """Permanently delete an entire virtual drive folder from disk."""
     data = request.json or {}
     drive_path = data.get('path')
     if not drive_path:
@@ -145,11 +128,6 @@ def delete_drive_route():
 
 @drive_bp.route('/search', methods=['GET'])
 def search_drive_files():
-    """
-    Recursively search for files/folders whose names contain `query`
-    anywhere inside `drivePath` (case-insensitive).
-    Returns the same file shape as /list for easy reuse in the frontend.
-    """
     drive_path = request.args.get('drivePath')
     query      = (request.args.get('query') or '').strip().lower()
     if not drive_path or not os.path.isdir(drive_path):
@@ -159,7 +137,7 @@ def search_drive_files():
 
     results = []
     CONFIG_NAME = '.drive_config.json'
-    MAX_RESULTS  = 500  # safety cap
+    MAX_RESULTS  = 500
 
     def _walk(folder: str) -> None:
         if len(results) >= MAX_RESULTS:
@@ -235,9 +213,9 @@ def rename_file():
 @drive_bp.route('/paste', methods=['POST'])
 def paste():
     data = request.json
-    sources = data.get('sources') # List of paths
+    sources = data.get('sources')
     dest = data.get('destination')
-    mode = data.get('mode', 'copy') # 'copy' or 'cut'
+    mode = data.get('mode', 'copy')
     if not sources or not dest:
         return jsonify({"error": "Sources and destination required"}), 400
     try:
@@ -268,12 +246,11 @@ def add_item():
     drive_path = data.get('drivePath')
     item_path = data.get('itemPath')
     is_folder = data.get('isFolder', False)
-    mode = data.get('mode') # Optional override
-    
+    mode = data.get('mode')
+
     if not drive_path or not item_path:
         return jsonify({"error": "drivePath and itemPath are required"}), 400
-        
-    # Get drive default mode if not specified
+
     if not mode:
         config = get_drive_config(drive_path)
         if config:
@@ -292,11 +269,9 @@ def add_item():
 
 @drive_bp.route('/scan-volume', methods=['GET'])
 def scan_volume():
-    """Return the top-N largest files on a volume using the MFT cache."""
     drive_letter = request.args.get('drive', 'C')
     limit        = int(request.args.get('limit', 200))
     try:
-        # Use volume stats which leverages the cache
         stats = get_volume_stats(drive_letter)
         if 'error' in stats:
             return jsonify({"error": stats['error']}), 500
@@ -314,11 +289,6 @@ def scan_volume():
 
 @drive_bp.route('/mft-search', methods=['GET'])
 def mft_search():
-    """
-    Fast MFT-based filename search across an entire NTFS volume.
-    GET /api/drive/mft-search?drive=C&q=searchterm&limit=200&dirs_only=0&files_only=0
-    Returns: [{name, full_path, is_dir, size, created, modified, accessed}]
-    """
     drive  = request.args.get('drive', 'C')
     query  = request.args.get('q', '').strip()
     limit  = int(request.args.get('limit', 200))
@@ -340,12 +310,6 @@ def mft_search():
 
 @drive_bp.route('/volume-stats', methods=['GET'])
 def volume_stats():
-    """
-    Full MFT-derived statistics for a volume.
-    GET /api/drive/volume-stats?drive=C
-    Returns: total_files, total_dirs, total_size, extensions_by_count,
-             extensions_by_size, largest_files
-    """
     drive = request.args.get('drive', 'C')
     try:
         stats = get_volume_stats(drive)
@@ -358,7 +322,6 @@ def volume_stats():
 
 @drive_bp.route('/invalidate-mft-cache', methods=['POST'])
 def invalidate_mft_cache():
-    """Force the MFT cache to expire for a drive (or all drives)."""
     data   = request.json or {}
     letter = data.get('drive')   # optional; omit to clear all
     try:
@@ -369,11 +332,6 @@ def invalidate_mft_cache():
 
 @drive_bp.route('/list', methods=['GET'])
 def list_drive_files():
-    """
-    List the contents of a virtual drive directory.
-    Tries MFT-based listing first (no per-entry syscalls); falls back to
-    os.scandir when MFT data is unavailable (non-NTFS, no admin rights, etc.).
-    """
     path = request.args.get('path')
     if not path or not os.path.exists(path):
         return jsonify({"error": "Invalid path"}), 400
@@ -383,7 +341,6 @@ def list_drive_files():
     try:
         config = get_drive_config(path)
 
-        # ── Try MFT listing (fast, no per-file syscalls) ──────────────────
         mft_children = list_directory_mft(drive_letter, path)
         if mft_children is not None:
             files = [
@@ -401,7 +358,6 @@ def list_drive_files():
             ]
             return jsonify({"files": files, "config": config, "source": "mft"})
 
-        # ── Fallback: os.scandir (POSIX / non-NTFS / no admin) ────────────
         files = []
         for entry in os.scandir(path):
             if entry.name == ".drive_config.json":
@@ -437,11 +393,6 @@ def serve_file():
 
 @drive_bp.route('/list-recursive', methods=['GET'])
 def list_recursive():
-    """
-    Recursively list ALL files inside a directory tree.
-    Returns flat list: [{name, path, size, is_dir}].
-    Used by the 3D Visualizer to find models & textures in nested subfolders.
-    """
     root = request.args.get('path')
     if not root or not os.path.isdir(root):
         return jsonify({"error": "Invalid path"}), 400

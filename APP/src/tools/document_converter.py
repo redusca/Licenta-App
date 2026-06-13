@@ -1,20 +1,3 @@
-"""
-Document Converter tool — convert between document formats locally.
-
-Supported conversions
----------------------
-PDF  → DOCX, TXT, HTML, PNG (renders each page as an image)
-DOCX → PDF, TXT, HTML
-HTML → PDF, DOCX
-TXT  → PDF, DOCX
-MD   → PDF, HTML, DOCX
-
-Execution modes (outputMode)
------------------------------
-replace        : place the result alongside the original with the new extension.
-copy           : place the result alongside the original with a _converted suffix.
-virtual_drive  : copy results into a DocConvertResults virtual drive.
-"""
 from __future__ import annotations
 
 import json
@@ -162,8 +145,13 @@ def _pdf_to_docx(src: str, dst: str) -> str:
 
 
 def _docx_to_pdf(src: str, dst: str) -> str:
-    from docx2pdf import convert
-    convert(src, dst)
+    import pythoncom
+    pythoncom.CoInitialize()
+    try:
+        from docx2pdf import convert
+        convert(src, dst)
+    finally:
+        pythoncom.CoUninitialize()
     return dst
 
 
@@ -507,7 +495,7 @@ def _process_single_item(
                 out_dir = virtual_drive_path
             elif output_mode == "copy":
                 out_dir = os.path.dirname(src)
-            else:  # replace
+            else:
                 out_dir = os.path.dirname(src)
 
             outputs = _pdf_to_png(src, out_dir, stem)
@@ -548,7 +536,7 @@ def _process_single_item(
             final = _unique_path(candidate)
             converter_fn(src, final)
 
-        else:  # virtual_drive
+        else:
             dest = os.path.join(virtual_drive_path, f"{stem}{out_ext}")  # type: ignore[arg-type]
             dest = _unique_path(dest)
             converter_fn(src, dest)
@@ -560,10 +548,9 @@ def _process_single_item(
         return {"path": src, "success": False, "error": str(exc)}
 
 
-# ── Public API ─────────────────────────────────────────────────────────────────
+
 
 def execute(input_data: dict) -> str:
-    """Synchronous single-threaded execution."""
     return execute_parallel(input_data, max_workers=1)
 
 

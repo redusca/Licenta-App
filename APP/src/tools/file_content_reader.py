@@ -1,18 +1,3 @@
-"""
-File Content Reader — agent tool that reads and understands the CONTENT of files.
-
-Routing:
-  image    → Groq Llama 4 Scout vision  (/api/ai/vision/llama-scout)
-  audio    → Whisper transcription       (/api/ai/transcribe/whisper)
-  video    → FFmpeg audio extract → Whisper transcription
-             + middle-frame thumbnail → vision description
-  document → text extraction (PyMuPDF / python-docx / plain text)
-  other    → metadata only
-
-Use this when the user asks WHAT is in a file, or when you need to understand
-file contents to make decisions (organize, search, categorize).
-Does NOT modify any files — read-only, no approval required.
-"""
 from __future__ import annotations
 
 import io
@@ -28,8 +13,6 @@ import requests
 import utils.ai_gateway as ai_gateway
 
 logger = logging.getLogger(__name__)
-
-# ── Extension sets ────────────────────────────────────────────────────────────
 
 _IMAGE_EXTS = frozenset({
     ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif",
@@ -68,8 +51,6 @@ def _ffmpeg_exe() -> str:
     except Exception:
         return "ffmpeg"
 
-
-# ── per-type analyzers ────────────────────────────────────────────────────────
 
 def _analyze_image(path: str, question: str | None) -> dict[str, Any]:
     try:
@@ -117,7 +98,6 @@ def _analyze_image(path: str, question: str | None) -> dict[str, Any]:
 
 
 def _transcribe_audio_bytes(filename: str, raw: bytes, question: str | None) -> dict[str, Any]:
-    """Send raw audio bytes to the Whisper endpoint and return transcript."""
     try:
         resp = requests.post(
             f"{ai_gateway.get_url()}/api/ai/transcribe/whisper",
@@ -131,7 +111,6 @@ def _transcribe_audio_bytes(filename: str, raw: bytes, question: str | None) -> 
         transcript = (data.get("transcription") or "").strip()
         result: dict[str, Any] = {"transcript": transcript}
         if question and transcript:
-            # Surface a quick relevance hint so the agent doesn't have to re-read everything
             lower_t = transcript.lower()
             lower_q = question.lower()
             keywords = [w for w in lower_q.split() if len(w) > 3]
@@ -150,7 +129,6 @@ def _analyze_audio(path: str, question: str | None) -> dict[str, Any]:
     except OSError:
         file_size = 0
 
-    # For very large files, extract the first N seconds with FFmpeg
     if file_size > 30 * 1024 * 1024:  # > 30 MB
         tmp = tempfile.mktemp(suffix=".wav")
         try:
@@ -177,11 +155,9 @@ def _analyze_audio(path: str, question: str | None) -> dict[str, Any]:
 
 
 def _analyze_video(path: str, question: str | None) -> dict[str, Any]:
-    """Extract audio → Whisper transcript + middle frame → vision description."""
     result: dict[str, Any] = {}
     ffmpeg = _ffmpeg_exe()
 
-    # ── 1. Audio track → Whisper ──────────────────────────────────────────────
     audio_tmp = tempfile.mktemp(suffix=".wav")
     try:
         proc = subprocess.run(
@@ -214,10 +190,8 @@ def _analyze_video(path: str, question: str | None) -> dict[str, Any]:
         if os.path.exists(audio_tmp):
             os.remove(audio_tmp)
 
-    # ── 2. Middle frame → vision ──────────────────────────────────────────────
     frame_tmp = tempfile.mktemp(suffix=".jpg")
     try:
-        # Get duration first
         probe = subprocess.run(
             [ffmpeg, "-i", path],
             capture_output=True, text=True, timeout=10,
@@ -283,8 +257,6 @@ def _analyze_document(path: str, question: str | None) -> dict[str, Any]:
     return result
 
 
-# ── main dispatcher ───────────────────────────────────────────────────────────
-
 def _analyze_file(path: str, question: str | None) -> dict[str, Any]:
     if not os.path.isfile(path):
         return {"path": path, "error": f"File not found: {path}"}
@@ -322,7 +294,6 @@ def _analyze_file(path: str, question: str | None) -> dict[str, Any]:
     return base
 
 
-# ── tool interface ────────────────────────────────────────────────────────────
 
 DEFINITION = {
     "name": "file_content_reader",
@@ -386,7 +357,6 @@ def execute(input_data: dict) -> str:
     files: list[dict] = input_data.get("files") or []
     global_question: str | None = input_data.get("question") or None
 
-    # Shorthand: single filePath field
     if not files:
         fp = (input_data.get("filePath") or "").strip()
         if fp:
@@ -397,7 +367,6 @@ def execute(input_data: dict) -> str:
 
     results = []
     for item in files:
-        # Accept both {"path": "...", "question": "..."} and bare "path" strings
         if isinstance(item, str):
             path = item.strip()
             question = global_question

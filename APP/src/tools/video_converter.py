@@ -1,14 +1,3 @@
-"""
-Video Converter tool — batch-convert videos between formats using FFmpeg.
-
-Execution modes
----------------
-replace        : overwrite the original file with the converted version.
-copy           : place the converted file alongside the original (same folder).
-virtual_drive  : copy converted files into the VideoConversionResults virtual drive
-                 located at <output_path>/VideoConversionResults; creates the drive
-                 (and registers it in tool_drives.json) if it does not already exist.
-"""
 from __future__ import annotations
 
 import json
@@ -203,7 +192,7 @@ def execute(input: dict) -> str:
                 final = _unique_path(candidate)
                 _convert_video(src, raw_fmt, final)
 
-            else:  # virtual_drive
+            else:
                 dest = os.path.join(virtual_drive_path, f"{stem}.{ext}")  # type: ignore[arg-type]
                 dest = _unique_path(dest)
                 _convert_video(src, raw_fmt, dest)
@@ -259,7 +248,7 @@ def _process_single_item(
             final = _unique_path(candidate)
             _convert_video(src, raw_fmt, final)
 
-        else:  # virtual_drive
+        else:
             dest = os.path.join(virtual_drive_path, f"{stem}.{ext}")  # type: ignore[arg-type]
             dest = _unique_path(dest)
             _convert_video(src, raw_fmt, dest)

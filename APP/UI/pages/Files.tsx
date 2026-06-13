@@ -123,7 +123,8 @@ export const Files: React.FC = () => {
     const [availableRoots, setAvailableRoots] = useState<string[]>([]);
     const [ejectedError, setEjectedError] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-    
+    const [driveSearch, setDriveSearch] = useState('');
+
     // Drive Management
     const [knownDrives, setKnownDrives] = useState<DriveConfig[]>([]);
     
@@ -201,6 +202,8 @@ export const Files: React.FC = () => {
     const [driveFilter, setDriveFilter] = useState<'all' | 'tool'>('all');
     const [driveTypeFilter, setDriveTypeFilter] = useState<'all' | 'shortcut' | 'move'>('all');
     const [toolDrives, setToolDrives] = useState<{ path: string; name: string; tool: string }[]>([]);
+
+    useEffect(() => { setDrivePage(0); setToolDrivePage(0); }, [driveSearch]);
 
     // Initial Load
     useEffect(() => {
@@ -1094,7 +1097,15 @@ export const Files: React.FC = () => {
             );
         }
 
-        const filteredDrives = knownDrives.filter(d => driveTypeFilter === 'all' || d.type === driveTypeFilter);
+        const q = driveSearch.toLowerCase();
+        const filteredDrives = knownDrives.filter(d => {
+            const matchesType = driveTypeFilter === 'all' || d.type === driveTypeFilter;
+            const matchesSearch = !q || d.name.toLowerCase().includes(q) || d.path.toLowerCase().includes(q);
+            return matchesType && matchesSearch;
+        });
+        const filteredToolDrives = !q ? toolDrives : toolDrives.filter(td =>
+            td.name.toLowerCase().includes(q) || td.path.toLowerCase().includes(q)
+        );
         const totalPages = Math.ceil(filteredDrives.length / DRIVES_PER_PAGE);
         const safePage = Math.min(drivePage, totalPages - 1 >= 0 ? totalPages - 1 : 0);
         const pageDrives = filteredDrives.slice(safePage * DRIVES_PER_PAGE, (safePage + 1) * DRIVES_PER_PAGE);
@@ -1148,6 +1159,36 @@ export const Files: React.FC = () => {
                     </div>
                 </div>
 
+                {/* Drive search */}
+                <div style={{ padding: '0 44px 16px' }}>
+                    <div style={{ position: 'relative', maxWidth: 400 }}>
+                        <Search className="w-4 h-4" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', pointerEvents: 'none' }} />
+                        <input
+                            type="text"
+                            value={driveSearch}
+                            onChange={e => setDriveSearch(e.target.value)}
+                            placeholder="Search drives…"
+                            style={{
+                                width: '100%', paddingLeft: 36, paddingRight: driveSearch ? 32 : 12,
+                                paddingTop: 8, paddingBottom: 8, borderRadius: 'var(--r-pill)',
+                                background: 'var(--surface)', border: '1px solid var(--border)',
+                                fontSize: 13.5, color: 'var(--ink)', outline: 'none',
+                                transition: 'border-color .15s var(--ease)',
+                            }}
+                            onFocus={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--accent)'; }}
+                            onBlur={e => { (e.target as HTMLInputElement).style.borderColor = 'var(--border)'; }}
+                        />
+                        {driveSearch && (
+                            <button
+                                onClick={() => setDriveSearch('')}
+                                style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
                 {/* Drive type filter */}
                 {driveFilter === 'all' && (
                     <div style={{ padding: '0 44px 16px', display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1170,13 +1211,13 @@ export const Files: React.FC = () => {
                 {driveFilter === 'tool' && (
                     <div style={{ padding: '0 44px 32px' }}>
                         {(() => {
-                            const toolTotalPages = Math.ceil(toolDrives.length / TOOL_DRIVES_PER_PAGE);
+                            const toolTotalPages = Math.ceil(filteredToolDrives.length / TOOL_DRIVES_PER_PAGE);
                             const safeTdPage = Math.min(toolDrivePage, toolTotalPages - 1 >= 0 ? toolTotalPages - 1 : 0);
-                            const pageToolDrives = toolDrives.slice(safeTdPage * TOOL_DRIVES_PER_PAGE, (safeTdPage + 1) * TOOL_DRIVES_PER_PAGE);
+                            const pageToolDrives = filteredToolDrives.slice(safeTdPage * TOOL_DRIVES_PER_PAGE, (safeTdPage + 1) * TOOL_DRIVES_PER_PAGE);
                             return (<>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                             <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.1em', fontWeight: 600, color: 'var(--faint)' }}>
-                                Tool Drives <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10 }}>{toolDrives.length}</span>
+                                Tool Drives <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10 }}>{filteredToolDrives.length}</span>
                             </div>
                             {toolTotalPages > 1 && (
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -1190,8 +1231,10 @@ export const Files: React.FC = () => {
                                 </div>
                             )}
                         </div>
-                        {toolDrives.length === 0 ? (
-                            <p style={{ fontSize: 13, color: 'var(--muted)' }}>No tool-created drives yet. Run a tool to see drives created automatically here.</p>
+                        {filteredToolDrives.length === 0 ? (
+                            <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+                                {q ? `No tool drives match "${driveSearch}".` : 'No tool-created drives yet. Run a tool to see drives created automatically here.'}
+                            </p>
                         ) : (
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                                 {pageToolDrives.map((td, i) => {
@@ -1266,6 +1309,12 @@ export const Files: React.FC = () => {
                                     <div style={{ fontSize: 11.5, marginTop: 2 }}>From a folder, or build from scratch</div>
                                 </div>
                             </button>
+
+                            {filteredDrives.length === 0 && driveSearch && (
+                                <div style={{ gridColumn: 'span 2', display: 'flex', alignItems: 'center', padding: '0 4px' }}>
+                                    <span style={{ fontSize: 13, color: 'var(--muted)' }}>No drives match <strong style={{ color: 'var(--ink)' }}>{driveSearch}</strong>.</span>
+                                </div>
+                            )}
 
                             {pageDrives.map((d, i) => {
                                 const available = isDriveAvailable(d);

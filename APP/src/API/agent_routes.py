@@ -1,18 +1,3 @@
-"""
-Agent proxy routes for the APP Flask backend.
-
-Stores the user's agent connection config in data/agent_config.json.
-
-── Config & key management ────────────────────────────────────────────────────
-  GET  /api/agent/config       — read current config
-  POST /api/agent/config       — save config
-
-── Planning Agent chat management ─────────────────────────────────────────────
-  POST   /api/agent/chat/create  — create a new chat on the server
-  GET    /api/agent/chat/info    — return active chat_id (or null)
-  DELETE /api/agent/chat/delete  — delete active chat + reset local state
-  POST   /api/agent/chat/stream  — SSE proxy: forward message to planning agent
-"""
 from __future__ import annotations
 
 import json
@@ -38,12 +23,7 @@ _DEFAULT_CONFIG: dict = {
 
 _TOOL_CALLBACK_URL = "http://host.docker.internal:5000/api/tools/execute"
 
-# In-memory map: api_key → chat_id currently active on the server.
-# Lost on Flask restart; user just creates a new chat automatically.
 _ACTIVE_CHATS: dict[str, str] = {}
-
-
-# ── Config helpers ─────────────────────────────────────────────────────────────
 
 def _load_config() -> dict:
     if _CONFIG_PATH.exists():
@@ -71,10 +51,9 @@ def _agent_headers(cfg: dict) -> dict:
     return {"X-API-Key": cfg["api_key"], "Content-Type": "application/json"}
 
 
-# ── Tool list builder ──────────────────────────────────────────────────────────
+
 
 def _build_tool_list() -> list[dict]:
-    """Build the tool definitions to send to the planning agent."""
     try:
         from API.tools_routes import _TOOLS
         defs: list[dict] = []
@@ -88,7 +67,7 @@ def _build_tool_list() -> list[dict]:
         return []
 
 
-# ── Config routes ──────────────────────────────────────────────────────────────
+
 
 @agent_bp.get("/config")
 def get_config():
@@ -111,15 +90,10 @@ def save_config():
     return jsonify({"ok": True})
 
 
-# ── Planning Agent — chat management ──────────────────────────────────────────
+
 
 @agent_bp.post("/chat/create")
 def create_chat():
-    """
-    Create a new planning-agent chat on the server.
-    Stores the resulting chat_id in _ACTIVE_CHATS.
-    Returns { chat_id, title }.
-    """
     cfg = _load_config()
     api_key = cfg.get("api_key", "")
     server_url = ai_gateway.get_url()
@@ -157,7 +131,6 @@ def create_chat():
 
 @agent_bp.get("/chat/info")
 def chat_info():
-    """Return the currently active chat_id (null if none)."""
     cfg = _load_config()
     api_key = cfg.get("api_key", "")
     chat_id = _ACTIVE_CHATS.get(api_key)
@@ -166,7 +139,6 @@ def chat_info():
 
 @agent_bp.delete("/chat/delete")
 def delete_chat():
-    """Delete the active chat on the server and clear local state."""
     cfg = _load_config()
     api_key = cfg.get("api_key", "")
     server_url = ai_gateway.get_url()
@@ -184,22 +156,10 @@ def delete_chat():
     return jsonify({"ok": True})
 
 
-# ── Planning Agent — SSE streaming message ─────────────────────────────────────
+
 
 @agent_bp.post("/chat/stream")
 def stream_chat():
-    """
-    SSE proxy: forwards a chat message to the planning agent and
-    streams the SSE response back to the React frontend.
-
-    Body: { "message": "...", "chat_id": "..." (optional override) }
-
-    The frontend connects with fetch() + ReadableStream, not EventSource,
-    because EventSource doesn't support POST requests.
-
-    Each forwarded chunk is raw bytes from the server's SSE stream,
-    already formatted as  data: <json>\\n\\n  events.
-    """
     body = request.get_json(force=True) or {}
     message: str = body.get("message", "").strip()
     if not message:
@@ -214,12 +174,10 @@ def stream_chat():
     if not server_url:
         return jsonify({"error": "AI server URL not configured. Go to Settings → Agent Connection."}), 400
 
-    # Accept an explicit chat_id (e.g. after page reload) or use active one
     chat_id = body.get("chat_id") or _ACTIVE_CHATS.get(api_key)
     if not chat_id:
         return jsonify({"error": "No active chat. Call /api/agent/chat/create first."}), 400
 
-    # Keep the active chat pointer current
     _ACTIVE_CHATS[api_key] = chat_id
 
     url = f"{server_url}/api/agent/chats/{chat_id}/message"
@@ -242,7 +200,6 @@ def stream_chat():
         try:
             resp = _post_stream(url)
 
-            # Chat expired (server restarted, in-memory store wiped) — auto-recover.
             if resp.status_code == 404:
                 try:
                     cr = requests.post(

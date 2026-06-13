@@ -1,19 +1,3 @@
-"""
-Base interface for all AI models exposed through the gateway.
-
-Every concrete model class **must** inherit from ``BaseAIModel`` and
-implement the three lifecycle hooks:
-
-    wake_up()   — download / load weights into memory (GPU or CPU)
-    process()   — run inference on a single request
-    unload()    — release GPU memory and any cached state
-
-The base class also provides:
-    • ``is_loaded`` property
-    • ``model_info`` property → dict with name, status, device
-    • Thread-safety via an ``asyncio.Lock`` on wake/unload
-"""
-
 from __future__ import annotations
 
 import abc
@@ -27,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ModelInfo:
-    """Read-only snapshot of a model's current state."""
-
     name: str
     model_id: str
     task: str
@@ -38,8 +20,6 @@ class ModelInfo:
 
 
 class BaseAIModel(abc.ABC):
-    """Abstract base class every AI model adapter must implement."""
-
     def __init__(self, name: str, model_id: str, task: str) -> None:
         self._name = name
         self._model_id = model_id
@@ -47,8 +27,6 @@ class BaseAIModel(abc.ABC):
         self._is_loaded = False
         self._device = "cpu"
         self._lock = asyncio.Lock()
-
-    # ── Public properties ─────────────────────────────────────────────────
 
     @property
     def name(self) -> str:
@@ -80,10 +58,7 @@ class BaseAIModel(abc.ABC):
             device=self._device,
         )
 
-    # ── Lifecycle ─────────────────────────────────────────────────────────
-
     async def ensure_loaded(self) -> None:
-        """Thread-safe lazy loader — calls ``wake_up`` only once."""
         if self._is_loaded:
             return
         async with self._lock:
@@ -95,7 +70,6 @@ class BaseAIModel(abc.ABC):
             logger.info("Model %s is ready on %s", self._name, self._device)
 
     async def safe_unload(self) -> None:
-        """Thread-safe unloader."""
         async with self._lock:
             if not self._is_loaded:
                 return
@@ -104,22 +78,11 @@ class BaseAIModel(abc.ABC):
             self._is_loaded = False
             logger.info("Model %s unloaded", self._name)
 
-    # ── Abstract hooks ────────────────────────────────────────────────────
+    @abc.abstractmethod
+    async def wake_up(self) -> None: ...
 
     @abc.abstractmethod
-    async def wake_up(self) -> None:
-        """Load the model weights into memory / GPU.
-
-        Implementations should set ``self._device`` appropriately.
-        """
+    async def process(self, **kwargs: Any) -> Any: ...
 
     @abc.abstractmethod
-    async def process(self, **kwargs: Any) -> Any:
-        """Run a single inference request.
-
-        Subclasses define their own keyword arguments and return types.
-        """
-
-    @abc.abstractmethod
-    async def unload(self) -> None:
-        """Release all resources (GPU memory, caches, temp files)."""
+    async def unload(self) -> None: ...

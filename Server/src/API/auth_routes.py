@@ -14,8 +14,6 @@ from utils.auth import hash_password, verify_password, create_access_token, get_
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
-# ── Schemas ───────────────────────────────────────────────────────────────────
-
 class RegisterIn(BaseModel):
     email: EmailStr
     password: str
@@ -34,8 +32,6 @@ class UserOut(BaseModel):
     class Config:
         from_attributes = True
 
-
-# ── Routes ────────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 def register(body: RegisterIn, db: Session = Depends(get_db)):

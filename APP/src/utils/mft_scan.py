@@ -1,29 +1,9 @@
-"""
-mft_scan.py
-===========
-Direct NTFS Master File Table (MFT) scanner.
-
-Advantages over os.walk / os.scandir:
-  - Single kernel call reads the entire MFT in large chunks.  No per-file
-    syscalls.
-  - Extracts name, size, timestamps, parent reference and computes full paths.
-  - Results are cached for CACHE_TTL seconds, so repeat searches are instant.
-
-Limitations:
-  - Requires administrator privileges (raw volume read).
-  - Only works on NTFS volumes.
-  - Falls back gracefully when admin rights are missing.
-"""
-
 import ctypes
 import struct
 import threading
 import time
 from ctypes import wintypes
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Win32 constants
-# ──────────────────────────────────────────────────────────────────────────────
 GENERIC_READ                    = 0x80000000
 FILE_SHARE_READ                 = 0x00000001
 FILE_SHARE_WRITE                = 0x00000002
@@ -32,7 +12,7 @@ FSCTL_GET_NTFS_VOLUME_DATA      = 0x00090064
 FSCTL_ALLOW_EXTENDED_DASD_IO    = 0x00090083   # required on Win10/11 for raw volume reads
 INVALID_HANDLE_VALUE            = ctypes.c_void_p(-1).value
 
-# ── Typed Win32 function bindings (prevents wrong calling convention on x64) ──
+# Typed Win32 function bindings — required on x64 to get the calling convention right.
 _k32 = ctypes.windll.kernel32
 
 _CreateFileW = _k32.CreateFileW
@@ -71,7 +51,6 @@ _CloseHandle = _k32.CloseHandle
 _CloseHandle.restype  = wintypes.BOOL
 _CloseHandle.argtypes = [ctypes.c_void_p]
 
-# MFT Attribute type codes
 ATTR_STANDARD_INFORMATION   = 0x10
 ATTR_ATTRIBUTE_LIST         = 0x20
 ATTR_FILE_NAME              = 0x30
@@ -80,13 +59,10 @@ ATTR_DATA                   = 0x80
 # Windows FILETIME epoch difference (100-ns intervals from 1601-01-01 to 1970-01-01)
 _FILETIME_EPOCH_DIFF = 116_444_736_000_000_000
 
-# MFT root directory record number
 _ROOT_RECORD_NUM = 5
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# NTFS volume data structure
-# ──────────────────────────────────────────────────────────────────────────────
+
 class NTFS_VOLUME_DATA_BUFFER(ctypes.Structure):
     _fields_ = [
         ("VolumeSerialNumber",           wintypes.LARGE_INTEGER),
@@ -106,10 +82,8 @@ class NTFS_VOLUME_DATA_BUFFER(ctypes.Structure):
     ]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Result cache  {letter -> {records, path_map, ts}}
-# ──────────────────────────────────────────────────────────────────────────────
-CACHE_TTL   = 600          # seconds before the cache is considered stale (10 min)
+
+CACHE_TTL   = 600
 _cache_lock = threading.Lock()
 _drive_cache: dict = {}
 
@@ -129,7 +103,6 @@ def _set_cache(letter: str, records: list, path_map: dict) -> None:
 
 
 def invalidate_cache(letter: str = None) -> None:
-    """Invalidate cache for one drive letter (pass None for all drives)."""
     with _cache_lock:
         if letter:
             _drive_cache.pop(letter.upper(), None)
@@ -137,9 +110,7 @@ def invalidate_cache(letter: str = None) -> None:
             _drive_cache.clear()
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Low-level Win32 helpers
-# ──────────────────────────────────────────────────────────────────────────────
+
 def is_admin() -> bool:
     try:
         return bool(ctypes.windll.shell32.IsUserAnAdmin())
@@ -148,7 +119,6 @@ def is_admin() -> bool:
 
 
 def _filetime_to_unix(filetime: int) -> float:
-    """Convert a Windows FILETIME value to a Unix timestamp (float seconds)."""
     if filetime == 0:
         return 0.0
     try:
@@ -188,18 +158,8 @@ def _get_ntfs_volume_data(handle) -> NTFS_VOLUME_DATA_BUFFER | None:
     return buf if ok else None
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# NTFS Update Sequence Array (USA) fixup
-# ──────────────────────────────────────────────────────────────────────────────
-def _apply_usa_fixup(data: bytearray, record_size: int) -> None:
-    """
-    Restore bytes overwritten by NTFS's sector-end fixup mechanism.
 
-    NTFS replaces the last 2 bytes of every 512-byte sector in an MFT record
-    with a sequence tag (USN).  The original values are stored in the Update
-    Sequence Array (USA) in the record header.  Without this restoration,
-    any attribute whose data straddles a sector boundary will be garbled.
-    """
+def _apply_usa_fixup(data: bytearray, record_size: int) -> None:
     try:
         if len(data) < 8:
             return
@@ -219,24 +179,8 @@ def _apply_usa_fixup(data: bytearray, record_size: int) -> None:
         pass
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# MFT record parser
-# ──────────────────────────────────────────────────────────────────────────────
-def _parse_mft_record(data: bytes, record_size: int, sequential_idx: int) -> dict | None:
-    """
-    Parse one raw MFT FILE record.
 
-    Returns None for unused / corrupt records.
-    Successful parse yields:
-      record_num  int     MFT record index (from header at 0x2C, NTFS 3.1+)
-      name        str     Filename (Win32/Win32+DOS namespace preferred)
-      is_dir      bool
-      parent_ref  int     Parent directory record number (lower 48 bits)
-      size        int     Bytes (from unnamed $DATA stream)
-      created     float   Unix timestamp
-      modified    float   Unix timestamp
-      accessed    float   Unix timestamp
-    """
+def _parse_mft_record(data: bytes, record_size: int, sequential_idx: int) -> dict | None:
     if len(data) < 0x30 or data[:4] != b"FILE":
         return None
 
@@ -282,7 +226,6 @@ def _parse_mft_record(data: bytes, record_size: int, sequential_idx: int) -> dic
 
         non_resident = data[offset + 8]
 
-        # ── $STANDARD_INFORMATION (timestamps) ────────────────────────────
         if attr_type == ATTR_STANDARD_INFORMATION and not non_resident:
             try:
                 c_off = struct.unpack_from("<H", data, offset + 0x14)[0]
@@ -294,7 +237,6 @@ def _parse_mft_record(data: bytes, record_size: int, sequential_idx: int) -> dic
             except Exception:
                 pass
 
-        # ── $FILE_NAME (name + parent ref) ────────────────────────────────
         elif attr_type == ATTR_FILE_NAME and not non_resident:
             try:
                 c_off = struct.unpack_from("<H", data, offset + 0x14)[0]
@@ -313,7 +255,6 @@ def _parse_mft_record(data: bytes, record_size: int, sequential_idx: int) -> dic
             except Exception:
                 pass
 
-        # ── $DATA (file size) ─────────────────────────────────────────────
         elif attr_type == ATTR_DATA:
             try:
                 if data[offset + 9] == 0:           # unnamed stream only
@@ -331,16 +272,8 @@ def _parse_mft_record(data: bytes, record_size: int, sequential_idx: int) -> dic
     return result if result["name"] else None
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Path resolution  (iterative, O(n), no recursion limit issues)
-# ──────────────────────────────────────────────────────────────────────────────
-def build_path_map(records: list, drive_letter: str) -> dict:
-    """
-    Compute {record_num: full_path} for every record in *records*.
 
-    Uses an iterative parent-chain walk to avoid recursion limits.
-    The MFT root (record 5) anchors at "X:\\".
-    """
+def build_path_map(records: list, drive_letter: str) -> dict:
     root_path  = drive_letter.upper() + ":\\"
     lookup     = {r["record_num"]: r for r in records if r.get("record_num") is not None}
     path_cache: dict[int, str] = {_ROOT_RECORD_NUM: root_path}
@@ -373,7 +306,6 @@ def build_path_map(records: list, drive_letter: str) -> dict:
                 break
             current = parent
 
-        # Propagate forward down the chain
         base = path_cache.get(current, root_path)
         for rn, name in reversed(chain):
             sep  = "" if base.endswith("\\") else "\\"
@@ -390,16 +322,8 @@ def build_path_map(records: list, drive_letter: str) -> dict:
     return path_cache
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# NTFS run-list parser  (handles fragmented MFT)
-# ──────────────────────────────────────────────────────────────────────────────
-def _parse_runlist(data: bytes, start_off: int) -> list:
-    """
-    Parse an NTFS attribute run list starting at *start_off*.
 
-    Returns [(start_lcn, cluster_count), ...].
-    Sparse runs (offset nibble == 0) are returned as (-1, cluster_count).
-    """
+def _parse_runlist(data: bytes, start_off: int) -> list:
     runs    = []
     off     = start_off
     prev_lcn = 0
@@ -427,13 +351,6 @@ def _parse_runlist(data: bytes, start_off: int) -> list:
 
 
 def _read_mft_runlist(handle, mft_offset: int, bytes_per_record: int) -> list:
-    """
-    Read MFT record 0 ($MFT) and return its $DATA run list.
-
-    Without this, a fragmented MFT is read only from its first extent and files
-    whose records live in later extents are silently missed.
-    Returns [] on any failure (caller falls back to single-run assumption).
-    """
     ok = _SetFilePointerEx(handle, mft_offset, None, 0)
     if not ok:
         return []
@@ -458,8 +375,7 @@ def _read_mft_runlist(handle, mft_offset: int, bytes_per_record: int) -> list:
             break
         if attr_type == 0xFFFFFFFF or attr_len == 0:
             break
-        # Unnamed, non-resident $DATA attribute
-        if attr_type == ATTR_DATA and rec[offset + 8] == 1 and rec[offset + 9] == 0:
+        if attr_type == ATTR_DATA and rec[offset + 8] == 1 and rec[offset + 9] == 0:  # unnamed non-resident $DATA
             try:
                 rl_off = struct.unpack_from("<H", rec, offset + 0x20)[0]
                 return _parse_runlist(bytes(rec), offset + rl_off)
@@ -469,16 +385,8 @@ def _read_mft_runlist(handle, mft_offset: int, bytes_per_record: int) -> list:
     return []
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Core scan  (run-list-aware MFT read)
-# ──────────────────────────────────────────────────────────────────────────────
+
 def scan_drive(drive_letter: str = "C") -> list:
-    """
-    Read the full MFT of *drive_letter* and return a flat list of record dicts.
-    Each dict: record_num, name, is_dir, parent_ref, size, created, modified,
-               accessed.
-    Full paths are NOT resolved here — call build_path_map() afterwards.
-    """
     if not is_admin():
         print(f"[mft_scan] Not running as admin; scan for {drive_letter}: will fail.")
 
@@ -503,7 +411,6 @@ def scan_drive(drive_letter: str = "C") -> list:
     print(f"[mft_scan] {drive_letter}: MFT offset={mft_offset} bpr={bytes_per_record} total_records~={total_records}")
 
     # Read the $MFT run list so fragmented MFTs are covered in full.
-    # If parsing fails we fall back to a single contiguous run from MftStartLcn.
     mft_runs = _read_mft_runlist(handle, mft_offset, bytes_per_record)
     if mft_runs:
         print(f"[mft_scan] {drive_letter}: $MFT has {len(mft_runs)} run(s)")
@@ -525,8 +432,7 @@ def scan_drive(drive_letter: str = "C") -> list:
                 break
 
             if run_lcn < 0:
-                # Sparse run — advance sequential counter without reading
-                sequential += (run_clusters * bytes_per_cluster) // bytes_per_record
+                sequential += (run_clusters * bytes_per_cluster) // bytes_per_record  # sparse run — skip
                 continue
 
             run_byte_offset = run_lcn * bytes_per_cluster
@@ -568,27 +474,8 @@ def scan_drive(drive_letter: str = "C") -> list:
     return files
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Junction-safe directory resolver
-# ──────────────────────────────────────────────────────────────────────────────
+
 def resolve_dir_mft_prefix(path_map: dict, dir_path: str) -> str | None:
-    """
-    Return the canonical MFT path prefix for *dir_path*, handling junctions.
-
-    Problem: a user-provided path like C:\\Users\\X\\Desktop\\Folder may reach
-    files that physically live at C:\\Users\\X\\OneDrive\\Desktop\\Folder when
-    OneDrive Known Folder Move is active.  MFT path_map stores physical paths,
-    so a plain string comparison fails.
-
-    Fix: use os.stat().st_ino to obtain the NTFS MFT record number for the
-    directory.  The OS follows junctions transparently, so the returned inode
-    IS the record number of the physical directory.  We then look up that
-    record in path_map to get the true physical prefix.
-
-    Falls back to string matching (original + realpath) if stat lookup fails.
-    Returns None if the directory cannot be located in path_map at all.
-    """
-    # --- stat-based lookup (handles junctions) ---
     try:
         ino = os.stat(dir_path).st_ino & 0xFFFF_FFFF  # match 32-bit record_num
         if ino in path_map:
@@ -597,7 +484,6 @@ def resolve_dir_mft_prefix(path_map: dict, dir_path: str) -> str | None:
     except Exception:
         pass
 
-    # --- string fallback: try original path and realpath ---
     candidates: set[str] = set()
     candidates.add(os.path.normpath(dir_path).lower().rstrip("\\"))
     try:
@@ -612,9 +498,7 @@ def resolve_dir_mft_prefix(path_map: dict, dir_path: str) -> str | None:
     return None
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# High-level API (cache-aware)
-# ──────────────────────────────────────────────────────────────────────────────
+
 def _ensure_cached(drive_letter: str) -> dict | None:
     letter = drive_letter.upper()
     if not _is_cache_valid(letter):
@@ -626,12 +510,6 @@ def _ensure_cached(drive_letter: str) -> dict | None:
 
 def search_volume(drive_letter: str, query: str,
                   is_dir_filter=None, max_results: int = 300) -> list:
-    """
-    Search for files/folders by name substring across the whole NTFS volume.
-
-    Uses the MFT cache — instant if the drive was scanned recently.
-    Returns: [{name, full_path, is_dir, size, created, modified, accessed}]
-    """
     ql     = query.lower()
     cached = _ensure_cached(drive_letter)
     if not cached:
@@ -664,15 +542,6 @@ def search_volume(drive_letter: str, query: str,
 
 
 def get_volume_stats(drive_letter: str) -> dict:
-    """
-    Compute volume-wide statistics using the MFT cache.
-
-    Returns:
-      total_files, total_dirs, total_size,
-      extensions_by_count [{ext, count}],
-      extensions_by_size  [{ext, size}],
-      largest_files       [{name, full_path, size}]  (top 20)
-    """
     cached = _ensure_cached(drive_letter)
     if not cached:
         return {"error": "Could not scan volume"}
@@ -712,14 +581,6 @@ def get_volume_stats(drive_letter: str) -> dict:
 
 
 def list_directory_mft(drive_letter: str, dir_path: str) -> list | None:
-    """
-    List the immediate children of *dir_path* using the MFT cache.
-
-    Returns None if the directory cannot be located in the cached MFT data
-    (the caller should fall back to os.scandir in that case).
-
-    Each item: {name, full_path, is_dir, size, created, modified, accessed}
-    """
     cached = _ensure_cached(drive_letter)
     if not cached:
         return None
@@ -758,15 +619,13 @@ def list_directory_mft(drive_letter: str, dir_path: str) -> list | None:
 import os
 
 def _fallback_space_analyzer(target_dir: str) -> dict:
-    """Fallback recursive size calculator using os.scandir when MFT isn't available."""
     try:
         if not os.path.exists(target_dir):
             return {"error": "Path does not exist"}
             
         children = []
         total_size = 0
-        
-        # Helper to get deep folder size
+
         def get_dir_size(path):
             total = 0
             try:
@@ -812,11 +671,6 @@ def _fallback_space_analyzer(target_dir: str) -> dict:
         return {"error": f"Scandir fallback failed: {e}"}
 
 def get_space_analyzer_data(drive_letter: str, dir_path: str = None) -> dict:
-    """
-    Computes recursive folder sizes efficiently and returns the immediate
-    children of `dir_path` (or root if None) with their total sizes,
-    suitable for mapping in a Space Analyzer (WizTree clone).
-    """
     cached = _ensure_cached(drive_letter)
     if not cached or not cached.get("records"):
         # Fallback to slow os.scandir if MFT scanning fails (e.g. no Admin rights)
@@ -826,7 +680,6 @@ def get_space_analyzer_data(drive_letter: str, dir_path: str = None) -> dict:
     records = cached["records"]
     path_map = cached["path_map"]
 
-    # Compute and cache recursive folder sizes once per drive scan
     if "folder_sizes" not in cached:
         parents = {r.get("record_num"): r.get("parent_ref") for r in records if r.get("record_num") is not None}
         fsizes = {}

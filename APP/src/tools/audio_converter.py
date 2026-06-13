@@ -1,14 +1,3 @@
-"""
-Audio Converter tool — batch-convert audio between formats using FFmpeg.
-
-Execution modes
----------------
-replace        : overwrite the original file with the converted version.
-copy           : place the converted file alongside the original (same folder).
-virtual_drive  : copy converted files into the AudioConversionResults virtual drive
-                 located at <output_path>/AudioConversionResults; creates the drive
-                 (and registers it in tool_drives.json) if it does not already exist.
-"""
 from __future__ import annotations
 
 import json
@@ -203,7 +192,7 @@ def execute(input: dict) -> str:
                 final = _unique_path(candidate)
                 _convert_audio(src, raw_fmt, final)
 
-            else:  # virtual_drive
+            else:
                 dest = os.path.join(virtual_drive_path, f"{stem}.{ext}")  # type: ignore[arg-type]
                 dest = _unique_path(dest)
                 _convert_audio(src, raw_fmt, dest)

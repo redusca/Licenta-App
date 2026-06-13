@@ -1,18 +1,3 @@
-"""
-PDF Merger / Splitter / Converter tool.
-
-Operations
-----------
-merge          : Combine multiple PDFs into one, with optional reordering.
-split          : Extract specific page ranges from a single PDF.
-convert        : Convert between PDF ↔ DOCX (and other formats via pandoc-like bridges).
-
-Execution modes (outputMode)
------------------------------
-replace        : overwrite the original file(s).
-copy           : place the result alongside the original (same folder).
-virtual_drive  : copy results into a PdfToolResults virtual drive.
-"""
 from __future__ import annotations
 
 import json
@@ -252,8 +237,13 @@ def _convert_pdf_to_docx(src_path: str, output_path: str) -> str:
 
 
 def _convert_docx_to_pdf(src_path: str, output_path: str) -> str:
-    from docx2pdf import convert
-    convert(src_path, output_path)
+    import pythoncom
+    pythoncom.CoInitialize()
+    try:
+        from docx2pdf import convert
+        convert(src_path, output_path)
+    finally:
+        pythoncom.CoUninitialize()
     return output_path
 
 
@@ -313,7 +303,7 @@ def _process_convert_item(
             final = _unique_path(candidate)
             converter_fn(src, final)
 
-        else:  # virtual_drive
+        else:
             dest = os.path.join(virtual_drive_path, f"{stem}{out_ext}")  # type: ignore[arg-type]
             dest = _unique_path(dest)
             converter_fn(src, dest)
