@@ -214,7 +214,7 @@ type ViewMode = 'categories' | 'list';
 
 export const Tools: React.FC = () => {
     const [searchParams, setSearchParams] = useSearchParams();
-    const { tools, categories, loading, error, reload } = useToolsCatalog();
+    const { tools, categories, loading, error, isOffline, reload } = useToolsCatalog();
 
     const urlCategory = searchParams.get('category') as CategoryKey | null;
 
@@ -342,8 +342,22 @@ export const Tools: React.FC = () => {
                 </div>
             </div>
 
-            {/* ── Error banner ── */}
-            {error && (
+            {/* ── Offline / error banner ── */}
+            {isOffline && (
+                <div style={{
+                    margin: '10px 20px 0', padding: '10px 14px',
+                    background: 'var(--c-ochre-bg)', color: 'var(--c-ochre)',
+                    borderRadius: 'var(--r-control)',
+                    display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, flexShrink: 0,
+                }}>
+                    <AlertCircle style={{ width: 14, height: 14, flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>Agent server is offline — tools requiring the server will not run, but all others are available.</span>
+                    <button onClick={reload} className="btn btn-secondary" style={{ padding: '4px 9px', fontSize: 11.5 }}>
+                        <RefreshCw style={{ width: 11, height: 11 }} /> Retry
+                    </button>
+                </div>
+            )}
+            {error && !isOffline && (
                 <div style={{
                     margin: '10px 20px 0', padding: '10px 14px',
                     background: 'var(--c-clay-bg)', color: 'var(--c-clay)',

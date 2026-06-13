@@ -701,6 +701,9 @@ export const Chat: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Mirrors live state so handleEvent (stable callback) can read current plan
   const liveRef = useRef<LiveRun | null>(null);
+  // Set to true when a tool_call SSE event is received; cleared after approval or step completion.
+  // Prevents the approval modal from appearing before the previous step_done event is processed.
+  const awaitingApprovalRef = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -800,10 +803,15 @@ export const Chat: React.FC = () => {
     if (!live) return;
     const id = setInterval(async () => {
       if (pendingTool) return;
+      // Only poll after a tool_call SSE event — ensures previous step_done is processed first.
+      if (!awaitingApprovalRef.current) return;
       try {
         const res = await fetch(`${TOOLS}/pending`);
         const list: PendingTool[] = await res.json();
-        if (list.length > 0) setPendingTool(list[0]);
+        if (list.length > 0) {
+          setPendingTool(list[0]);
+          awaitingApprovalRef.current = false;
+        }
       } catch { /* ignore */ }
     }, 350);
     return () => clearInterval(id);
@@ -842,7 +850,16 @@ export const Chat: React.FC = () => {
           };
         });
         break;
+      case 'tool_call':
+        // Signal that we are now expecting an approval check for this step.
+        awaitingApprovalRef.current = true;
+        break;
+      case 'tool_result':
+        // Tool returned; no longer waiting for approval for this step.
+        awaitingApprovalRef.current = false;
+        break;
       case 'step_done':
+        awaitingApprovalRef.current = false;
         setLive(prev => {
           if (!prev) return null;
           return {
@@ -867,6 +884,7 @@ export const Chat: React.FC = () => {
         }
         break;
       case 'tool_error':
+        awaitingApprovalRef.current = false;
         setLive(prev => {
           if (!prev) return null;
           return {
@@ -881,6 +899,7 @@ export const Chat: React.FC = () => {
         setLive(prev => prev ? { ...prev, synthesis: prev.synthesis + (evt.content ?? '') } : null);
         break;
       case 'final': {
+        awaitingApprovalRef.current = false;
         const pipeline: PipelineStep[] = (liveRef.current?.plan ?? [])
           .filter(s => s.type === 'tool' && s.tool && s.tool !== 'ask_user' && s.tool !== 'hello'
                     && (s.status === 'done' || s.status === 'error'))
@@ -899,6 +918,7 @@ export const Chat: React.FC = () => {
         break;
       }
       case 'error':
+        awaitingApprovalRef.current = false;
         setEntries(prev => [...prev, {
           id: `e-${Date.now()}`,
           kind: 'error',

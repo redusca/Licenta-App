@@ -24,6 +24,23 @@ _PYTHON_EXE_CACHE: str | None = None
 _PYTHON_EXE_SEARCHED = False
 
 
+def _clean_env() -> dict:
+    """Return a copy of os.environ with PyInstaller's temp dir removed from PATH.
+
+    PyInstaller's onefile mode extracts DLLs to a temp dir and prepends it to
+    PATH, which causes onnxruntime to pick up the wrong native DLLs when
+    launched as a subprocess from the frozen exe.
+    """
+    env = os.environ.copy()
+    mei = getattr(sys, "_MEIPASS", None)
+    if mei:
+        sep = os.pathsep
+        parts = env.get("PATH", "").split(sep)
+        parts = [p for p in parts if os.path.normcase(p) != os.path.normcase(mei)]
+        env["PATH"] = sep.join(parts)
+    return env
+
+
 def _find_python_with_rembg() -> str | None:
     global _PYTHON_EXE_CACHE, _PYTHON_EXE_SEARCHED
     if _PYTHON_EXE_SEARCHED:
@@ -33,10 +50,20 @@ def _find_python_with_rembg() -> str | None:
 
     candidates: list[str] = []
 
-    # When NOT bundled, the current interpreter already works — no need to spawn
+    # When NOT bundled, the current interpreter is always the right choice —
+    # it's the same Python that has rembg installed.
     if not getattr(sys, "frozen", False):
         _PYTHON_EXE_CACHE = sys.executable
         return _PYTHON_EXE_CACHE
+
+    # Project .venv relative to the frozen exe — check first (most reliable in dev)
+    # exe is at APP/resources/backend/backend.exe, so 4 levels up = repo root
+    exe_path = Path(sys.executable).resolve()
+    for steps_up in (4, 3, 2, 1):
+        parent = exe_path
+        for _ in range(steps_up):
+            parent = parent.parent
+        candidates.append(str(parent / ".venv" / "Scripts" / "python.exe"))
 
     for name in ("python", "python3", "py"):
         found = shutil.which(name)
@@ -51,6 +78,7 @@ def _find_python_with_rembg() -> str | None:
     for ver in ("313", "312", "311", "310", "39"):
         candidates.append(rf"C:\Python{ver}\python.exe")
 
+    clean = _clean_env()
     seen: set[str] = set()
     for exe in candidates:
         if not exe or exe in seen:
@@ -63,6 +91,7 @@ def _find_python_with_rembg() -> str | None:
                 [exe, "-c", "import rembg, onnxruntime"],
                 capture_output=True,
                 timeout=15,
+                env=clean,
             )
             if r.returncode == 0:
                 _PYTHON_EXE_CACHE = exe
@@ -112,6 +141,7 @@ def _remove_background_subprocess(
         capture_output=True,
         text=True,
         timeout=120,
+        env=_clean_env(),
     )
 
     if result.returncode != 0 or not os.path.isfile(dst_path):
@@ -253,40 +283,34 @@ def _remove_background(
     dst_path: str,
     preserve_metadata: bool = True,
 ) -> None:
-    # When running inside a PyInstaller bundle, onnxruntime native DLLs may not
-    # be loadable — delegate to the system Python which has them properly installed.
     if getattr(sys, "frozen", False):
+        # Frozen: onnxruntime DLLs can't load inside the PyInstaller bundle —
+        # always delegate to the system Python subprocess.
         _remove_background_subprocess(src_path, dst_path, preserve_metadata)
         return
 
+    # Non-frozen: try in-process first (fastest path — no subprocess overhead).
+    # If onnxruntime fails to create a session (e.g. DLL conflict with the Flask
+    # process), fall back to the subprocess which runs in full isolation.
     try:
         from PIL import Image
-    except ImportError:
-        raise RuntimeError(
-            "Pillow is not installed in the Python used by the backend. "
-            "Open a terminal and run:  pip install Pillow"
-        )
-    try:
         from rembg import remove
-    except ImportError:
-        raise RuntimeError(
-            "rembg is not installed. "
-            "Open a terminal and run:  pip install rembg"
-        )
+        img = Image.open(src_path)
+        output = remove(img)
+        save_kwargs: dict = {}
+        if preserve_metadata:
+            try:
+                exif_bytes = img.info.get("exif")
+                if exif_bytes:
+                    save_kwargs["exif"] = exif_bytes
+            except Exception:
+                pass
+        output.save(dst_path, format="PNG", **save_kwargs)
+        return
+    except Exception:
+        pass  # In-process failed — fall through to subprocess
 
-    img = Image.open(src_path)
-    output = remove(img)
-
-    save_kwargs: dict = {}
-    if preserve_metadata:
-        try:
-            exif_bytes = img.info.get("exif")
-            if exif_bytes:
-                save_kwargs["exif"] = exif_bytes
-        except Exception:
-            pass
-
-    output.save(dst_path, format="PNG", **save_kwargs)
+    _remove_background_subprocess(src_path, dst_path, preserve_metadata)
 
 
 def _unique_path(path: str) -> str:

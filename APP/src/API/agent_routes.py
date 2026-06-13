@@ -51,8 +51,6 @@ def _agent_headers(cfg: dict) -> dict:
     return {"X-API-Key": cfg["api_key"], "Content-Type": "application/json"}
 
 
-
-
 def _build_tool_list() -> list[dict]:
     try:
         from API.tools_routes import _TOOLS
